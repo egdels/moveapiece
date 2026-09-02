@@ -1,1 +1,1 @@
-Offline-Schach gegen Stockfish – ohne Konten, ohne Internet
+Offline-Schach gegen Stockfish, optional mit echtem DGT-Pegasus-Brett

@@ -2,6 +2,10 @@ MoveAPiece ist eine native Android-Schach-App, die gegen eine lokal
 mitgelieferte Stockfish-Engine spielt – vollständig offline, ohne
 Konten, ohne Netzwerkzugriff und ohne proprietäre Dienste.
 
+Optional lässt sich MoveAPiece per Bluetooth LE mit einem physischen
+DGT-Pegasus-Schachbrett verbinden, sodass gegen Stockfish auf einem
+echten Brett statt am Bildschirm gespielt werden kann.
+
 Funktionen:
 
 * Lokales Spiel: Mensch gegen Mensch oder Mensch gegen Stockfish
@@ -20,5 +24,9 @@ Funktionen:
 * Hoch- und Querformat
 * Verfügbar auf Deutsch, Englisch, Französisch, Spanisch, Italienisch und
   Niederländisch
+* Unterstützung für physische Bretter (DGT Pegasus, BLE): Züge auf dem
+  Brett werden automatisch erkannt und übernommen, Stockfishs Antworten
+  werden über LEDs auf dem Brett angezeigt. Die Bedienung per Fingertipp
+  auf dem Bildschirm bleibt dabei jederzeit vollständig nutzbar.
 
 MoveAPiece ist unter der GPLv3 lizenziert.
