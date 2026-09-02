@@ -1,0 +1,105 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'de.schliweb.moveapiece'
+    compileSdk 36
+    // Reproducibility requirement: pin build-tools explicitly, never let
+    // AGP pick an implicit default that could differ between machines/CI
+    // depending on what's installed.
+    buildToolsVersion "36.1.0"
+    ndkVersion "28.0.13004108"
+
+    defaultConfig {
+        applicationId "de.schliweb.moveapiece"
+        // Kept at 26 (not lowered to 24) in anticipation of re-adding physical
+        // DGT Pegasus board support (BLE) once the manufacturer has responded;
+        // that integration's transport needs the modern BLE scan APIs, which
+        // require API 26+.
+        minSdk 26
+        targetSdk 36
+        versionCode 1
+        versionName "0.1.0"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+
+        // Only the ABIs we actually build Stockfish for (see stockfish.gradle).
+        ndk {
+            abiFilters "arm64-v8a", "armeabi-v7a", "x86_64"
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            // Deterministic-build hygiene: strip VCS metadata so the APK does not
+            // depend on checkout details (dirty state, remote URL, etc.) that could
+            // differ between our CI and the F-Droid build server.
+            vcsInfo {
+                include false
+            }
+        }
+        debug {
+            vcsInfo {
+                include false
+            }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    buildFeatures {
+        viewBinding true
+    }
+
+    // Native Stockfish binary is built by a dedicated task (see stockfish.gradle)
+    // and placed directly under src/main/jniLibs/<abi>/libstockfish.so, packaged
+    // like a normal native library so Android grants it execute permission.
+    sourceSets {
+        main {
+            jniLibs.srcDirs = ['src/main/jniLibs']
+        }
+    }
+
+    packagingOptions {
+        jniLibs {
+            // Reproducibility requirement: do not let Gradle strip native
+            // libraries, since re-stripping is not guaranteed to be
+            // byte-for-byte deterministic across toolchain/host differences.
+            useLegacyPackaging = true
+        }
+        doNotStrip '**/*.so'
+    }
+
+    dependenciesInfo {
+        // Do not embed the Play Store signing/dependency block; irrelevant
+        // outside Play and it is one more non-essential source of variance.
+        includeInApk = false
+        includeInBundle = false
+    }
+
+    lint {
+        abortOnError = true
+    }
+}
+
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.8.0'
+    implementation 'com.google.android.material:material:1.14.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.2.2'
+    implementation 'com.github.bhlangonijr:chesslib:1.3.7'
+    // Platform-agnostic chess/engine/opening-trainer logic shared with the
+    // desktop app; see :core and its build.gradle.
+    implementation project(':core')
+
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.3.0'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.7.0'
+}
+
+apply from: 'stockfish.gradle'

@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="menu_new_game">Nuova partita</string>
+    <string name="menu_undo">Annulla mossa</string>
+    <string name="menu_flip_board">Ruota scacchiera</string>
+    <string name="menu_opening_library">Libreria delle aperture</string>
+    <string name="menu_opponent">Avversario</string>
+
+    <string name="dialog_new_game_title">Nuova partita</string>
+    <string name="opponent_human">Umano (2 giocatori)</string>
+    <string name="opponent_engine">Stockfish</string>
+    <string name="opponent_training">Allenamento aperture</string>
+    <string name="dialog_color_title">Scegli il colore</string>
+    <string name="color_white">Bianco</string>
+    <string name="color_black">Nero</string>
+    <string name="dialog_opening_title">Apertura</string>
+    <string name="dialog_training_hint_checkbox">Mostra suggerimento mossa</string>
+
+    <string name="dialog_strength_format">Forza di gioco di Stockfish (Elo): %1$d</string>
+    <string name="status_engine_strength_format">Stockfish (Elo %1$d)</string>
+
+    <string name="status_white_to_move">Muove il Bianco</string>
+    <string name="status_black_to_move">Muove il Nero</string>
+    <string name="status_engine_thinking">Stockfish sta pensando…</string>
+    <string name="status_training_auto_move">Mossa in corso…</string>
+    <string name="status_training_progress_format">%1$s – mossa %2$d di %3$d</string>
+    <string name="status_checkmate_white">Scacco matto – vince il Bianco</string>
+    <string name="status_checkmate_black">Scacco matto – vince il Nero</string>
+    <string name="status_stalemate">Stallo – patta</string>
+    <string name="status_draw">Patta</string>
+    <string name="status_check">Scacco!</string>
+    <string name="status_engine_unavailable">Motore Stockfish non disponibile</string>
+
+    <string name="evaluation_toggle_label">Mostra valutazione</string>
+    <string name="evaluation_mate_format">Matto in %1$d (%2$s)</string>
+
+    <string name="action_export_pgn">Esporta PGN</string>
+    <string name="action_import_pgn">Importa PGN</string>
+    <string name="pgn_import_failed">Impossibile leggere il PGN</string>
+    <string name="pgn_import_progress">Importazione PGN in corso…</string>
+    <string name="pgn_select_game_title">Seleziona partita</string>
+
+    <string name="dialog_training_complete_title">Apertura completata</string>
+    <string name="dialog_training_complete_message_format">«%1$s» è terminata.</string>
+    <string name="action_repeat">Ripeti</string>
+    <string name="action_pick_opening">Scegli un\'altra apertura</string>
+    <string name="action_continue_free_play">Continua liberamente</string>
+
+    <string name="cd_chess_board">Scacchiera</string>
+    <string name="move_history_title">Cronologia mosse</string>
+    <string name="promotion_title">Promozione del pedone</string>
+    <string name="promotion_queen">Donna</string>
+    <string name="promotion_rook">Torre</string>
+    <string name="promotion_bishop">Alfiere</string>
+    <string name="promotion_knight">Cavallo</string>
+
+    <string name="action_ok">OK</string>
+    <string name="action_cancel">Annulla</string>
+
+
+    <string name="opening_ruy_lopez">Apertura spagnola (Ruy López)</string>
+    <string name="opening_italian">Partita italiana</string>
+    <string name="opening_sicilian_najdorf">Siciliana, variante Najdorf</string>
+    <string name="opening_queens_gambit_declined">Gambetto di donna rifiutato</string>
+    <string name="opening_kings_indian">Difesa Est-Indiana</string>
+    <string name="opening_french">Difesa francese</string>
+    <string name="opening_caro_kann">Difesa Caro-Kann</string>
+    <string name="opening_english">Apertura inglese</string>
+    <string name="opening_scandinavian">Difesa scandinava</string>
+    <string name="opening_slav">Difesa slava</string>
+    <string name="opening_nimzo_indian">Difesa nimzo-indiana</string>
+    <string name="opening_gruenfeld">Difesa Grünfeld</string>
+    <string name="opening_scotch">Partita scozzese</string>
+    <string name="opening_pirc">Difesa Pirc</string>
+    <string name="opening_london">Sistema Londra</string>
+    <string name="opening_vienna">Partita viennese</string>
+    <string name="opening_kings_gambit">Gambetto di Re</string>
+    <string name="opening_benoni">Benoni moderna</string>
+    <string name="opening_catalan">Apertura catalana</string>
+    <string name="opening_trompowsky">Attacco Trompowsky</string>
+
+    <string name="opening_library_title">Libreria delle aperture</string>
+    <string name="opening_library_search_hint">Cerca aperture</string>
+    <string name="opening_library_empty">Nessuna apertura trovata</string>
+    <string name="opening_preview_progress_format">Mossa %1$d di %2$d</string>
+    <string name="action_previous_move">Precedente</string>
+    <string name="action_next_move">Successiva</string>
+</resources>

@@ -1,0 +1,24 @@
+MoveAPiece ist eine native Android-Schach-App, die gegen eine lokal
+mitgelieferte Stockfish-Engine spielt – vollständig offline, ohne
+Konten, ohne Netzwerkzugriff und ohne proprietäre Dienste.
+
+Funktionen:
+
+* Lokales Spiel: Mensch gegen Mensch oder Mensch gegen Stockfish
+* Eröffnungstraining: feste Linien aus einer eingebauten Bibliothek von 20
+  bekannten Eröffnungen üben
+* Einstellbare Stockfish-Spielstärke (UCI_LimitStrength / UCI_Elo,
+  1320–3190)
+* Zugverlauf in algebraischer Notation, Zug zurücknehmen
+* Bewertungsanzeige: zeigt optional Stockfishs Einschätzung der aktuellen
+  Stellung an (ein-/ausschaltbar)
+* PGN-Import/-Export: Partien über den Teilen-Dialog exportieren oder aus
+  einer PGN-Datei laden und weiterspielen
+* Erkennung von Schach, Schachmatt, Patt und Remis (Stellungswiederholung,
+  50-Züge-Regel, unzureichendes Material)
+* Zug-, Schlag- und Schach-Soundeffekte
+* Hoch- und Querformat
+* Verfügbar auf Deutsch, Englisch, Französisch, Spanisch, Italienisch und
+  Niederländisch
+
+MoveAPiece ist unter der GPLv3 lizenziert.

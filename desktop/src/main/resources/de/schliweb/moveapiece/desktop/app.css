@@ -1,0 +1,226 @@
+/*
+ * Visual theme for the desktop app: the Android app's actual Material 3
+ * brand colors (see app/src/main/res/values/colors.xml and themes.xml -
+ * brand_primary #2E7D32, brand_primary_dark #1B5E20, brand_secondary
+ * #8D6E63), applied to plain JavaFX controls so the two apps read as the
+ * same product instead of a default-Modena-styled prototype. Light theme
+ * only for now, matching the light half of Android's Material3.DayNight.
+ */
+
+.root {
+    -primary: #2E7D32;
+    -primary-dark: #1B5E20;
+    -primary-light: #E8F5E9;
+    -secondary: #8D6E63;
+    -on-primary: white;
+    -surface: white;
+    -bg: #F3F3F0;
+    -text: #212121;
+    -text-muted: #6B6B6B;
+    -border: #DDDDDD;
+    -danger: #C62828;
+
+    -fx-font-family: "Helvetica Neue", "Segoe UI", Arial, sans-serif;
+    -fx-font-size: 13px;
+    -fx-background-color: -bg;
+    -fx-text-fill: -text;
+}
+
+.label {
+    -fx-text-fill: -text;
+}
+
+.section-label {
+    -fx-font-weight: bold;
+    -fx-font-size: 12px;
+    -fx-text-fill: -text-muted;
+}
+
+/* ---- buttons ------------------------------------------------------- */
+
+.button {
+    -fx-background-color: -surface;
+    -fx-text-fill: -text;
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+    -fx-border-color: -border;
+    -fx-border-width: 1;
+    -fx-background-insets: 0;
+    -fx-padding: 6 14 6 14;
+    -fx-cursor: hand;
+}
+
+.button:hover {
+    -fx-background-color: derive(-surface, -6%);
+}
+
+.button:armed {
+    -fx-background-color: derive(-surface, -12%);
+}
+
+.button:default, .button-primary {
+    -fx-background-color: -primary;
+    -fx-text-fill: -on-primary;
+    -fx-border-width: 0;
+    -fx-font-weight: bold;
+}
+
+.button:default:hover, .button-primary:hover {
+    -fx-background-color: -primary-dark;
+}
+
+.icon-button {
+    -fx-background-color: transparent;
+    -fx-border-color: -border;
+    -fx-background-radius: 20;
+    -fx-border-radius: 20;
+    -fx-padding: 6;
+    -fx-min-width: 36;
+    -fx-min-height: 36;
+    -fx-max-width: 36;
+    -fx-max-height: 36;
+    -fx-alignment: center;
+}
+
+.icon-button:hover {
+    -fx-background-color: -primary-light;
+    -fx-border-color: -primary;
+}
+
+.icon-button .icon-shape {
+    -fx-fill: -text;
+}
+
+.icon-button:hover .icon-shape {
+    -fx-fill: -primary-dark;
+}
+
+/* ---- radio / check boxes, accented with the brand green ------------ */
+
+.radio-button:selected > .radio > .dot {
+    -fx-background-color: -primary;
+}
+
+.check-box:selected > .box {
+    -fx-background-color: -primary;
+    -fx-border-color: -primary;
+}
+
+.check-box:selected > .box > .mark {
+    -fx-background-color: white;
+}
+
+/* ---- slider ---------------------------------------------------------*/
+
+.slider .track {
+    -fx-background-color: -border;
+    -fx-background-radius: 3;
+}
+
+.slider .thumb {
+    -fx-background-color: -primary;
+}
+
+/* ---- text inputs / lists --------------------------------------------*/
+
+.text-field, .text-area, .list-view, .combo-box {
+    -fx-background-color: -surface;
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+    -fx-border-color: -border;
+    -fx-border-width: 1;
+}
+
+.text-area .content {
+    -fx-background-color: -surface;
+    -fx-background-radius: 6;
+}
+
+.move-list {
+    -fx-font-family: "Menlo", "Consolas", monospace;
+    -fx-font-size: 12px;
+}
+
+.list-cell:filled:selected {
+    -fx-background-color: -primary-light;
+    -fx-text-fill: -primary-dark;
+}
+
+/* ---- surfaces (board, sidebar, and dialog content as elevated cards) */
+
+.card {
+    -fx-background-color: -surface;
+    -fx-background-radius: 14;
+    -fx-padding: 16;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.15), 10, 0, 0, 3);
+}
+
+.board-holder {
+    -fx-padding: 14;
+}
+
+.sidebar {
+    -fx-padding: 18;
+    -fx-font-size: 15px;
+}
+
+/* ---- status / progress text ------------------------------------------*/
+
+.status-label {
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+}
+
+.status-label.check {
+    -fx-text-fill: -danger;
+}
+
+.status-label.gameover {
+    -fx-text-fill: -primary-dark;
+}
+
+.training-progress-label {
+    -fx-text-fill: -secondary;
+    -fx-font-style: italic;
+}
+
+/* ---- dialogs ----------------------------------------------------------*/
+
+.dialog-pane {
+    -fx-background-color: -surface;
+}
+
+.dialog-pane > .header-panel {
+    -fx-background-color: -primary-light;
+}
+
+.dialog-pane > .button-bar > .container > .button {
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+}
+
+.dialog-pane:header .header-panel .label {
+    -fx-text-fill: -primary-dark;
+    -fx-font-weight: bold;
+}
+
+/*
+ * Modena's own ".content.label" rule (2-class specificity) otherwise wins
+ * over a plain ".label" rule from this stylesheet, leaving Alert/Dialog/
+ * ChoiceDialog body text in Modena's muted default gray - match its
+ * specificity here to actually override it.
+ */
+.dialog-pane > .content.label,
+.dialog-pane .content.label,
+.dialog-pane .content {
+    -fx-text-fill: -text;
+    -fx-font-weight: 600;
+    -fx-font-size: 14px;
+}
+
+.dialog-pane .label,
+.dialog-pane .radio-button,
+.dialog-pane .check-box {
+    -fx-text-fill: -text;
+    -fx-font-weight: 600;
+}

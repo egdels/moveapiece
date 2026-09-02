@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="menu_new_game">Nieuw spel</string>
+    <string name="menu_undo">Zet terugnemen</string>
+    <string name="menu_flip_board">Bord draaien</string>
+    <string name="menu_opening_library">Openingsbibliotheek</string>
+    <string name="menu_opponent">Tegenstander</string>
+
+    <string name="dialog_new_game_title">Nieuw spel</string>
+    <string name="opponent_human">Mens (2 spelers)</string>
+    <string name="opponent_engine">Stockfish</string>
+    <string name="opponent_training">Openingstraining</string>
+    <string name="dialog_color_title">Kies kleur</string>
+    <string name="color_white">Wit</string>
+    <string name="color_black">Zwart</string>
+    <string name="dialog_opening_title">Opening</string>
+    <string name="dialog_training_hint_checkbox">Zetsuggestie tonen</string>
+
+    <string name="dialog_strength_format">Speelsterkte Stockfish (Elo): %1$d</string>
+    <string name="status_engine_strength_format">Stockfish (Elo %1$d)</string>
+
+    <string name="status_white_to_move">Wit aan zet</string>
+    <string name="status_black_to_move">Zwart aan zet</string>
+    <string name="status_engine_thinking">Stockfish denkt na…</string>
+    <string name="status_training_auto_move">Zet wordt uitgevoerd…</string>
+    <string name="status_training_progress_format">%1$s – zet %2$d van %3$d</string>
+    <string name="status_checkmate_white">Schaakmat – Wit wint</string>
+    <string name="status_checkmate_black">Schaakmat – Zwart wint</string>
+    <string name="status_stalemate">Pat – remise</string>
+    <string name="status_draw">Remise</string>
+    <string name="status_check">Schaak!</string>
+    <string name="status_engine_unavailable">Stockfish-engine niet beschikbaar</string>
+
+    <string name="evaluation_toggle_label">Waardering tonen</string>
+    <string name="evaluation_mate_format">Mat in %1$d (%2$s)</string>
+
+    <string name="action_export_pgn">PGN exporteren</string>
+    <string name="action_import_pgn">PGN importeren</string>
+    <string name="pgn_import_failed">PGN kon niet worden gelezen</string>
+    <string name="pgn_import_progress">PGN wordt geïmporteerd…</string>
+    <string name="pgn_select_game_title">Partij selecteren</string>
+
+    <string name="dialog_training_complete_title">Opening voltooid</string>
+    <string name="dialog_training_complete_message_format">‘%1$s’ is voltooid.</string>
+    <string name="action_repeat">Herhalen</string>
+    <string name="action_pick_opening">Andere opening</string>
+    <string name="action_continue_free_play">Vrij verdergaan</string>
+
+    <string name="cd_chess_board">Schaakbord</string>
+    <string name="move_history_title">Zetgeschiedenis</string>
+    <string name="promotion_title">Promotie</string>
+    <string name="promotion_queen">Dame</string>
+    <string name="promotion_rook">Toren</string>
+    <string name="promotion_bishop">Loper</string>
+    <string name="promotion_knight">Paard</string>
+
+    <string name="action_ok">OK</string>
+    <string name="action_cancel">Annuleren</string>
+
+
+    <string name="opening_ruy_lopez">Spaans (Ruy Lopez)</string>
+    <string name="opening_italian">Italiaanse partij</string>
+    <string name="opening_sicilian_najdorf">Siciliaans, Najdorfvariant</string>
+    <string name="opening_queens_gambit_declined">Damegambiet, afgeslagen</string>
+    <string name="opening_kings_indian">Koningsindisch</string>
+    <string name="opening_french">Frans</string>
+    <string name="opening_caro_kann">Caro-Kann</string>
+    <string name="opening_english">Engels</string>
+    <string name="opening_scandinavian">Scandinavisch</string>
+    <string name="opening_slav">Slavisch</string>
+    <string name="opening_nimzo_indian">Nimzo-Indisch</string>
+    <string name="opening_gruenfeld">Grünfeld-Indisch</string>
+    <string name="opening_scotch">Schots</string>
+    <string name="opening_pirc">Pirc</string>
+    <string name="opening_london">Londen-systeem</string>
+    <string name="opening_vienna">Weens</string>
+    <string name="opening_kings_gambit">Koningsgambiet</string>
+    <string name="opening_benoni">Modern Benoni</string>
+    <string name="opening_catalan">Catalaans</string>
+    <string name="opening_trompowsky">Trompowsky-aanval</string>
+
+    <string name="opening_library_title">Openingsbibliotheek</string>
+    <string name="opening_library_search_hint">Openingen zoeken</string>
+    <string name="opening_library_empty">Geen openingen gevonden</string>
+    <string name="opening_preview_progress_format">Zet %1$d van %2$d</string>
+    <string name="action_previous_move">Vorige</string>
+    <string name="action_next_move">Volgende</string>
+</resources>

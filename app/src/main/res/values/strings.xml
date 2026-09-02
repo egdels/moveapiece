@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name" translatable="false">MoveAPiece</string>
+
+    <string name="menu_new_game">New Game</string>
+    <string name="menu_undo">Undo Move</string>
+    <string name="menu_flip_board">Flip Board</string>
+    <string name="menu_opening_library">Opening Library</string>
+    <string name="menu_opponent">Opponent</string>
+
+    <string name="dialog_new_game_title">New Game</string>
+    <string name="opponent_human">Human (2 Players)</string>
+    <string name="opponent_engine">Stockfish</string>
+    <string name="opponent_training">Opening Trainer</string>
+    <string name="dialog_color_title">Choose Color</string>
+    <string name="color_white">White</string>
+    <string name="color_black">Black</string>
+    <string name="dialog_opening_title">Opening</string>
+    <string name="dialog_training_hint_checkbox">Show move hint</string>
+
+    <string name="dialog_strength_format">Stockfish playing strength (Elo): %1$d</string>
+    <string name="status_engine_strength_format">Stockfish (Elo %1$d)</string>
+
+    <string name="status_white_to_move">White to move</string>
+    <string name="status_black_to_move">Black to move</string>
+    <string name="status_engine_thinking">Stockfish is thinking…</string>
+    <string name="status_training_auto_move">Playing move…</string>
+    <string name="status_training_progress_format">%1$s – move %2$d of %3$d</string>
+    <string name="status_checkmate_white">Checkmate – White wins</string>
+    <string name="status_checkmate_black">Checkmate – Black wins</string>
+    <string name="status_stalemate">Stalemate – draw</string>
+    <string name="status_draw">Draw</string>
+    <string name="status_check">Check!</string>
+    <string name="status_engine_unavailable">Stockfish engine unavailable</string>
+
+    <string name="evaluation_toggle_label">Show evaluation</string>
+    <string name="evaluation_mate_format">Mate in %1$d (%2$s)</string>
+
+    <string name="action_export_pgn">Export PGN</string>
+    <string name="action_import_pgn">Import PGN</string>
+    <string name="pgn_import_failed">Could not read PGN</string>
+    <string name="pgn_import_progress">Importing PGN…</string>
+    <string name="pgn_select_game_title">Select Game</string>
+
+    <string name="dialog_training_complete_title">Opening complete</string>
+    <string name="dialog_training_complete_message_format">“%1$s” is complete.</string>
+    <string name="action_repeat">Repeat</string>
+    <string name="action_pick_opening">Choose Another Opening</string>
+    <string name="action_continue_free_play">Continue Freely</string>
+
+    <string name="cd_chess_board">Chessboard</string>
+    <string name="move_history_title">Move History</string>
+    <string name="promotion_title">Pawn Promotion</string>
+    <string name="promotion_queen">Queen</string>
+    <string name="promotion_rook">Rook</string>
+    <string name="promotion_bishop">Bishop</string>
+    <string name="promotion_knight">Knight</string>
+
+    <string name="action_ok">OK</string>
+    <string name="action_cancel">Cancel</string>
+
+
+    <string name="opening_ruy_lopez">Ruy Lopez (Spanish Opening)</string>
+    <string name="opening_italian">Italian Game</string>
+    <string name="opening_sicilian_najdorf">Sicilian Defense, Najdorf Variation</string>
+    <string name="opening_queens_gambit_declined">Queen\'s Gambit Declined</string>
+    <string name="opening_kings_indian">King\'s Indian Defense</string>
+    <string name="opening_french">French Defense</string>
+    <string name="opening_caro_kann">Caro-Kann Defense</string>
+    <string name="opening_english">English Opening</string>
+    <string name="opening_scandinavian">Scandinavian Defense</string>
+    <string name="opening_slav">Slav Defense</string>
+    <string name="opening_nimzo_indian">Nimzo-Indian Defense</string>
+    <string name="opening_gruenfeld">Grünfeld Defense</string>
+    <string name="opening_scotch">Scotch Game</string>
+    <string name="opening_pirc">Pirc Defense</string>
+    <string name="opening_london">London System</string>
+    <string name="opening_vienna">Vienna Game</string>
+    <string name="opening_kings_gambit">King\'s Gambit</string>
+    <string name="opening_benoni">Modern Benoni Defense</string>
+    <string name="opening_catalan">Catalan Opening</string>
+    <string name="opening_trompowsky">Trompowsky Attack</string>
+
+    <string name="opening_library_title">Opening Library</string>
+    <string name="opening_library_search_hint">Search openings</string>
+    <string name="opening_library_empty">No openings found</string>
+    <string name="opening_preview_progress_format">Move %1$d of %2$d</string>
+    <string name="action_previous_move">Previous</string>
+    <string name="action_next_move">Next</string>
+</resources>

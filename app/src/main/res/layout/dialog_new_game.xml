@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ScrollView wrapper: in landscape the dialog's available height can be
+     shorter than this form's content (see MainActivity#showNewGameDialog,
+     a plain MaterialAlertDialogBuilder#setView with no scrolling of its
+     own) - without it, the bottom fields get silently clipped instead of
+     reachable. -->
+<ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+<androidx.constraintlayout.widget.ConstraintLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingStart="24dp"
+    android:paddingEnd="24dp"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp">
+
+    <TextView
+        android:id="@+id/opponentLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/menu_opponent"
+        android:textAppearance="?attr/textAppearanceLabelLarge"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <!-- RadioGroup must stay a RadioGroup (a LinearLayout subclass) for its
+         built-in mutual-exclusivity behavior; only the outer form container
+         here is ConstraintLayout. -->
+    <RadioGroup
+        android:id="@+id/opponentGroup"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toBottomOf="@id/opponentLabel"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <RadioButton
+            android:id="@+id/opponentHuman"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/opponent_human" />
+
+        <RadioButton
+            android:id="@+id/opponentEngine"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:checked="true"
+            android:text="@string/opponent_engine" />
+
+        <RadioButton
+            android:id="@+id/opponentTraining"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/opponent_training" />
+    </RadioGroup>
+
+    <TextView
+        android:id="@+id/colorLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="@string/dialog_color_title"
+        android:textAppearance="?attr/textAppearanceLabelLarge"
+        app:layout_constraintTop_toBottomOf="@id/opponentGroup"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <RadioGroup
+        android:id="@+id/colorGroup"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        app:layout_constraintTop_toBottomOf="@id/colorLabel"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <RadioButton
+            android:id="@+id/colorWhite"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="24dp"
+            android:checked="true"
+            android:text="@string/color_white" />
+
+        <RadioButton
+            android:id="@+id/colorBlack"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/color_black" />
+    </RadioGroup>
+
+    <TextView
+        android:id="@+id/strengthLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:textAppearance="?attr/textAppearanceLabelLarge"
+        tools:text="Elo: 1500"
+        app:layout_constraintTop_toBottomOf="@id/colorGroup"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <SeekBar
+        android:id="@+id/strengthSeekBar"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:max="1870"
+        android:progress="180"
+        app:layout_constraintTop_toBottomOf="@id/strengthLabel"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <TextView
+        android:id="@+id/openingLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="@string/dialog_opening_title"
+        android:textAppearance="?attr/textAppearanceLabelLarge"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/colorGroup"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <Spinner
+        android:id="@+id/openingSpinner"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/openingLabel"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <CheckBox
+        android:id="@+id/hintCheckBox"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:checked="true"
+        android:text="@string/dialog_training_hint_checkbox"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/openingSpinner"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>
+</ScrollView>

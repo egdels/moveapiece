@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingStart="24dp"
+    android:paddingEnd="24dp"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp">
+
+    <TextView
+        android:id="@+id/opponentLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/menu_opponent"
+        android:textAppearance="?attr/textAppearanceLabelLarge"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <RadioGroup
+        android:id="@+id/opponentGroup"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toBottomOf="@id/opponentLabel"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <RadioButton
+            android:id="@+id/opponentHuman"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:checked="true"
+            android:text="@string/opponent_human" />
+
+        <RadioButton
+            android:id="@+id/opponentEngine"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/opponent_engine" />
+    </RadioGroup>
+
+    <TextView
+        android:id="@+id/strengthLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:textAppearance="?attr/textAppearanceLabelLarge"
+        android:visibility="gone"
+        tools:text="Elo: 1500"
+        app:layout_constraintTop_toBottomOf="@id/opponentGroup"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <SeekBar
+        android:id="@+id/strengthSeekBar"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:max="1870"
+        android:progress="180"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/strengthLabel"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

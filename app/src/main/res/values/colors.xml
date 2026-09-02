@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="board_light">#F0D9B5</color>
+    <color name="board_dark">#B58863</color>
+    <color name="board_selected">#F6F669</color>
+    <color name="board_legal_move">#8A6DC46E</color>
+    <color name="board_last_move">#A6CCCC33</color>
+    <color name="board_check">#E0553030</color>
+    <color name="board_training_hint">#A63399CC</color>
+
+    <color name="brand_primary">#2E7D32</color>
+    <color name="brand_primary_dark">#1B5E20</color>
+    <color name="brand_secondary">#8D6E63</color>
+</resources>

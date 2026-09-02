@@ -1,0 +1,210 @@
+name: Build
+
+# Reproducibility self-test: builds the debug APK twice, on two independent
+# GitHub-hosted runners, and fails the workflow if the resulting APKs are
+# not byte-for-byte identical. This is a pre-submission sanity check only;
+# it does not replace F-Droid's own reproducible-build verification against
+# the fdroiddata metadata.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+env:
+  NDK_VERSION: "28.0.13004108"
+  BUILD_TOOLS_VERSION: "36.1.0"
+  PLATFORM_VERSION: "android-36"
+
+jobs:
+  code-quality:
+    name: Code quality (Spotless + Lint)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install pinned SDK components
+        run: sdkmanager --install "platforms;${PLATFORM_VERSION}" "build-tools;${BUILD_TOOLS_VERSION}" "ndk;${NDK_VERSION}"
+
+      - name: Check formatting (Spotless)
+        run: ./gradlew --no-daemon spotlessCheck
+
+      - name: Android Lint
+        run: ./gradlew --no-daemon :app:lintDebug
+
+      - name: Upload lint report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-results
+          path: app/build/reports/lint-results-debug.html
+
+  unit-tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install pinned SDK components
+        run: sdkmanager --install "platforms;${PLATFORM_VERSION}" "build-tools;${BUILD_TOOLS_VERSION}" "ndk;${NDK_VERSION}"
+
+      - name: Run JVM unit tests
+        run: ./gradlew --no-daemon :app:testDebugUnitTest
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-results
+          path: app/build/test-results/testDebugUnitTest
+
+  instrumented-tests:
+    name: Instrumented tests (emulator)
+    # StockfishEngine (real subprocess + Handler/Looper) and BoardView (real
+    # View measure/layout/touch, resources, BitmapFactory) can't be tested
+    # on the plain JVM; app/src/androidTest runs them on an emulator.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install pinned SDK components
+        run: sdkmanager --install "platforms;${PLATFORM_VERSION}" "build-tools;${BUILD_TOOLS_VERSION}" "ndk;${NDK_VERSION}"
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run instrumented tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: default
+          profile: pixel_6
+          disable-animations: true
+          script: ./gradlew --no-daemon :app:connectedDebugAndroidTest
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: instrumented-test-results
+          path: |
+            app/build/outputs/androidTest-results
+            app/build/reports/androidTests
+
+  build-a:
+    name: Build A (independent runner)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install pinned SDK components
+        run: sdkmanager --install "platforms;${PLATFORM_VERSION}" "build-tools;${BUILD_TOOLS_VERSION}" "ndk;${NDK_VERSION}"
+
+      - name: Build debug APK
+        run: ./gradlew --no-daemon :app:assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-a
+          path: app/build/outputs/apk/debug/app-debug.apk
+
+  build-b:
+    name: Build B (independent runner)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install pinned SDK components
+        run: sdkmanager --install "platforms;${PLATFORM_VERSION}" "build-tools;${BUILD_TOOLS_VERSION}" "ndk;${NDK_VERSION}"
+
+      - name: Build debug APK
+        run: ./gradlew --no-daemon :app:assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-b
+          path: app/build/outputs/apk/debug/app-debug.apk
+
+  compare:
+    name: Compare build hashes
+    needs: [build-a, build-b]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: app-debug-a
+          path: build-a
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: app-debug-b
+          path: build-b
+
+      - name: Compare SHA-256 hashes
+        run: |
+          HASH_A=$(sha256sum build-a/app-debug.apk | cut -d' ' -f1)
+          HASH_B=$(sha256sum build-b/app-debug.apk | cut -d' ' -f1)
+          echo "Build A: $HASH_A"
+          echo "Build B: $HASH_B"
+          if [ "$HASH_A" != "$HASH_B" ]; then
+            echo "::error::Builds are not reproducible: hashes differ between two independent runners."
+            exit 1
+          fi
+          echo "Builds are bit-identical across independent runners."
+
+      - name: Upload verified APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-verified
+          path: build-a/app-debug.apk

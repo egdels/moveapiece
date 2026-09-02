@@ -1,0 +1,102 @@
+name: Desktop
+
+# Builds and packages the JavaFX desktop app (see desktop/) across OSes and
+# architectures. Unlike build.yml's Android reproducibility check, this is
+# plain build/package verification - desktop has no reproducible-build
+# requirement.
+#
+# macos-latest (Apple Silicon) mirrors what has actually been built and run
+# locally throughout desktop/'s development. macos-15-intel and
+# ubuntu-24.04-arm cover the other arch on each OS at no code cost -
+# desktop/stockfish.gradle's sfArch already branches on the host arch, not
+# just the OS. Every leg besides arm64 Mac (Linux x86-64/arm64, and
+# especially Windows) is effectively a first run: desktop/stockfish.gradle's
+# host-Stockfish build has native-toolchain branches for all of them, but
+# only arm64 Mac had a real machine to verify against before this workflow
+# existed - see that file's header comment. Treat early failures on the
+# unverified runners as expected teething, not a sign anything else is
+# wrong.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  desktop:
+    name: Build & package (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            shell: bash
+          # ubuntu-latest is x86-64 only; same idea as macos-15-intel below
+          # (desktop/stockfish.gradle's sfArch already branches on the host
+          # arch for Linux too - armv8 vs. x86-64 - no code change needed).
+          - os: ubuntu-24.04-arm
+            shell: bash
+          - os: macos-latest
+            shell: bash
+          # macos-latest is Apple Silicon (arm64); this covers Intel Macs
+          # (desktop/stockfish.gradle's sfArch already branches on
+          # isArm/os.arch, so no code change was needed - just the runner).
+          - os: macos-15-intel
+            shell: bash
+          - os: windows-latest
+            # Stockfish's Makefile needs a real MinGW toolchain (COMP=mingw)
+            # to build a native Windows binary - the default windows-latest
+            # runner has no C/C++ compiler at all, so one is installed below
+            # via MSYS2 and every subsequent command runs inside its shell
+            # so make/g++/xz resolve on PATH.
+            shell: 'msys2 {0}'
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up MinGW toolchain (Windows)
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          install: mingw-w64-x86_64-toolchain make xz
+          path-type: inherit
+
+      - name: Install build tools (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y build-essential xz-utils
+
+      - name: Install build tools (macOS)
+        if: runner.os == 'macOS'
+        run: brew install xz
+
+      - name: Run core unit tests
+        run: ./gradlew --no-daemon :core:test
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-core-test-results-${{ matrix.os }}
+          path: core/build/test-results/test
+
+      - name: Build desktop app image
+        run: ./gradlew --no-daemon :desktop:jpackageAppImage
+
+      - name: Upload app image
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: moveapiece-desktop-${{ matrix.os }}
+          path: desktop/build/jpackage
+          if-no-files-found: warn

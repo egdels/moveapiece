@@ -1,0 +1,44 @@
+/*
+ * Copyright (C) 2026 Christian Kierdorf
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
+package de.schliweb.moveapiece.engine;
+
+import java.util.OptionalInt;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * Extracts the {@code score cp}/{@code score mate} fields from a raw UCI "info ..." line ({@link
+ * StockfishEngine} forwards these unparsed via {@link EngineListener#onInfo}). Both scores are
+ * relative to the side that was asked to search, per the UCI spec — converting to an absolute
+ * (White-relative) perspective is the caller's job, since only the caller knows which side that
+ * was.
+ */
+public final class UciInfoParser {
+
+    private static final Pattern SCORE_CP = Pattern.compile("score cp (-?\\d+)");
+    private static final Pattern SCORE_MATE = Pattern.compile("score mate (-?\\d+)");
+
+    private UciInfoParser() {}
+
+    public static OptionalInt parseScoreCp(String infoLine) {
+        return parse(SCORE_CP, infoLine);
+    }
+
+    public static OptionalInt parseScoreMate(String infoLine) {
+        return parse(SCORE_MATE, infoLine);
+    }
+
+    private static OptionalInt parse(Pattern pattern, String infoLine) {
+        if (infoLine == null) {
+            return OptionalInt.empty();
+        }
+        Matcher matcher = pattern.matcher(infoLine);
+        if (!matcher.find()) {
+            return OptionalInt.empty();
+        }
+        return OptionalInt.of(Integer.parseInt(matcher.group(1)));
+    }
+}

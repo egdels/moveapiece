@@ -1,0 +1,5 @@
+/*
+ * Copyright (C) $YEAR Christian Kierdorf
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+

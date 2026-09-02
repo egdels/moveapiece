@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp">
+
+    <ImageButton
+        android:id="@+id/promotionQueen"
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:layout_margin="4dp"
+        android:padding="6dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:scaleType="fitCenter"
+        android:contentDescription="@string/promotion_queen" />
+
+    <ImageButton
+        android:id="@+id/promotionRook"
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:layout_margin="4dp"
+        android:padding="6dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:scaleType="fitCenter"
+        android:contentDescription="@string/promotion_rook" />
+
+    <ImageButton
+        android:id="@+id/promotionBishop"
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:layout_margin="4dp"
+        android:padding="6dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:scaleType="fitCenter"
+        android:contentDescription="@string/promotion_bishop" />
+
+    <ImageButton
+        android:id="@+id/promotionKnight"
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:layout_margin="4dp"
+        android:padding="6dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:scaleType="fitCenter"
+        android:contentDescription="@string/promotion_knight" />
+
+</LinearLayout>

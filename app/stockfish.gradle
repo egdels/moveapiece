@@ -1,0 +1,284 @@
+/*
+ * Builds the Stockfish UCI engine binary from the pinned git submodule
+ * (app/src/main/cpp/stockfish, fixed at tag sf_18) using Stockfish's own
+ * Makefile via the Android NDK, and installs it as a prebuilt "native
+ * library" (libstockfish.so) so the APK packager grants it execute
+ * permission on-device (Android blocks executing arbitrary files written
+ * to app-private storage on API 29+, but files shipped as jniLibs are
+ * extracted with the same handling as real .so files).
+ *
+ * NNUE networks are built with NNUE_EMBEDDING_OFF: by default Stockfish
+ * embeds both eval networks (~112 MB combined) directly into the linked
+ * binary via incbin, which would triple that weight across our three ABI
+ * binaries. Instead we compile them out and ship the two network files
+ * once as APK assets; NnueAssets (Java) extracts them to app-private
+ * storage on first run and StockfishEngine points the engine at them via
+ * "setoption name EvalFile/EvalFileSmall value <path>".
+ *
+ * Reproducibility notes:
+ *  - Stockfish source is pinned via git submodule commit, not a branch.
+ *  - NNUE network files ship committed in app/nnue-nets/ (the large one
+ *    xz-compressed, the small one as-is) and are decompressed/copied into
+ *    the build's NNUE cache, verified by SHA-256 before every build; the
+ *    hash is what matters, not the source of the bytes. This makes the
+ *    actual build step network-free, which F-Droid's sandboxed build
+ *    server requires. If the committed files are ever missing or fail
+ *    verification, the task falls back to downloading from Stockfish's
+ *    own mirrors (same SHA-256 check) so local/CI builds keep working.
+ *  - Linker build-id is disabled (-Wl,--build-id=none) so the output does
+ *    not encode a build-path-dependent identifier.
+ *  - Parallelism is fixed (-j4), not derived from nproc.
+ *  - Nothing is stripped: neither by `make strip` (never invoked) nor by
+ *    Gradle's packaging (doNotStrip is set in app/build.gradle).
+ */
+
+def sdkDir = System.getenv('ANDROID_HOME') ?: System.getenv('ANDROID_SDK_ROOT')
+if (!sdkDir) {
+    def localProps = new File(rootDir, 'local.properties')
+    if (localProps.exists()) {
+        def props = new Properties()
+        localProps.withInputStream { props.load(it) }
+        sdkDir = props.getProperty('sdk.dir')
+    }
+}
+def ndkDir = new File(sdkDir, "ndk/${android.ndkVersion}")
+def hostTag = 'darwin-x86_64'
+if (org.gradle.internal.os.OperatingSystem.current().isLinux()) {
+    hostTag = 'linux-x86_64'
+} else if (org.gradle.internal.os.OperatingSystem.current().isWindows()) {
+    hostTag = 'windows-x86_64'
+}
+def toolchainBin = new File(ndkDir, "toolchains/llvm/prebuilt/${hostTag}/bin")
+
+def stockfishSrcDir = file('src/main/cpp/stockfish/src')
+def jniLibsDir = file('src/main/jniLibs')
+
+// Fixed native API level for the Stockfish binary. Stockfish's Makefile
+// hardcodes API 29 NDK wrapper scripts for COMP=ndk; we override via
+// COMPCXX to match the app's minSdk (24) instead.
+def nativeApiLevel = 24
+
+// NNUE evaluation networks required by this exact Stockfish commit
+// (see src/evaluate.h: EvalFileDefaultNameBig / EvalFileDefaultNameSmall).
+// Fetched by fixed URL, verified by SHA-256 -> deterministic input.
+def nnueNets = [
+    [name: 'nn-c288c895ea92.nnue',
+     sha256: 'c288c895ea924429ea9092e3f36b2b3c1f00f2a3a4c759ff7e57e79e3b43e4a7'],
+    [name: 'nn-37f18f62d772.nnue',
+     sha256: '37f18f62d772f3107e1d6aaca3898c130c3c86f2ab63e6555fbbca20635a899d'],
+]
+def nnueCacheDir = layout.buildDirectory.dir('nnue-cache').get().asFile
+
+// Committed copies of the NNUE nets (the large one xz-compressed, the small
+// one as-is) so the build never needs network access for them; see the
+// reproducibility note at the top of this file.
+def committedNnueDir = file('nnue-nets')
+
+def sha256Of = { File f ->
+    def md = java.security.MessageDigest.getInstance('SHA-256')
+    f.withInputStream { is ->
+        byte[] buf = new byte[8192]
+        int n
+        while ((n = is.read(buf)) != -1) {
+            md.update(buf, 0, n)
+        }
+    }
+    md.digest().collect { String.format('%02x', it) }.join()
+}
+
+// Decompresses an xz-compressed NNUE net straight to a file. Uses
+// ProcessBuilder#redirectOutput(File) instead of the runProcess/eachLine
+// helper below: that helper treats the child's stdout as text log lines,
+// which would corrupt binary network data.
+def decompressXz = { File src, File dest ->
+    def pb = new ProcessBuilder(['xz', '-dc', src.absolutePath])
+    pb.redirectOutput(dest)
+    Process proc = pb.start()
+    int exitCode = proc.waitFor()
+    if (exitCode != 0) {
+        throw new GradleException("xz decompression failed for ${src.name} (exit ${exitCode})")
+    }
+}
+
+// Plain java.lang.ProcessBuilder instead of project.exec {}: Gradle 9's task
+// execution model disallows calling back into the (configuration-time) Project
+// instance from inside doLast, so we drive the native `make` invocations
+// ourselves instead of relying on Gradle's Exec support.
+def runProcess = { List<String> cmd, File workDir, Map<String, String> env ->
+    def pb = new ProcessBuilder(cmd.collect { it.toString() })
+    pb.directory(workDir)
+    env.each { k, v -> pb.environment().put(k.toString(), v.toString()) }
+    pb.redirectErrorStream(true)
+    Process proc = pb.start()
+    proc.inputStream.eachLine { logger.lifecycle(it) }
+    int exitCode = proc.waitFor()
+    if (exitCode != 0) {
+        throw new GradleException("Command failed (${exitCode}): ${cmd.join(' ')}")
+    }
+}
+
+tasks.register('downloadNnueNets') {
+    def outFiles = nnueNets.collect { new File(nnueCacheDir, it.name) }
+    outputs.files(outFiles)
+    doLast {
+        nnueCacheDir.mkdirs()
+        nnueNets.each { net ->
+            def dest = new File(nnueCacheDir, net.name)
+            if (dest.exists() && sha256Of(dest) == net.sha256) {
+                return
+            }
+
+            def committedXz = new File(committedNnueDir, "${net.name}.xz")
+            def committedPlain = new File(committedNnueDir, net.name)
+            def preparedFromRepo = false
+            try {
+                if (committedXz.exists()) {
+                    logger.lifecycle("Decompressing committed NNUE net ${net.name} ...")
+                    decompressXz(committedXz, dest)
+                    preparedFromRepo = sha256Of(dest) == net.sha256
+                } else if (committedPlain.exists()) {
+                    dest.bytes = committedPlain.bytes
+                    preparedFromRepo = sha256Of(dest) == net.sha256
+                }
+            } catch (Exception e) {
+                logger.warn("Could not prepare ${net.name} from the committed copy in app/nnue-nets (${e.message}), falling back to download")
+                preparedFromRepo = false
+            }
+            if (preparedFromRepo) {
+                return
+            }
+
+            logger.lifecycle("Downloading NNUE net ${net.name} ...")
+            def urls = [
+                "https://tests.stockfishchess.org/api/nn/${net.name}",
+                "https://data.stockfishchess.org/nn/${net.name}",
+                "https://github.com/official-stockfish/networks/raw/master/${net.name}",
+            ]
+            def ok = false
+            for (url in urls) {
+                try {
+                    dest.withOutputStream { out -> out << new URL(url).newInputStream() }
+                    if (sha256Of(dest) == net.sha256) {
+                        ok = true
+                        break
+                    }
+                } catch (Exception ignored) {
+                    // try next mirror
+                }
+            }
+            if (!ok) {
+                dest.delete()
+                throw new GradleException("Failed to download ${net.name} with matching SHA-256 from any mirror")
+            }
+        }
+    }
+}
+
+// Installs the two NNUE net files once (not per-ABI) as an APK asset dir,
+// picked up at runtime by NnueAssets.java / StockfishEngine.setEvalFiles().
+def nnueAssetsDir = layout.buildDirectory.dir('generated/nnueAssets/nnue').get().asFile
+tasks.register('installNnueAssets') {
+    dependsOn 'downloadNnueNets'
+    inputs.files(nnueNets.collect { new File(nnueCacheDir, it.name) })
+    outputs.dir(nnueAssetsDir)
+    doLast {
+        nnueAssetsDir.mkdirs()
+        nnueNets.each { net ->
+            def src = new File(nnueCacheDir, net.name)
+            def dst = new File(nnueAssetsDir, net.name)
+            dst.bytes = src.bytes
+        }
+    }
+}
+android.sourceSets.main.assets.srcDirs += nnueAssetsDir.parentFile
+
+// abi -> [makeArch, clang++ wrapper name]
+def abiConfigs = [
+    'arm64-v8a'   : ['armv8', "aarch64-linux-android${nativeApiLevel}-clang++"],
+    'armeabi-v7a' : ['armv7', "armv7a-linux-androideabi${nativeApiLevel}-clang++"],
+    'x86_64'      : ['x86-64', "x86_64-linux-android${nativeApiLevel}-clang++"],
+]
+
+def stockfishTasks = []
+abiConfigs.each { abi, cfg ->
+    def (makeArch, clangxx) = cfg
+    def taskName = "buildStockfish_${abi.replace('-', '_')}"
+    def outFile = new File(jniLibsDir, "${abi}/libstockfish.so")
+    def t = tasks.register(taskName) {
+        dependsOn 'downloadNnueNets'
+        inputs.dir(stockfishSrcDir)
+        inputs.property('makeArch', makeArch)
+        inputs.property('clangxx', clangxx)
+        inputs.property('nativeApiLevel', nativeApiLevel)
+        inputs.property('extraCxxFlags', '-DNNUE_EMBEDDING_OFF')
+        inputs.property('extraLdFlags', '-Wl,--build-id=none')
+        outputs.file(outFile)
+
+        doLast {
+            nnueNets.each { net ->
+                def cached = new File(nnueCacheDir, net.name)
+                def target = new File(stockfishSrcDir, net.name)
+                target.bytes = cached.bytes
+            }
+
+            def env = [
+                'PATH': "${toolchainBin.absolutePath}${File.pathSeparator}${System.getenv('PATH')}",
+            ]
+
+            runProcess(['make', 'objclean'], stockfishSrcDir, env)
+            runProcess([
+                    'make',
+                    "ARCH=${makeArch}".toString(),
+                    'OS=Android',
+                    // The Makefile gates several host-toolchain flags (notably
+                    // macOS's -mmacosx-version-min/-arch/-mdynamic-no-pic) on
+                    // $(KERNEL), i.e. the *build* host, not the cross-compile
+                    // target; those are meaningless (and rejected by clang)
+                    // when targeting Android. Forcing KERNEL=Linux here makes
+                    // the build host-independent, matching what a Linux CI
+                    // runner would see natively, without patching the pinned
+                    // upstream submodule.
+                    'KERNEL=Linux',
+                    'COMP=ndk',
+                    "COMPCXX=${clangxx}".toString(),
+                    // Compile out the incbin'd networks (see header comment):
+                    // they are shipped once as APK assets instead of once
+                    // per ABI binary.
+                    'EXTRACXXFLAGS=-DNNUE_EMBEDDING_OFF',
+                    'EXTRALDFLAGS=-Wl,--build-id=none',
+                    '-j', '4',
+                    'build',
+            ], stockfishSrcDir, env)
+
+            def builtExe = new File(stockfishSrcDir, 'stockfish')
+            if (!builtExe.exists()) {
+                throw new GradleException("Stockfish build for ${abi} did not produce an executable")
+            }
+            outFile.parentFile.mkdirs()
+            outFile.bytes = builtExe.bytes
+            outFile.setExecutable(true, false)
+
+            // Leave the shared src/ dir clean so the next ABI's build
+            // cannot silently reuse this ABI's object files.
+            runProcess(['make', 'objclean'], stockfishSrcDir, env)
+        }
+    }
+    stockfishTasks << t
+}
+
+// The three ABI builds share the same Stockfish src/ directory (object
+// files, the linked executable), so they must not run concurrently.
+(1..<stockfishTasks.size()).each { int i ->
+    def current = stockfishTasks[i]
+    def previous = stockfishTasks[i - 1]
+    current.configure { mustRunAfter previous }
+}
+
+tasks.register('buildStockfishAll') {
+    dependsOn stockfishTasks
+}
+
+tasks.matching { it.name == 'preBuild' }.configureEach {
+    dependsOn 'buildStockfishAll'
+    dependsOn 'installNnueAssets'
+}

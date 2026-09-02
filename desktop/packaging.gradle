@@ -1,0 +1,197 @@
+/*
+ * Packages the desktop app as a native, double-clickable application image
+ * via the JDK's own `jpackage` tool - no extra Gradle plugin, driven
+ * directly with ProcessBuilder the same way stockfish.gradle drives `make`
+ * (see that file's header comment for why: Gradle 9's task execution model
+ * disallows calling back into the Project instance from inside doLast).
+ *
+ * The app icon is the Android app's own launcher icon (same artwork as
+ * app/src/main/res/mipmap/ic_launcher.png; src/main/resources/.../icon.png
+ * is a copy of the Play Store listing image at
+ * fastlane/metadata/android/de-DE/images/icon.png, 512x512 - a resolution
+ * actually usable for a desktop icon, and also used at runtime for
+ * DesktopApp's window/dock icon), converted here into the per-OS format
+ * jpackage needs (.icns/.ico/.png). Only the macOS path has
+ * actually been run and verified in this project so far; the Windows/Linux
+ * icon generation is included for when this build runs on those hosts, but
+ * is unverified - see the analogous note in desktop/stockfish.gradle about
+ * only the macOS Stockfish host build being verified.
+ *
+ * `--type app-image` (not a signed dmg/pkg/msi/exe installer) deliberately:
+ * a real installer needs code-signing/notarization credentials this project
+ * doesn't have configured. The app-image is already a normal, launchable
+ * .app/.exe folder - just not a polished installer experience.
+ */
+
+def os = org.gradle.internal.os.OperatingSystem.current()
+def appName = 'MoveAPiece'
+// macOS requires the first component of --app-version to be a positive
+// integer (it becomes CFBundleVersion), so this can't just mirror the
+// Android app's "0.1.0" versionName.
+def appVersion = '1.0.0'
+// Not DesktopApp itself - see Launcher's Javadoc for why a jpackage
+// app-image (classpath-mode, no --module-path) needs this indirection.
+def mainClassName = 'de.schliweb.moveapiece.desktop.Launcher'
+
+def sourceIconPng = file("$projectDir/src/main/resources/de/schliweb/moveapiece/desktop/icon.png")
+def iconsDir = layout.buildDirectory.dir('icons').get().asFile
+def jpackageInputDir = layout.buildDirectory.dir('jpackage-input').get().asFile
+def jpackageDestDir = layout.buildDirectory.dir('jpackage').get().asFile
+
+def writeLE16 = { java.io.DataOutputStream dos, int v ->
+    dos.write(v & 0xFF)
+    dos.write((v >> 8) & 0xFF)
+}
+def writeLE32 = { java.io.DataOutputStream dos, int v ->
+    dos.write(v & 0xFF)
+    dos.write((v >> 8) & 0xFF)
+    dos.write((v >> 16) & 0xFF)
+    dos.write((v >> 24) & 0xFF)
+}
+
+// Windows .ico: a small header/directory followed by one PNG-encoded image
+// per size (PNG-in-ICO has been valid since Windows Vista) - much simpler
+// than writing raw BMP/DIB bitmaps, and needs no extra library beyond
+// javax.imageio, which is already part of the JDK running this build.
+def generateIco = { File destIco, List<Integer> sizes ->
+    def source = javax.imageio.ImageIO.read(sourceIconPng)
+    def entries = sizes.collect { size ->
+        def scaled = new java.awt.image.BufferedImage(size, size, java.awt.image.BufferedImage.TYPE_INT_ARGB)
+        def g = scaled.createGraphics()
+        g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION,
+                java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR)
+        g.drawImage(source, 0, 0, size, size, null)
+        g.dispose()
+        def baos = new java.io.ByteArrayOutputStream()
+        javax.imageio.ImageIO.write(scaled, 'png', baos)
+        [size: size, bytes: baos.toByteArray()]
+    }
+    destIco.parentFile.mkdirs()
+    destIco.withOutputStream { rawOut ->
+        def dos = new java.io.DataOutputStream(rawOut)
+        writeLE16(dos, 0)
+        writeLE16(dos, 1)
+        writeLE16(dos, entries.size())
+        int offset = 6 + entries.size() * 16
+        entries.each { e ->
+            int wh = e.size >= 256 ? 0 : e.size
+            dos.write(wh)
+            dos.write(wh)
+            dos.write(0)
+            dos.write(0)
+            writeLE16(dos, 1)
+            writeLE16(dos, 32)
+            writeLE32(dos, e.bytes.length)
+            writeLE32(dos, offset)
+            offset += e.bytes.length
+        }
+        entries.each { e -> dos.write(e.bytes) }
+    }
+}
+
+tasks.register('generateIcons') {
+    inputs.file(sourceIconPng)
+    def icnsFile = new File(iconsDir, 'icon.icns')
+    def icoFile = new File(iconsDir, 'icon.ico')
+    def pngFile = new File(iconsDir, 'icon.png')
+    outputs.files(icnsFile, icoFile, pngFile)
+
+    doLast {
+        iconsDir.mkdirs()
+
+        // Linux: jpackage just wants a single PNG.
+        pngFile.bytes = sourceIconPng.bytes
+
+        // Windows: PNG-in-ICO, see generateIco above.
+        generateIco(icoFile, [16, 32, 48, 128, 256])
+
+        // macOS: build a .iconset directory and hand it to `iconutil`
+        // (only available on macOS - guarded so this build still
+        // completes on other hosts, just without a .icns).
+        if (os.isMacOsX()) {
+            def iconset = new File(iconsDir, 'icon.iconset')
+            iconset.mkdirs()
+            def source = javax.imageio.ImageIO.read(sourceIconPng)
+            // name -> pixel size, per Apple's documented iconset naming.
+            def sizes = [
+                'icon_16x16.png'      : 16,
+                'icon_16x16@2x.png'   : 32,
+                'icon_32x32.png'      : 32,
+                'icon_32x32@2x.png'   : 64,
+                'icon_128x128.png'    : 128,
+                'icon_128x128@2x.png' : 256,
+                'icon_256x256.png'    : 256,
+                'icon_256x256@2x.png' : 512,
+                'icon_512x512.png'    : 512,
+            ]
+            sizes.each { name, size ->
+                def scaled = new java.awt.image.BufferedImage(size, size, java.awt.image.BufferedImage.TYPE_INT_ARGB)
+                def g = scaled.createGraphics()
+                g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION,
+                        java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR)
+                g.drawImage(source, 0, 0, size, size, null)
+                g.dispose()
+                javax.imageio.ImageIO.write(scaled, 'png', new File(iconset, name))
+            }
+            def pb = new ProcessBuilder(['iconutil', '-c', 'icns', '-o', icnsFile.absolutePath, iconset.absolutePath])
+            pb.redirectErrorStream(true)
+            Process proc = pb.start()
+            proc.inputStream.eachLine { logger.lifecycle(it) }
+            int exitCode = proc.waitFor()
+            if (exitCode != 0) {
+                throw new GradleException("iconutil failed (${exitCode}) building ${icnsFile}")
+            }
+        }
+    }
+}
+
+tasks.register('prepareJpackageInput', Copy) {
+    dependsOn tasks.named('jar')
+    from tasks.named('jar')
+    from configurations.runtimeClasspath
+    into jpackageInputDir
+}
+
+tasks.register('jpackageAppImage') {
+    dependsOn 'generateIcons', 'prepareJpackageInput'
+    def mainJarName = tasks.named('jar').get().archiveFileName.get()
+    inputs.dir(jpackageInputDir)
+    inputs.file(sourceIconPng)
+    outputs.dir(jpackageDestDir)
+
+    doLast {
+        jpackageDestDir.mkdirs()
+        def icon
+        if (os.isMacOsX()) {
+            icon = new File(iconsDir, 'icon.icns')
+        } else if (os.isWindows()) {
+            icon = new File(iconsDir, 'icon.ico')
+        } else {
+            icon = new File(iconsDir, 'icon.png')
+        }
+        def jpackageBin = new File(System.getProperty('java.home'), 'bin/jpackage').absolutePath
+        def cmd = [
+            jpackageBin,
+            '--type', 'app-image',
+            '--name', appName,
+            '--app-version', appVersion,
+            '--input', jpackageInputDir.absolutePath,
+            '--main-jar', mainJarName,
+            '--main-class', mainClassName,
+            '--dest', jpackageDestDir.absolutePath,
+            '--vendor', 'schliweb.de',
+        ]
+        if (icon.exists()) {
+            cmd += ['--icon', icon.absolutePath]
+        }
+        def pb = new ProcessBuilder(cmd)
+        pb.redirectErrorStream(true)
+        Process proc = pb.start()
+        proc.inputStream.eachLine { logger.lifecycle(it) }
+        int exitCode = proc.waitFor()
+        if (exitCode != 0) {
+            throw new GradleException("jpackage failed (${exitCode})")
+        }
+        logger.lifecycle("App image written to ${jpackageDestDir}")
+    }
+}

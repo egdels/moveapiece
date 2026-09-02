@@ -1,0 +1,197 @@
+/*
+ * Builds the Stockfish UCI engine binary for the machine running the build,
+ * from the same pinned git submodule the Android app uses
+ * (app/src/main/cpp/stockfish, fixed at tag sf_18), by driving Stockfish's
+ * own Makefile directly with the host's native toolchain (no NDK/cross
+ * compilation involved - see app/stockfish.gradle for that variant).
+ *
+ * NNUE networks: reuses the same committed, SHA-256-verified copies from
+ * app/nnue-nets/ that the Android build uses (built with NNUE_EMBEDDING_OFF,
+ * see the header comment in app/stockfish.gradle for the full rationale) so
+ * the files are not duplicated in the repo. They are copied next to the
+ * built binary; DesktopApp points Stockfish at them via
+ * "setoption name EvalFile/EvalFileSmall value <path>", same as Android.
+ *
+ * Host coverage: only the macOS branch below has actually been built and
+ * run in this project so far. The Linux and Windows branches follow the
+ * same pattern (see app/stockfish.gradle's ABI table for the analogous
+ * Android mapping) but are unverified - building/testing them on those
+ * hosts (and adding CI coverage) is explicit follow-up work, not done here.
+ * Windows in particular needs a MinGW toolchain (COMP=mingw) that this
+ * script does not attempt to locate.
+ *
+ * Concurrency note: this shares the *same* Stockfish source checkout as
+ * app/stockfish.gradle (object files, linked executable live in that one
+ * src/ directory). Do not build :app and :desktop's Stockfish targets in
+ * the same parallel Gradle invocation - see the analogous note in
+ * app/stockfish.gradle about the three Android ABI builds needing to run
+ * serially for the same reason.
+ */
+
+def stockfishSrcDir = file("$rootDir/app/src/main/cpp/stockfish/src")
+def committedNnueDir = file("$rootDir/app/nnue-nets")
+def nnueCacheDir = layout.buildDirectory.dir('nnue-cache').get().asFile
+
+def nnueNets = [
+    [name: 'nn-c288c895ea92.nnue',
+     sha256: 'c288c895ea924429ea9092e3f36b2b3c1f00f2a3a4c759ff7e57e79e3b43e4a7'],
+    [name: 'nn-37f18f62d772.nnue',
+     sha256: '37f18f62d772f3107e1d6aaca3898c130c3c86f2ab63e6555fbbca20635a899d'],
+]
+
+def sha256Of = { File f ->
+    def md = java.security.MessageDigest.getInstance('SHA-256')
+    f.withInputStream { is ->
+        byte[] buf = new byte[8192]
+        int n
+        while ((n = is.read(buf)) != -1) {
+            md.update(buf, 0, n)
+        }
+    }
+    md.digest().collect { String.format('%02x', it) }.join()
+}
+
+def decompressXz = { File src, File dest ->
+    def pb = new ProcessBuilder(['xz', '-dc', src.absolutePath])
+    pb.redirectOutput(dest)
+    Process proc = pb.start()
+    int exitCode = proc.waitFor()
+    if (exitCode != 0) {
+        throw new GradleException("xz decompression failed for ${src.name} (exit ${exitCode})")
+    }
+}
+
+def runProcess = { List<String> cmd, File workDir, Map<String, String> env ->
+    def pb = new ProcessBuilder(cmd.collect { it.toString() })
+    pb.directory(workDir)
+    env.each { k, v -> pb.environment().put(k.toString(), v.toString()) }
+    pb.redirectErrorStream(true)
+    Process proc = pb.start()
+    proc.inputStream.eachLine { logger.lifecycle(it) }
+    int exitCode = proc.waitFor()
+    if (exitCode != 0) {
+        throw new GradleException("Command failed (${exitCode}): ${cmd.join(' ')}")
+    }
+}
+
+tasks.register('downloadNnueNets') {
+    def outFiles = nnueNets.collect { new File(nnueCacheDir, it.name) }
+    outputs.files(outFiles)
+    doLast {
+        nnueCacheDir.mkdirs()
+        nnueNets.each { net ->
+            def dest = new File(nnueCacheDir, net.name)
+            if (dest.exists() && sha256Of(dest) == net.sha256) {
+                return
+            }
+
+            def committedXz = new File(committedNnueDir, "${net.name}.xz")
+            def committedPlain = new File(committedNnueDir, net.name)
+            def preparedFromRepo = false
+            try {
+                if (committedXz.exists()) {
+                    logger.lifecycle("Decompressing committed NNUE net ${net.name} ...")
+                    decompressXz(committedXz, dest)
+                    preparedFromRepo = sha256Of(dest) == net.sha256
+                } else if (committedPlain.exists()) {
+                    dest.bytes = committedPlain.bytes
+                    preparedFromRepo = sha256Of(dest) == net.sha256
+                }
+            } catch (Exception e) {
+                logger.warn("Could not prepare ${net.name} from the committed copy in app/nnue-nets (${e.message}), falling back to download")
+                preparedFromRepo = false
+            }
+            if (!preparedFromRepo) {
+                throw new GradleException("Failed to prepare ${net.name} with matching SHA-256 from app/nnue-nets")
+            }
+        }
+    }
+}
+
+// Host OS/arch -> Stockfish ARCH value (see stockfishSrcDir/Makefile's
+// `help` target for the full list) and output directory naming.
+def os = org.gradle.internal.os.OperatingSystem.current()
+def hostArch = System.getProperty('os.arch')
+def isArm = hostArch == 'aarch64' || hostArch == 'arm64'
+
+def osName
+def sfArch
+def compVar = null
+if (os.isMacOsX()) {
+    osName = 'macos'
+    sfArch = isArm ? 'apple-silicon' : 'x86-64'
+} else if (os.isLinux()) {
+    osName = 'linux'
+    sfArch = isArm ? 'armv8' : 'x86-64'
+} else if (os.isWindows()) {
+    osName = 'windows'
+    sfArch = 'x86-64'
+    compVar = 'mingw'
+} else {
+    throw new GradleException("Unsupported host OS for building Stockfish: ${os.name}")
+}
+def archDirName = isArm ? 'arm64' : 'x86_64'
+def outDir = file("$projectDir/build/stockfish/${osName}-${archDirName}")
+def exeName = os.isWindows() ? 'stockfish.exe' : 'stockfish'
+def outFile = new File(outDir, exeName)
+
+tasks.register('buildStockfishHost') {
+    dependsOn 'downloadNnueNets'
+    inputs.dir(stockfishSrcDir)
+    inputs.property('sfArch', sfArch)
+    inputs.property('compVar', compVar ?: '')
+    outputs.file(outFile)
+    outputs.files(nnueNets.collect { new File(outDir, it.name) })
+
+    doLast {
+        nnueNets.each { net ->
+            def cached = new File(nnueCacheDir, net.name)
+            def target = new File(stockfishSrcDir, net.name)
+            target.bytes = cached.bytes
+        }
+
+        def env = [:]
+        def makeArgs = ['make', '-j4', "ARCH=${sfArch}".toString(), 'EXTRACXXFLAGS=-DNNUE_EMBEDDING_OFF']
+        if (compVar) {
+            makeArgs << "COMP=${compVar}".toString()
+        }
+        makeArgs << 'build'
+
+        runProcess(['make', 'objclean'], stockfishSrcDir, env)
+        runProcess(makeArgs, stockfishSrcDir, env)
+
+        def builtExe = new File(stockfishSrcDir, exeName)
+        if (!builtExe.exists()) {
+            throw new GradleException("Stockfish host build did not produce an executable")
+        }
+        outDir.mkdirs()
+        outFile.bytes = builtExe.bytes
+        outFile.setExecutable(true, false)
+
+        nnueNets.each { net ->
+            def cached = new File(nnueCacheDir, net.name)
+            new File(outDir, net.name).bytes = cached.bytes
+        }
+
+        // Leave the shared src/ dir clean, see the concurrency note above.
+        runProcess(['make', 'objclean'], stockfishSrcDir, env)
+    }
+}
+
+// Exposed to DesktopApp/tests via a generated properties file, so the
+// build-time output layout doesn't need to be hardcoded at runtime.
+def stockfishHomeProps = layout.buildDirectory.file('generated-stockfish/stockfishHome.properties').get().asFile
+tasks.register('writeStockfishHomeProperties') {
+    dependsOn 'buildStockfishHost'
+    outputs.file(stockfishHomeProps)
+    doLast {
+        stockfishHomeProps.parentFile.mkdirs()
+        stockfishHomeProps.text = "stockfish.home=${outDir.absolutePath}\nstockfish.exe=${exeName}\n"
+    }
+}
+
+sourceSets.main.resources.srcDirs += stockfishHomeProps.parentFile
+
+tasks.matching { it.name == 'processResources' }.configureEach {
+    dependsOn 'writeStockfishHomeProperties'
+}
