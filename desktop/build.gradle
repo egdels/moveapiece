@@ -9,7 +9,10 @@ java {
 }
 
 javafx {
-    version = '21.0.2'
+    // 24.0.2, not 21.0.2: JavaFX only started publishing linux-aarch64
+    // natives on Maven Central from 22.0.1 onward, so 21.0.2 fails to
+    // resolve entirely on ARM64 Linux (desktop.yml's ubuntu-24.04-arm leg).
+    version = '24.0.2'
     modules = ['javafx.controls', 'javafx.media']
 }
 
