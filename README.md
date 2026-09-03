@@ -79,12 +79,13 @@ shasum -a 256 app/build/outputs/apk/debug/app-debug.apk
 ```
 
 `.github/workflows/build.yml` builds the debug APK on two independent
-runners (`build-a`, `build-b`) but does not currently compare their
-hashes: debug builds are signed with AGP's auto-generated debug keystore,
-freshly and randomly generated per (ephemeral) CI runner, so a hash
-comparison fails on the signing block alone even when the app content is
-identical. A real CI reproducibility gate needs a fixed, shared
-debug-signing key first. This reproducibility requirement is
+runners (`build-a`, `build-b`) and a third job (`compare`) fails the
+workflow if their SHA-256 hashes differ. Both jobs sign with the same
+fixed, committed `app/debug.keystore` (see `app/build.gradle`'s
+`signingConfigs.debug`) instead of AGP's auto-generated per-machine
+keystore, which is what makes a whole-file hash comparison meaningful -
+without it, the signing block alone would differ between runners even
+when the app content is identical. This reproducibility requirement is
 Android-specific (driven by F-Droid's build process) and does not apply
 to the desktop app.
 

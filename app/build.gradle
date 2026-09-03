@@ -30,6 +30,21 @@ android {
         }
     }
 
+    // Reproducibility requirement: AGP auto-generates ~/.android/debug.keystore
+    // per machine (with a random key) if none exists, so two otherwise-identical
+    // CI runners produce debug APKs that differ in their signing block alone.
+    // This fixed, committed keystore (not sensitive - debug-only, never used for
+    // release signing) makes the signature identical everywhere, which is what
+    // lets build.yml's build-a/build-b hash comparison actually work.
+    signingConfigs {
+        debug {
+            storeFile file('debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
@@ -42,6 +57,7 @@ android {
             }
         }
         debug {
+            signingConfig signingConfigs.debug
             vcsInfo {
                 include false
             }
