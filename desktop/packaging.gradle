@@ -186,6 +186,21 @@ tasks.register('prepareJpackageInput', Copy) {
     }
 }
 
+// The bundled runtime's module set. DesktopApp launches in classpath mode
+// (see Launcher's Javadoc), so jpackage/jlink can't compute this itself by
+// tracing module-info requires - without --add-modules it defaults to
+// bundling the *entire* JDK (~150 MB). Computed via:
+//   jdeps --multi-release <N> --ignore-missing-deps --print-module-deps \
+//     --class-path <all jpackage-input jars> <all jpackage-input jars>
+// against desktop.jar, core.jar, chesslib, commons-lang3 and the javafx-*
+// jars together (jdeps only reports *JDK platform* module deps - the
+// third-party jars themselves are simply bundled as-is, not part of the
+// runtime image). Re-run that whenever a new JDK API or dependency is
+// added and re-verify the app still works end-to-end (UI, engine moves,
+// move sounds, file dialogs) with the trimmed runtime - jdeps only sees
+// static bytecode references, not reflection/ServiceLoader-based ones.
+def runtimeModules = ['java.base', 'java.desktop', 'jdk.jfr', 'jdk.unsupported']
+
 def runJpackage = { String type ->
     jpackageDestDir.mkdirs()
     def icon
@@ -208,6 +223,7 @@ def runJpackage = { String type ->
         '--main-class', mainClassName,
         '--dest', jpackageDestDir.absolutePath,
         '--vendor', 'schliweb.de',
+        '--add-modules', runtimeModules.join(','),
     ]
     if (icon.exists()) {
         cmd += ['--icon', icon.absolutePath]
