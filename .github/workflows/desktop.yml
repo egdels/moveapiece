@@ -97,12 +97,27 @@ jobs:
           path: core/build/test-results/test
 
       - name: Build desktop app image
+        if: runner.os != 'macOS'
         run: ./gradlew --no-daemon :desktop:jpackageAppImage
 
+      # DMG, not the raw app-image, on macOS - see packaging.gradle's file
+      # header for why the app-image doesn't survive an artifact round trip.
+      - name: Build desktop DMG (macOS)
+        if: runner.os == 'macOS'
+        run: ./gradlew --no-daemon :desktop:jpackageDmg
+
       - name: Upload app image
-        if: always()
+        if: always() && runner.os != 'macOS'
         uses: actions/upload-artifact@v4
         with:
           name: moveapiece-desktop-${{ matrix.os }}
           path: desktop/build/jpackage
+          if-no-files-found: warn
+
+      - name: Upload DMG (macOS)
+        if: always() && runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: moveapiece-desktop-${{ matrix.os }}
+          path: desktop/build/jpackage/*.dmg
           if-no-files-found: warn

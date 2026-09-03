@@ -17,10 +17,21 @@
  * is unverified - see the analogous note in desktop/stockfish.gradle about
  * only the macOS Stockfish host build being verified.
  *
- * `--type app-image` (not a signed dmg/pkg/msi/exe installer) deliberately:
- * a real installer needs code-signing/notarization credentials this project
+ * `--type app-image` (not a signed pkg/msi/exe installer) deliberately: a
+ * real installer needs code-signing/notarization credentials this project
  * doesn't have configured. The app-image is already a normal, launchable
  * .app/.exe folder - just not a polished installer experience.
+ *
+ * macOS is the exception: it also gets `--type dmg` (jpackageDmg below).
+ * jpackage ad-hoc-signs the app bundle either way (arm64 Macs refuse to run
+ * an entirely unsigned binary), and that signature embeds a hash manifest
+ * of every file in the bundle. A raw app-image directory is a poor way to
+ * ship that: CI uploads it by zipping the directory tree, and unzipping it
+ * again on the receiving end doesn't reliably reproduce the exact
+ * bytes/permissions the manifest was hashed against, so the seal silently
+ * breaks - macOS then refuses to launch it at all ("app is damaged"),
+ * which not even a user override can bypass. A DMG is a raw disk-image
+ * file, byte-identical after download; mounting it never touches the seal.
  */
 
 def os = org.gradle.internal.os.OperatingSystem.current()
@@ -160,46 +171,67 @@ tasks.register('prepareJpackageInput', Copy) {
     into jpackageInputDir
 }
 
+def runJpackage = { String type ->
+    jpackageDestDir.mkdirs()
+    def icon
+    if (os.isMacOsX()) {
+        icon = new File(iconsDir, 'icon.icns')
+    } else if (os.isWindows()) {
+        icon = new File(iconsDir, 'icon.ico')
+    } else {
+        icon = new File(iconsDir, 'icon.png')
+    }
+    def mainJarName = tasks.named('jar').get().archiveFileName.get()
+    def jpackageBin = new File(System.getProperty('java.home'), 'bin/jpackage').absolutePath
+    def cmd = [
+        jpackageBin,
+        '--type', type,
+        '--name', appName,
+        '--app-version', appVersion,
+        '--input', jpackageInputDir.absolutePath,
+        '--main-jar', mainJarName,
+        '--main-class', mainClassName,
+        '--dest', jpackageDestDir.absolutePath,
+        '--vendor', 'schliweb.de',
+    ]
+    if (icon.exists()) {
+        cmd += ['--icon', icon.absolutePath]
+    }
+    def pb = new ProcessBuilder(cmd)
+    pb.redirectErrorStream(true)
+    Process proc = pb.start()
+    proc.inputStream.eachLine { logger.lifecycle(it) }
+    int exitCode = proc.waitFor()
+    if (exitCode != 0) {
+        throw new GradleException("jpackage --type ${type} failed (${exitCode})")
+    }
+    logger.lifecycle("${type} written to ${jpackageDestDir}")
+}
+
 tasks.register('jpackageAppImage') {
     dependsOn 'generateIcons', 'prepareJpackageInput'
-    def mainJarName = tasks.named('jar').get().archiveFileName.get()
     inputs.dir(jpackageInputDir)
     inputs.file(sourceIconPng)
     outputs.dir(jpackageDestDir)
 
     doLast {
-        jpackageDestDir.mkdirs()
-        def icon
-        if (os.isMacOsX()) {
-            icon = new File(iconsDir, 'icon.icns')
-        } else if (os.isWindows()) {
-            icon = new File(iconsDir, 'icon.ico')
-        } else {
-            icon = new File(iconsDir, 'icon.png')
+        runJpackage('app-image')
+    }
+}
+
+// See the file header for why macOS ships a DMG instead of the raw
+// app-image: it's the only format that survives a CI-artifact round trip
+// without breaking the app bundle's ad-hoc code signature.
+tasks.register('jpackageDmg') {
+    dependsOn 'generateIcons', 'prepareJpackageInput'
+    inputs.dir(jpackageInputDir)
+    inputs.file(sourceIconPng)
+    outputs.dir(jpackageDestDir)
+
+    doLast {
+        if (!os.isMacOsX()) {
+            throw new GradleException('jpackageDmg is only supported on macOS')
         }
-        def jpackageBin = new File(System.getProperty('java.home'), 'bin/jpackage').absolutePath
-        def cmd = [
-            jpackageBin,
-            '--type', 'app-image',
-            '--name', appName,
-            '--app-version', appVersion,
-            '--input', jpackageInputDir.absolutePath,
-            '--main-jar', mainJarName,
-            '--main-class', mainClassName,
-            '--dest', jpackageDestDir.absolutePath,
-            '--vendor', 'schliweb.de',
-        ]
-        if (icon.exists()) {
-            cmd += ['--icon', icon.absolutePath]
-        }
-        def pb = new ProcessBuilder(cmd)
-        pb.redirectErrorStream(true)
-        Process proc = pb.start()
-        proc.inputStream.eachLine { logger.lifecycle(it) }
-        int exitCode = proc.waitFor()
-        if (exitCode != 0) {
-            throw new GradleException("jpackage failed (${exitCode})")
-        }
-        logger.lifecycle("App image written to ${jpackageDestDir}")
+        runJpackage('dmg')
     }
 }
