@@ -41,14 +41,21 @@ if (!sdkDir) {
         sdkDir = props.getProperty('sdk.dir')
     }
 }
-def ndkDir = new File(sdkDir, "ndk/${android.ndkVersion}")
+// sdkDir is null when this script is evaluated without an Android SDK
+// present (e.g. desktop.yml's CI matrix, which only needs :core:test /
+// :desktop:jpackageAppImage) - Gradle still configures every project in
+// settings.gradle regardless of which task was actually requested, so this
+// script runs either way. ndkDir/toolchainBin stay null in that case;
+// nothing dereferences them unless a buildStockfish_* task's doLast
+// actually executes, which only happens for real :app native-build tasks.
+def ndkDir = sdkDir ? new File(sdkDir, "ndk/${android.ndkVersion}") : null
 def hostTag = 'darwin-x86_64'
 if (org.gradle.internal.os.OperatingSystem.current().isLinux()) {
     hostTag = 'linux-x86_64'
 } else if (org.gradle.internal.os.OperatingSystem.current().isWindows()) {
     hostTag = 'windows-x86_64'
 }
-def toolchainBin = new File(ndkDir, "toolchains/llvm/prebuilt/${hostTag}/bin")
+def toolchainBin = ndkDir ? new File(ndkDir, "toolchains/llvm/prebuilt/${hostTag}/bin") : null
 
 def stockfishSrcDir = file('src/main/cpp/stockfish/src')
 def jniLibsDir = file('src/main/jniLibs')
