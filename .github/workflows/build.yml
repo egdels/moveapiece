@@ -1,10 +1,14 @@
 name: Build
 
-# Reproducibility self-test: builds the debug APK twice, on two independent
-# GitHub-hosted runners, and fails the workflow if the resulting APKs are
-# not byte-for-byte identical. This is a pre-submission sanity check only;
-# it does not replace F-Droid's own reproducible-build verification against
-# the fdroiddata metadata.
+# The debug APK is built on two independent GitHub-hosted runners (build-a,
+# build-b) but the two outputs are not currently compared: debug builds are
+# signed with AGP's auto-generated debug keystore, which is freshly and
+# randomly generated per (ephemeral) runner, so a bit-for-bit hash
+# comparison fails on the signing block alone even though the actual app
+# content is identical - see the reproducibility discussion in git history.
+# A real reproducibility check needs a fixed, shared debug-signing key
+# first; until then this is just a build sanity check on two runners, not a
+# reproducibility gate.
 
 on:
   push:
@@ -175,36 +179,3 @@ jobs:
         with:
           name: app-debug-b
           path: app/build/outputs/apk/debug/app-debug.apk
-
-  compare:
-    name: Compare build hashes
-    needs: [build-a, build-b]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: app-debug-a
-          path: build-a
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: app-debug-b
-          path: build-b
-
-      - name: Compare SHA-256 hashes
-        run: |
-          HASH_A=$(sha256sum build-a/app-debug.apk | cut -d' ' -f1)
-          HASH_B=$(sha256sum build-b/app-debug.apk | cut -d' ' -f1)
-          echo "Build A: $HASH_A"
-          echo "Build B: $HASH_B"
-          if [ "$HASH_A" != "$HASH_B" ]; then
-            echo "::error::Builds are not reproducible: hashes differ between two independent runners."
-            exit 1
-          fi
-          echo "Builds are bit-identical across independent runners."
-
-      - name: Upload verified APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-debug-verified
-          path: build-a/app-debug.apk

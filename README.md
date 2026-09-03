@@ -78,9 +78,15 @@ shasum -a 256 app/build/outputs/apk/debug/app-debug.apk
 # both hashes must match
 ```
 
-`.github/workflows/build.yml` runs the same check on two independent
-runners as a CI job. This reproducibility requirement is Android-specific
-(driven by F-Droid's build process) and does not apply to the desktop app.
+`.github/workflows/build.yml` builds the debug APK on two independent
+runners (`build-a`, `build-b`) but does not currently compare their
+hashes: debug builds are signed with AGP's auto-generated debug keystore,
+freshly and randomly generated per (ephemeral) CI runner, so a hash
+comparison fails on the signing block alone even when the app content is
+identical. A real CI reproducibility gate needs a fixed, shared
+debug-signing key first. This reproducibility requirement is
+Android-specific (driven by F-Droid's build process) and does not apply
+to the desktop app.
 
 ### Desktop
 
