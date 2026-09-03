@@ -157,7 +157,7 @@ tasks.register('generateIcons') {
 }
 
 tasks.register('prepareJpackageInput', Copy) {
-    dependsOn tasks.named('jar')
+    dependsOn tasks.named('jar'), tasks.named('buildStockfishHost')
     // Copy never removes files that are no longer part of its inputs, so a
     // jar left behind by a dependency version bump (e.g. the old
     // javafx-*-21.0.2-*.jar files after bumping to 24.0.2) would otherwise
@@ -168,7 +168,22 @@ tasks.register('prepareJpackageInput', Copy) {
     }
     from tasks.named('jar')
     from configurations.runtimeClasspath
+    // Bundle the host-built Stockfish binary + NNUE nets into the package
+    // itself, at Contents/app/stockfish/ - StockfishLocator resolves them
+    // there relative to its own jar at runtime. Without this, the app only
+    // knew stockfishHome.properties' build-time absolute path, which only
+    // exists on the machine that built the package (e.g. a CI runner's
+    // ephemeral checkout), so an installed app silently had no engine.
+    from(project.ext.stockfishOutDir) {
+        into 'stockfish'
+    }
     into jpackageInputDir
+    // Copy doesn't reliably preserve the exec bit across all OSes/Gradle
+    // versions, and a non-executable Stockfish binary fails the same way
+    // as a missing one.
+    doLast {
+        new File(jpackageInputDir, "stockfish/${project.ext.stockfishExeName}").setExecutable(true, false)
+    }
 }
 
 def runJpackage = { String type ->

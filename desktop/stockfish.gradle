@@ -135,6 +135,12 @@ def outDir = file("$projectDir/build/stockfish/${osName}-${archDirName}")
 def exeName = os.isWindows() ? 'stockfish.exe' : 'stockfish'
 def outFile = new File(outDir, exeName)
 
+// Consumed by packaging.gradle, which bundles outDir's contents (the exe
+// plus the two NNUE nets buildStockfishHost drops next to it) into the
+// jpackage image - see StockfishLocator's Javadoc for why that's needed.
+project.ext.stockfishOutDir = outDir
+project.ext.stockfishExeName = exeName
+
 tasks.register('buildStockfishHost') {
     dependsOn 'downloadNnueNets'
     inputs.dir(stockfishSrcDir)
