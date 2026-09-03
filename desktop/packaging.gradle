@@ -147,6 +147,14 @@ tasks.register('generateIcons') {
 
 tasks.register('prepareJpackageInput', Copy) {
     dependsOn tasks.named('jar')
+    // Copy never removes files that are no longer part of its inputs, so a
+    // jar left behind by a dependency version bump (e.g. the old
+    // javafx-*-21.0.2-*.jar files after bumping to 24.0.2) would otherwise
+    // sit next to the new one forever, putting two versions of the same
+    // classes on jpackage's classpath.
+    doFirst {
+        delete jpackageInputDir
+    }
     from tasks.named('jar')
     from configurations.runtimeClasspath
     into jpackageInputDir

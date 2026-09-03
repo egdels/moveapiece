@@ -62,7 +62,13 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "21"
+          # jpackage bundles its app-image runtime from whichever JDK runs
+          # it (System.getProperty('java.home') in packaging.gradle), and
+          # javafx 24.0.2's classes are compiled to class-file version 66
+          # (Java 22) - a JDK 21 runtime can't load them at all
+          # (UnsupportedClassVersionError at launch), even though the CI
+          # build itself succeeds since packaging never loads the classes.
+          java-version: "22"
 
       - name: Set up MinGW toolchain (Windows)
         if: runner.os == 'Windows'
