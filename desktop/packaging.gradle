@@ -214,7 +214,19 @@ tasks.register('prepareJpackageInput', Copy) {
 // added and re-verify the app still works end-to-end (UI, engine moves,
 // move sounds, file dialogs) with the trimmed runtime - jdeps only sees
 // static bytecode references, not reflection/ServiceLoader-based ones.
-def runtimeModules = ['java.base', 'java.desktop', 'jdk.jfr', 'jdk.unsupported']
+// TEMPORARY DIAGNOSTIC (see conversation/commit history): move sounds are
+// silent in the packaged Windows .msi - confirmed via the volume mixer,
+// the per-app level meter never moves at all, so AudioClip.play() isn't
+// producing output at all, not just routing to the wrong device. Broadened
+// to java.se (all standard Java SE API modules) to test whether the narrow
+// trimmed set above is missing something javafx.media's Windows audio
+// backend needs via reflection/ServiceLoader (invisible to the
+// jdeps-based computation this list is normally derived from - see the
+// comment above). If this fixes it, bisect java.se's module list back
+// down to whatever's actually required and drop this back to an explicit,
+// minimal list; if it doesn't, the cause is elsewhere and this should be
+// reverted.
+def runtimeModules = ['java.se', 'jdk.jfr', 'jdk.unsupported']
 
 def runJpackage = { String type ->
     jpackageDestDir.mkdirs()
