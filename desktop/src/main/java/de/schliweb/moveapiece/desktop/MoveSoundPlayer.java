@@ -11,67 +11,51 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import javafx.scene.media.Media;
-import javafx.scene.media.MediaPlayer;
+import javafx.scene.media.AudioClip;
 
 /**
- * Short one-shot move/capture/check sound effects. Same audio files as the Android app's {@code
- * ui.MoveSoundPlayer} (SoundPool there).
- *
- * <p>TEMPORARY DIAGNOSTIC (see conversation/commit history): normally backed by {@code
- * javafx.scene.media.AudioClip} (low latency, meant for exactly this kind of playback), but that
- * API has no error-reporting surface at all - on the one Windows machine this has been tested on so
- * far, move sounds are completely silent (confirmed via the OS volume mixer: the per-app level
- * meter never moves) with zero output anywhere, console included, so there is no way to find out
- * *why* through AudioClip. Swapped to {@link MediaPlayer}, which does expose {@code setOnError}/
- * {@code setOnReady}, purely to see what it reports. Revert to AudioClip once the cause is known
- * (unless MediaPlayer turns out to actually work correctly here, in which case just keep it).
+ * Short one-shot move/capture/check sound effects, backed by JavaFX's {@link AudioClip} (low
+ * latency, meant for exactly this kind of playback). Same audio files as the Android app's {@code
+ * ui.MoveSoundPlayer} (SoundPool there, AudioClip here - platform equivalents).
  *
  * <p>Each clip is extracted to a temp file and loaded from a plain {@code file:} URL rather than
- * played directly from a {@code jar:} URL: loading straight out of a jar (as happens once the app
- * is packaged - {@code :desktop:run} runs from exploded classes/resources directories, so this
- * never showed up there) made JavaFX's GStreamer-backed media engine double-play every clip, one
- * real play() call producing two audible, overlapping playbacks. Extracting to a real file
- * sidesteps whatever jar-URL handling caused that.
+ * played directly from a {@code jar:} URL: loading an {@code AudioClip} straight out of a jar (as
+ * happens once the app is packaged - {@code :desktop:run} runs from exploded classes/ resources
+ * directories, so this never showed up there) made JavaFX's GStreamer-backed media engine
+ * double-play every clip, one real call to {@link AudioClip#play()} producing two audible,
+ * overlapping playbacks. Extracting to a real file sidesteps whatever jar-URL handling caused that.
+ *
+ * <p>The bundled sounds/*.mp3 files must not carry an ID3v2 tag: Windows' bundled GStreamer build
+ * rejected these clips outright (ERROR_MEDIA_INVALID, confirmed via a temporary MediaPlayer-based
+ * diagnostic - AudioClip itself has no error-reporting API at all) because of a malformed ID3
+ * comment frame in the original encode, while macOS's build tolerated it - see the commit that
+ * stripped the tags (`ffmpeg -map_metadata -1 -id3v2_version 0 -write_id3v1 0 -c copy`) for
+ * details. Re-strip any replacement/new sound file's ID3 tag the same way before adding it here.
  */
 final class MoveSoundPlayer {
 
-    private final MediaPlayer moveClip = load("move.mp3");
-    private final MediaPlayer captureClip = load("capture.mp3");
-    private final MediaPlayer checkClip = load("check.mp3");
+    private final AudioClip moveClip = load("move.mp3");
+    private final AudioClip captureClip = load("capture.mp3");
+    private final AudioClip checkClip = load("check.mp3");
 
     void playMove() {
-        replay(moveClip, "move.mp3");
+        moveClip.play();
     }
 
     void playCapture() {
-        replay(captureClip, "capture.mp3");
+        captureClip.play();
     }
 
     void playCheck() {
-        replay(checkClip, "check.mp3");
+        checkClip.play();
     }
 
-    private static void replay(MediaPlayer player, String resourceName) {
-        System.out.println("[sound] play " + resourceName + ", status=" + player.getStatus());
-        player.stop();
-        player.play();
-    }
-
-    private static MediaPlayer load(String resourceName) {
+    private static AudioClip load(String resourceName) {
         try (InputStream in = MoveSoundPlayer.class.getResourceAsStream("sounds/" + resourceName)) {
             Path tempFile = Files.createTempFile("moveapiece-", "-" + resourceName);
             tempFile.toFile().deleteOnExit();
             Files.copy(in, tempFile, StandardCopyOption.REPLACE_EXISTING);
-            Media media = new Media(tempFile.toUri().toString());
-            MediaPlayer player = new MediaPlayer(media);
-            player.setOnError(
-                    () ->
-                            System.out.println(
-                                    "[sound] " + resourceName + " ERROR: " + player.getError()));
-            player.setOnReady(() -> System.out.println("[sound] " + resourceName + " ready"));
-            System.out.println("[sound] " + resourceName + " extracted to " + tempFile);
-            return player;
+            return new AudioClip(tempFile.toUri().toString());
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to extract sound resource " + resourceName, e);
         }

@@ -251,14 +251,6 @@ def runJpackage = { String type ->
                 '--win-shortcut',
                 '--win-menu',
                 '--win-upgrade-uuid', WIN_UPGRADE_UUID,
-                // TEMPORARY DIAGNOSTIC (see conversation/commit history): move
-                // sounds are silent in the installed .msi with no error visible
-                // anywhere - AudioClip.play() may be failing internally and
-                // logging to stderr, invisible because a normal jpackage'd
-                // Windows GUI app has no attached console. --win-console keeps
-                // one open so stdout/stderr are actually visible. Remove once
-                // the real cause is found.
-                '--win-console',
         ]
     }
     def pb = new ProcessBuilder(cmd)
