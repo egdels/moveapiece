@@ -7,6 +7,7 @@ package de.schliweb.moveapiece.desktop;
 
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
+import java.awt.Taskbar;
 import java.awt.geom.RoundRectangle2D;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
@@ -30,11 +31,14 @@ public class DesktopApp extends Application {
     @Override
     public void start(Stage stage) {
         stage.setTitle("MoveAPiece");
+        BufferedImage icon = loadIcon();
         // Same artwork as the Android app's launcher icon (see
         // desktop/packaging.gradle's header comment) - jpackage sets the
-        // packaged app's icon separately, this covers the window/dock icon
-        // for a plain `:desktop:run`.
-        stage.getIcons().add(dockIcon());
+        // packaged app's icon separately, this covers the window icon for a
+        // plain `:desktop:run` (title bar on Windows/Linux; macOS windows
+        // don't show one).
+        stage.getIcons().add(toFxImage(icon));
+        setDockIcon(icon);
         controller = new GameController(stage);
         BorderPane root = controller.buildView();
         Scene scene = new Scene(root, 900, 640);
@@ -59,15 +63,40 @@ public class DesktopApp extends Application {
         launch(args);
     }
 
-    private static Image dockIcon() {
+    private static BufferedImage loadIcon() {
         try (InputStream in = DesktopApp.class.getResourceAsStream("icon.png")) {
             BufferedImage source = ImageIO.read(in);
-            BufferedImage icon = isMac() ? maskToMacSquircle(source) : source;
+            return isMac() ? maskToMacSquircle(source) : source;
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    private static Image toFxImage(BufferedImage awtImage) {
+        try {
             ByteArrayOutputStream pngBytes = new ByteArrayOutputStream();
-            ImageIO.write(icon, "png", pngBytes);
+            ImageIO.write(awtImage, "png", pngBytes);
             return new Image(new ByteArrayInputStream(pngBytes.toByteArray()));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
+        }
+    }
+
+    /**
+     * {@code Stage.getIcons()} alone does not actually set the Dock tile on macOS - a long-standing
+     * JavaFX bug (JDK-8095033) that still applies as of this JavaFX version: the app just keeps
+     * showing the default Java icon there. {@code java.awt.Taskbar} (JDK 9+, toolkit-agnostic - it
+     * doesn't require or start a Swing/AWT UI) is the mechanism that actually works, on macOS and
+     * anywhere else that supports it; {@code isSupported} guards make this a no-op elsewhere (e.g.
+     * Windows, which doesn't support runtime taskbar-icon changes through this API at all).
+     */
+    private static void setDockIcon(BufferedImage icon) {
+        if (!Taskbar.isTaskbarSupported()) {
+            return;
+        }
+        Taskbar taskbar = Taskbar.getTaskbar();
+        if (taskbar.isSupported(Taskbar.Feature.ICON_IMAGE)) {
+            taskbar.setIconImage(icon);
         }
     }
 
@@ -78,13 +107,10 @@ public class DesktopApp extends Application {
     /**
      * Pads and rounds a plain square icon to approximate macOS's Big Sur+ "squircle" app-icon
      * shape. The packaged .app's .icns gets that treatment automatically from Finder/Dock whenever
-     * the app isn't running, but a Stage icon set at runtime becomes the Dock tile via
-     * NSApplication.setApplicationIconImage, which shows exactly the pixels it's given - unmasked -
-     * so without this, the running app's Dock icon looks like a plain square next to its own
-     * rounded icon everywhere else (Finder, Launchpad, the not-yet-running Dock icon). Uses plain
-     * AWT (Graphics2D/BufferedImage), same as packaging.gradle's .icns/.ico generation, rather than
-     * an off-screen JavaFX node snapshot - the latter is unreliable here (HiDPI/Retina
-     * backing-scale snapshots can come out at the wrong pixel size).
+     * the app isn't running; the Dock tile set at runtime (see {@link #setDockIcon}) shows exactly
+     * the pixels it's given - unmasked - so without this, the running app's Dock icon would look
+     * like a plain square next to its own rounded icon everywhere else (Finder, Launchpad, the
+     * not-yet-running Dock icon).
      */
     private static BufferedImage maskToMacSquircle(BufferedImage source) {
         int size = Math.max(source.getWidth(), source.getHeight());
