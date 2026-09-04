@@ -41,6 +41,23 @@ android {
         }
     }
 
+    // Per-ABI split APKs: F-Droid has no first-class support for a single
+    // build producing several per-ABI outputs (unlike Play's multi-APK), so
+    // its convention is one shared recipe whose per-ABI outputs are each
+    // declared as a separate packaging-metadata build, pinned to a distinct
+    // versionCode (see the androidComponents block below) so the client
+    // always resolves the one matching the device's ABI. universalApk stays
+    // on too, for a single no-thinking-required download - e.g. the fat
+    // APK release.yml attaches to a GitHub Release.
+    splits {
+        abi {
+            enable true
+            reset()
+            include "armeabi-v7a", "arm64-v8a", "x86_64"
+            universalApk true
+        }
+    }
+
     // Reproducibility requirement: AGP auto-generates ~/.android/debug.keystore
     // per machine (with a random key) if none exists, so two otherwise-identical
     // CI runners produce debug APKs that differ in their signing block alone.
@@ -123,6 +140,37 @@ android {
 
     lint {
         abortOnError = true
+    }
+}
+
+// Assigns each ABI split's versionCode as baseCode*10 + abiCode, so a device
+// always resolves to the split matching its own ABI, and a future baseCode
+// bump (e.g. 1 -> 2) still outranks every split of every older baseCode
+// (10-14 < 20-24). The universal APK has no ABI filter, so it doesn't match
+// any abiCodes entry and is left at baseCode unchanged, same as AGP's
+// default. "x86" has no entry in stockfish.gradle's abiConfigs (nothing
+// builds a 32-bit x86 binary) and isn't in splits.abi's include list above
+// - kept in this map only so the code->ABI ordering matches F-Droid's
+// documented recommendation (armeabi-v7a < arm64-v8a < x86 < x86_64).
+def baseCode = android.defaultConfig.versionCode ?: 1
+def abiCodes = [
+        "armeabi-v7a": 1,
+        "arm64-v8a" : 2,
+        "x86"       : 3,
+        "x86_64"    : 4
+]
+
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        variant.outputs.forEach { output ->
+            def abi = output.filters.find {
+                it.filterType == com.android.build.api.variant.FilterConfiguration.FilterType.ABI
+            }?.identifier
+            def abiCode = abiCodes[abi]
+            if (abiCode != null) {
+                output.versionCode.set(baseCode * 10 + abiCode)
+            }
+        }
     }
 }
 

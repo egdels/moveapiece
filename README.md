@@ -72,22 +72,25 @@ builds:
 
 ```sh
 ./gradlew clean :app:assembleDebug
-shasum -a 256 app/build/outputs/apk/debug/app-debug.apk
+shasum -a 256 app/build/outputs/apk/debug/*.apk
 ./gradlew clean :app:assembleDebug
-shasum -a 256 app/build/outputs/apk/debug/app-debug.apk
-# both hashes must match
+shasum -a 256 app/build/outputs/apk/debug/*.apk
+# hashes must match per file
 ```
 
-`.github/workflows/build.yml` builds the debug APK on two independent
-runners (`build-a`, `build-b`) and a third job (`compare`) fails the
-workflow if their SHA-256 hashes differ. Both jobs sign with the same
-fixed, committed `app/debug.keystore` (see `app/build.gradle`'s
-`signingConfigs.debug`) instead of AGP's auto-generated per-machine
-keystore, which is what makes a whole-file hash comparison meaningful -
-without it, the signing block alone would differ between runners even
-when the app content is identical. This reproducibility requirement is
-Android-specific (driven by F-Droid's build process) and does not apply
-to the desktop app.
+`assembleDebug` produces one APK per ABI plus a universal one (see
+`app/build.gradle`'s `splits.abi` - each ABI split gets a distinct
+`versionCode` so an F-Droid client always resolves the one matching the
+device). `.github/workflows/build.yml` builds all of them on two
+independent runners (`build-a`, `build-b`) and a third job (`compare`)
+fails the workflow if any file's SHA-256 hash differs between the two.
+Both jobs sign with the same fixed, committed `app/debug.keystore` (see
+`app/build.gradle`'s `signingConfigs.debug`) instead of AGP's
+auto-generated per-machine keystore, which is what makes a whole-file
+hash comparison meaningful - without it, the signing block alone would
+differ between runners even when the app content is identical. This
+reproducibility requirement is Android-specific (driven by F-Droid's
+build process) and does not apply to the desktop app.
 
 ### Desktop
 

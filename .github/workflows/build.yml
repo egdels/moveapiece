@@ -1,14 +1,15 @@
 name: Build
 
-# Reproducibility self-test: builds the debug APK twice, on two independent
-# GitHub-hosted runners, and fails the workflow if the resulting APKs are
-# not byte-for-byte identical. Both jobs sign with the same fixed, committed
-# app/debug.keystore (see app/build.gradle's signingConfigs.debug) rather
-# than AGP's auto-generated per-machine one, which is what makes a
-# whole-file hash comparison meaningful instead of failing on the signing
-# block alone. This is a pre-submission sanity check only; it does not
-# replace F-Droid's own reproducible-build verification against the
-# fdroiddata metadata.
+# Reproducibility self-test: builds the debug APKs (per-ABI splits plus the
+# universal one - see app/build.gradle's splits.abi) twice, on two
+# independent GitHub-hosted runners, and fails the workflow if any of the
+# resulting APKs are not byte-for-byte identical between the two runs. Both
+# jobs sign with the same fixed, committed app/debug.keystore (see app/
+# build.gradle's signingConfigs.debug) rather than AGP's auto-generated
+# per-machine one, which is what makes a whole-file hash comparison
+# meaningful instead of failing on the signing block alone. This is a
+# pre-submission sanity check only; it does not replace F-Droid's own
+# reproducible-build verification against the fdroiddata metadata.
 
 on:
   push:
@@ -144,14 +145,14 @@ jobs:
       - name: Install pinned SDK components
         run: sdkmanager --install "platforms;${PLATFORM_VERSION}" "build-tools;${BUILD_TOOLS_VERSION}" "ndk;${NDK_VERSION}"
 
-      - name: Build debug APK
+      - name: Build debug APKs
         run: ./gradlew --no-daemon :app:assembleDebug
 
-      - name: Upload APK
+      - name: Upload APKs
         uses: actions/upload-artifact@v4
         with:
           name: app-debug-a
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: app/build/outputs/apk/debug/*.apk
 
   build-b:
     name: Build B (independent runner)
@@ -171,14 +172,14 @@ jobs:
       - name: Install pinned SDK components
         run: sdkmanager --install "platforms;${PLATFORM_VERSION}" "build-tools;${BUILD_TOOLS_VERSION}" "ndk;${NDK_VERSION}"
 
-      - name: Build debug APK
+      - name: Build debug APKs
         run: ./gradlew --no-daemon :app:assembleDebug
 
-      - name: Upload APK
+      - name: Upload APKs
         uses: actions/upload-artifact@v4
         with:
           name: app-debug-b
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: app/build/outputs/apk/debug/*.apk
 
   compare:
     name: Compare build hashes
@@ -197,18 +198,36 @@ jobs:
 
       - name: Compare SHA-256 hashes
         run: |
-          HASH_A=$(sha256sum build-a/app-debug.apk | cut -d' ' -f1)
-          HASH_B=$(sha256sum build-b/app-debug.apk | cut -d' ' -f1)
-          echo "Build A: $HASH_A"
-          echo "Build B: $HASH_B"
-          if [ "$HASH_A" != "$HASH_B" ]; then
-            echo "::error::Builds are not reproducible: hashes differ between two independent runners."
+          shopt -s nullglob
+          apks=(build-a/*.apk)
+          if [ ${#apks[@]} -eq 0 ]; then
+            echo "::error::No APKs found in build A's artifact."
             exit 1
           fi
-          echo "Builds are bit-identical across independent runners."
+          fail=0
+          for apk_a in "${apks[@]}"; do
+            name=$(basename "$apk_a")
+            apk_b="build-b/$name"
+            if [ ! -f "$apk_b" ]; then
+              echo "::error::$name was produced by build A but not build B."
+              fail=1
+              continue
+            fi
+            hash_a=$(sha256sum "$apk_a" | cut -d' ' -f1)
+            hash_b=$(sha256sum "$apk_b" | cut -d' ' -f1)
+            echo "$name: A=$hash_a B=$hash_b"
+            if [ "$hash_a" != "$hash_b" ]; then
+              echo "::error::$name is not reproducible: hashes differ between two independent runners."
+              fail=1
+            fi
+          done
+          if [ "$fail" -ne 0 ]; then
+            exit 1
+          fi
+          echo "All APKs are bit-identical across independent runners."
 
-      - name: Upload verified APK
+      - name: Upload verified APKs
         uses: actions/upload-artifact@v4
         with:
           name: app-debug-verified
-          path: build-a/app-debug.apk
+          path: build-a/*.apk
