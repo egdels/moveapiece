@@ -1,18 +1,24 @@
 name: Release
 
-# Triggered by pushing a version tag (v1.0.0, v1.0.0-rc1, ...), not by
-# creating a GitHub Release first - this job creates the Release itself.
-# Builds release APKs signed with the real release key and publishes them
-# as a GitHub Release for that tag: one per ABI (see app/build.gradle's
-# splits.abi) plus a universal one for a single no-thinking-required
-# download. Unlike build.yml's debug builds (signed with the committed,
-# non-secret app/debug.keystore purely for reproducibility testing), this
-# needs the actual signing identity from repository secrets. F-Droid does
-# not use this workflow: it builds and signs from source itself, picking
-# up the per-ABI splits via its own packaging metadata.
+# Triggered by pushing a version tag (v1.0.0, v1.0.0-rc1, ...). create-release
+# creates the (empty) GitHub Release for that tag first; android and desktop
+# then build in parallel and each upload their own assets to it via
+# `gh release upload`, so a failure in one doesn't block the other's assets
+# from landing. A tag with a "-" suffix (e.g. "-rc1", "-beta1") is published
+# as a pre-release; a plain "vX.Y.Z" tag is a full release.
 #
-# A tag with a "-" suffix (e.g. "-rc1", "-beta1") is published as a
-# pre-release; a plain "vX.Y.Z" tag is a full release.
+# android builds the signed per-ABI + universal APKs (see app/build.gradle's
+# splits.abi), using the real release signing identity from repository
+# secrets - unlike build.yml's debug builds, which sign with the committed,
+# non-secret app/debug.keystore purely for reproducibility testing. F-Droid
+# does not use this workflow: it builds and signs the APK from source
+# itself, picking up the per-ABI splits via its own packaging metadata.
+#
+# desktop packages the JavaFX app for every OS/arch desktop.yml already
+# verifies builds (see that file's header for which legs are proven vs.
+# first-run-unverified) and attaches one archive per leg: a DMG on macOS
+# (packaging.gradle's file header explains why not a raw app-image), a
+# .tar.gz app-image on Linux, a .zip app-image on Windows.
 
 on:
   push:
@@ -28,8 +34,24 @@ permissions:
   contents: write
 
 jobs:
-  build-and-sign:
-    name: Build & sign release APK
+  create-release:
+    name: Create the GitHub Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create release (no assets yet)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ github.ref_name }}"
+          extra_args=(--title "$TAG" --generate-notes --repo "${{ github.repository }}")
+          if [[ "$TAG" == *-* ]]; then
+            extra_args+=(--prerelease)
+          fi
+          gh release create "$TAG" "${extra_args[@]}"
+
+  android:
+    name: Build & sign release APKs
+    needs: create-release
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -59,13 +81,103 @@ jobs:
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
         run: ./gradlew --no-daemon :app:assembleRelease
 
-      - name: Create the GitHub Release and upload APKs
+      - name: Upload APKs to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.ref_name }}" app/build/outputs/apk/release/*.apk --clobber
+
+  desktop:
+    name: Build & package desktop (${{ matrix.asset }})
+    needs: create-release
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            shell: bash
+            asset: linux-x86_64
+          - os: ubuntu-24.04-arm
+            shell: bash
+            asset: linux-arm64
+          - os: macos-latest
+            shell: bash
+            asset: macos-arm64
+          - os: macos-15-intel
+            shell: bash
+            asset: macos-x86_64
+          - os: windows-latest
+            shell: 'msys2 {0}'
+            asset: windows-x86_64
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          # See desktop.yml: jpackage bundles its app-image runtime from
+          # whichever JDK runs it, and javafx 24.0.2's class files need 22+.
+          java-version: "22"
+
+      - name: Set up MinGW toolchain (Windows)
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          install: mingw-w64-x86_64-toolchain make xz zip
+          path-type: inherit
+
+      - name: Install build tools (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y build-essential xz-utils
+
+      - name: Install build tools (macOS)
+        if: runner.os == 'macOS'
+        run: brew install xz
+
+      - name: Build desktop app image
+        if: runner.os != 'macOS'
+        run: ./gradlew --no-daemon :desktop:jpackageAppImage
+
+      # DMG, not the raw app-image, on macOS - see packaging.gradle's file
+      # header for why the app-image doesn't survive an artifact round trip.
+      - name: Build desktop DMG (macOS)
+        if: runner.os == 'macOS'
+        run: ./gradlew --no-daemon :desktop:jpackageDmg
+
+      - name: Package and upload (Linux)
+        if: runner.os == 'Linux'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="${{ github.ref_name }}"
-          extra_args=(--title "$TAG" --generate-notes)
-          if [[ "$TAG" == *-* ]]; then
-            extra_args+=(--prerelease)
-          fi
-          gh release create "$TAG" app/build/outputs/apk/release/*.apk "${extra_args[@]}"
+          VERSION=$(grep '^appVersion=' gradle.properties | cut -d= -f2)
+          ASSET="MoveAPiece-${VERSION}-${{ matrix.asset }}.tar.gz"
+          tar czf "$ASSET" -C desktop/build/jpackage MoveAPiece
+          gh release upload "${{ github.ref_name }}" "$ASSET" --clobber
+
+      - name: Package and upload (Windows)
+        if: runner.os == 'Windows'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(grep '^appVersion=' gradle.properties | cut -d= -f2)
+          ASSET="MoveAPiece-${VERSION}-${{ matrix.asset }}.zip"
+          DEST="$(pwd)/$ASSET"
+          (cd desktop/build/jpackage && zip -r "$DEST" MoveAPiece)
+          gh release upload "${{ github.ref_name }}" "$ASSET" --clobber
+
+      - name: Upload DMG (macOS)
+        if: runner.os == 'macOS'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(grep '^appVersion=' gradle.properties | cut -d= -f2)
+          SRC="desktop/build/jpackage/MoveAPiece-${VERSION}.dmg"
+          ASSET="MoveAPiece-${VERSION}-${{ matrix.asset }}.dmg"
+          mv "$SRC" "$ASSET"
+          gh release upload "${{ github.ref_name }}" "$ASSET" --clobber
