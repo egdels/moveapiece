@@ -17,21 +17,29 @@
  * is unverified - see the analogous note in desktop/stockfish.gradle about
  * only the macOS Stockfish host build being verified.
  *
- * `--type app-image` (not a signed pkg/msi/exe installer) deliberately: a
- * real installer needs code-signing/notarization credentials this project
- * doesn't have configured. The app-image is already a normal, launchable
- * .app/.exe folder - just not a polished installer experience.
+ * jpackageAppImage (`--type app-image`) is the plain, no-prerequisites
+ * output - a normal, launchable .app/.exe/binary folder, not a polished
+ * installer, useful for local testing without dpkg-deb/WiX installed. The
+ * actual release artifacts (release.yml) use a real installer format per
+ * OS instead - none of these are code-signed (no signing/notarization
+ * credentials configured for this project), so first launch/install shows
+ * the OS's usual "unidentified developer" style warning:
  *
- * macOS is the exception: it also gets `--type dmg` (jpackageDmg below).
- * jpackage ad-hoc-signs the app bundle either way (arm64 Macs refuse to run
- * an entirely unsigned binary), and that signature embeds a hash manifest
- * of every file in the bundle. A raw app-image directory is a poor way to
- * ship that: CI uploads it by zipping the directory tree, and unzipping it
- * again on the receiving end doesn't reliably reproduce the exact
- * bytes/permissions the manifest was hashed against, so the seal silently
- * breaks - macOS then refuses to launch it at all ("app is damaged"),
- * which not even a user override can bypass. A DMG is a raw disk-image
- * file, byte-identical after download; mounting it never touches the seal.
+ *  - macOS: jpackageDmg (`--type dmg`). jpackage ad-hoc-signs the app
+ *    bundle either way (arm64 Macs refuse to run an entirely unsigned
+ *    binary), and that signature embeds a hash manifest of every file in
+ *    the bundle. A raw app-image directory is a poor way to ship that: CI
+ *    would upload it by zipping the directory tree, and unzipping it again
+ *    on the receiving end doesn't reliably reproduce the exact
+ *    bytes/permissions the manifest was hashed against, so the seal
+ *    silently breaks - macOS then refuses to launch it at all ("app is
+ *    damaged"), which not even a user override can bypass. A DMG is a raw
+ *    disk-image file, byte-identical after download; mounting it never
+ *    touches the seal.
+ *  - Linux: jpackageDeb (`--type deb`). Needs `dpkg-deb` (present on any
+ *    Debian/Ubuntu host) and `fakeroot`.
+ *  - Windows: jpackageMsi (`--type msi`). Needs the WiX Toolset (v3;
+ *    candle.exe/light.exe) on PATH - not bundled with the JDK.
  */
 
 def os = org.gradle.internal.os.OperatingSystem.current()
@@ -44,6 +52,12 @@ def appVersion = project.property('appVersion')
 // Not DesktopApp itself - see Launcher's Javadoc for why a jpackage
 // app-image (classpath-mode, no --module-path) needs this indirection.
 def mainClassName = 'de.schliweb.moveapiece.desktop.Launcher'
+// Fixed, generated once via `uuidgen` - never change this. jpackage's MSI
+// bundler uses it as the product's upgrade code; a stable value is what
+// lets Windows recognize a newer MSI as an upgrade of the same app
+// (Add/Remove Programs) instead of installing a second, parallel copy. Left
+// unpinned, jpackage generates a random one per build.
+def WIN_UPGRADE_UUID = 'B7D289C7-B828-43F3-AAB5-392C2E796CB5'
 
 def sourceIconPng = file("$projectDir/src/main/resources/de/schliweb/moveapiece/desktop/icon.png")
 def iconsDir = layout.buildDirectory.dir('icons').get().asFile
@@ -229,6 +243,16 @@ def runJpackage = { String type ->
     if (icon.exists()) {
         cmd += ['--icon', icon.absolutePath]
     }
+    if (type == 'deb') {
+        cmd += ['--linux-shortcut']
+    }
+    if (type == 'msi') {
+        cmd += [
+                '--win-shortcut',
+                '--win-menu',
+                '--win-upgrade-uuid', WIN_UPGRADE_UUID,
+        ]
+    }
     def pb = new ProcessBuilder(cmd)
     pb.redirectErrorStream(true)
     Process proc = pb.start()
@@ -265,5 +289,36 @@ tasks.register('jpackageDmg') {
             throw new GradleException('jpackageDmg is only supported on macOS')
         }
         runJpackage('dmg')
+    }
+}
+
+// See the file header for the Linux/Windows equivalents of the DMG note
+// above: dpkg-deb/fakeroot and the WiX Toolset respectively must be on
+// PATH.
+tasks.register('jpackageDeb') {
+    dependsOn 'generateIcons', 'prepareJpackageInput'
+    inputs.dir(jpackageInputDir)
+    inputs.file(sourceIconPng)
+    outputs.dir(jpackageDestDir)
+
+    doLast {
+        if (!os.isLinux()) {
+            throw new GradleException('jpackageDeb is only supported on Linux')
+        }
+        runJpackage('deb')
+    }
+}
+
+tasks.register('jpackageMsi') {
+    dependsOn 'generateIcons', 'prepareJpackageInput'
+    inputs.dir(jpackageInputDir)
+    inputs.file(sourceIconPng)
+    outputs.dir(jpackageDestDir)
+
+    doLast {
+        if (!os.isWindows()) {
+            throw new GradleException('jpackageMsi is only supported on Windows')
+        }
+        runJpackage('msi')
     }
 }

@@ -16,9 +16,9 @@ name: Release
 #
 # desktop packages the JavaFX app for every OS/arch desktop.yml already
 # verifies builds (see that file's header for which legs are proven vs.
-# first-run-unverified) and attaches one archive per leg: a DMG on macOS
-# (packaging.gradle's file header explains why not a raw app-image), a
-# .tar.gz app-image on Linux, a .zip app-image on Windows.
+# first-run-unverified) and attaches one installer per leg: a DMG on macOS,
+# a DEB on Linux, an MSI on Windows (desktop/packaging.gradle's file header
+# has the per-format prerequisites and why not a raw app-image).
 
 on:
   push:
@@ -129,20 +129,37 @@ jobs:
         uses: msys2/setup-msys2@v2
         with:
           msystem: MINGW64
-          install: mingw-w64-x86_64-toolchain make xz zip
+          install: mingw-w64-x86_64-toolchain make xz
           path-type: inherit
+
+      # Two steps, not one: choco updates the machine-level WIX env var, which
+      # only a freshly spawned process (i.e. the next step) picks up - not
+      # this same install step's own already-running shell.
+      - name: Install WiX Toolset (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: choco install wixtoolset --no-progress -y
+
+      - name: Add WiX Toolset to PATH (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Join-Path $env:WIX 'bin' | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Install build tools (Linux)
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y build-essential xz-utils
+        run: sudo apt-get update && sudo apt-get install -y build-essential xz-utils fakeroot
 
       - name: Install build tools (macOS)
         if: runner.os == 'macOS'
         run: brew install xz
 
-      - name: Build desktop app image
-        if: runner.os != 'macOS'
-        run: ./gradlew --no-daemon :desktop:jpackageAppImage
+      - name: Build desktop DEB (Linux)
+        if: runner.os == 'Linux'
+        run: ./gradlew --no-daemon :desktop:jpackageDeb
+
+      - name: Build desktop MSI (Windows)
+        if: runner.os == 'Windows'
+        run: ./gradlew --no-daemon :desktop:jpackageMsi
 
       # DMG, not the raw app-image, on macOS - see packaging.gradle's file
       # header for why the app-image doesn't survive an artifact round trip.
@@ -150,28 +167,29 @@ jobs:
         if: runner.os == 'macOS'
         run: ./gradlew --no-daemon :desktop:jpackageDmg
 
-      - name: Package and upload (Linux)
+      - name: Upload DEB to the release (Linux)
         if: runner.os == 'Linux'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION=$(grep '^appVersion=' gradle.properties | cut -d= -f2)
-          ASSET="MoveAPiece-${VERSION}-${{ matrix.asset }}.tar.gz"
-          tar czf "$ASSET" -C desktop/build/jpackage MoveAPiece
+          SRC=$(ls desktop/build/jpackage/*.deb)
+          ASSET="MoveAPiece-${VERSION}-${{ matrix.asset }}.deb"
+          cp "$SRC" "$ASSET"
           gh release upload "${{ github.ref_name }}" "$ASSET" --clobber
 
-      - name: Package and upload (Windows)
+      - name: Upload MSI to the release (Windows)
         if: runner.os == 'Windows'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION=$(grep '^appVersion=' gradle.properties | cut -d= -f2)
-          ASSET="MoveAPiece-${VERSION}-${{ matrix.asset }}.zip"
-          DEST="$(pwd)/$ASSET"
-          (cd desktop/build/jpackage && zip -r "$DEST" MoveAPiece)
+          SRC=$(ls desktop/build/jpackage/*.msi)
+          ASSET="MoveAPiece-${VERSION}-${{ matrix.asset }}.msi"
+          cp "$SRC" "$ASSET"
           gh release upload "${{ github.ref_name }}" "$ASSET" --clobber
 
-      - name: Upload DMG (macOS)
+      - name: Upload DMG to the release (macOS)
         if: runner.os == 'macOS'
         env:
           GH_TOKEN: ${{ github.token }}
