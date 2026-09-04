@@ -75,6 +75,7 @@ public class MainActivity extends AppCompatActivity
     private final ChessGame game = new ChessGame();
     private StockfishEngine engine;
     private MoveSoundPlayer soundPlayer;
+    private Settings settings;
     private ActivityResultLauncher<String> pgnImportLauncher;
 
     private GameMode mode = GameMode.ENGINE;
@@ -153,6 +154,9 @@ public class MainActivity extends AppCompatActivity
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         soundPlayer = new MoveSoundPlayer(getApplicationContext());
+        settings = new Settings(getApplicationContext());
+        engineElo = settings.getEngineElo(engineElo);
+        evaluationEnabled = settings.isEvaluationDisplayEnabled(evaluationEnabled);
         pgnImportLauncher =
                 registerForActivityResult(
                         new ActivityResultContracts.GetContent(), this::onPgnFileSelected);
@@ -190,6 +194,7 @@ public class MainActivity extends AppCompatActivity
         binding.evaluationSwitch.setOnCheckedChangeListener(
                 (btn, checked) -> {
                     evaluationEnabled = checked;
+                    settings.setEvaluationDisplayEnabled(checked);
                     if (!checked) {
                         binding.evaluationText.setText("");
                     } else {
@@ -396,6 +401,7 @@ public class MainActivity extends AppCompatActivity
         mode = chosenMode;
         engineSide = chosenMode == GameMode.ENGINE ? chosenSide : engineSide;
         engineElo = chosenElo;
+        settings.setEngineElo(engineElo);
         trainingSession =
                 mode == GameMode.TRAINING
                         ? new TrainingSession(chosenOpening, chosenSide, hintsEnabled)
@@ -924,6 +930,7 @@ public class MainActivity extends AppCompatActivity
                                 mode = GameMode.ENGINE;
                                 engineSide = trainedSide == Side.WHITE ? Side.BLACK : Side.WHITE;
                                 engineElo = ELO_MIN + dialogBinding.strengthSeekBar.getProgress();
+                                settings.setEngineElo(engineElo);
                                 if (engineReady) {
                                     engine.newGame();
                                     engine.setStrength(engineElo);

@@ -93,7 +93,7 @@ final class GameController implements BoardCanvas.MoveSource, EngineListener {
     private final BoardCanvas boardCanvas = new BoardCanvas();
     private final Label statusLabel = new Label();
     private final TextArea moveListArea = new TextArea();
-    private final Slider strengthSlider = new Slider(1320, 3190, 2200);
+    private final Slider strengthSlider = new Slider(1320, 3190, Settings.getEngineElo());
     private final Label strengthLabel = new Label();
     // Same Material icon glyphs as the Android app's ic_undo.xml/ic_flip_board.xml
     // (SVG path data reused verbatim - both use the same path-string syntax).
@@ -124,7 +124,7 @@ final class GameController implements BoardCanvas.MoveSource, EngineListener {
     private boolean engineReady = false;
     private boolean waitingForEngineMove = false;
     private boolean boardFlipped = false;
-    private boolean evaluationEnabled = true;
+    private boolean evaluationEnabled = Settings.isEvaluationDisplayEnabled();
     private Side analysisSideToMove;
     private final Deque<PendingSearch> pendingSearches = new ArrayDeque<>();
     private int searchGeneration = 0;
@@ -245,6 +245,7 @@ final class GameController implements BoardCanvas.MoveSource, EngineListener {
         evaluationCheckbox.setOnAction(
                 e -> {
                     evaluationEnabled = evaluationCheckbox.isSelected();
+                    Settings.setEvaluationDisplayEnabled(evaluationEnabled);
                     if (!evaluationEnabled) {
                         evaluationLabel.setText("");
                     } else {
@@ -264,6 +265,7 @@ final class GameController implements BoardCanvas.MoveSource, EngineListener {
                         (obs, old, val) -> {
                             strengthLabel.setText(
                                     Messages.get("dialog_strength_format", val.intValue()));
+                            Settings.setEngineElo(val.intValue());
                             if (engineReady) {
                                 engine.setStrength(val.intValue());
                             }
