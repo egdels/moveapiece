@@ -29,7 +29,9 @@ android {
         minSdk 26
         targetSdk 36
         versionCode 1
-        versionName "0.1.0"
+        // Shared with the desktop app's --app-version (see packaging.gradle);
+        // the actual value lives in the root gradle.properties.
+        versionName project.appVersion
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 

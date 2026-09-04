@@ -36,10 +36,11 @@
 
 def os = org.gradle.internal.os.OperatingSystem.current()
 def appName = 'MoveAPiece'
-// macOS requires the first component of --app-version to be a positive
-// integer (it becomes CFBundleVersion), so this can't just mirror the
-// Android app's "0.1.0" versionName.
-def appVersion = '1.0.0'
+// Shared with the Android app's versionName (see app/build.gradle); the
+// actual value lives in the root gradle.properties. macOS requires the
+// first component of --app-version to be a positive integer (it becomes
+// CFBundleVersion), so that value must not itself start with "0".
+def appVersion = project.property('appVersion')
 // Not DesktopApp itself - see Launcher's Javadoc for why a jpackage
 // app-image (classpath-mode, no --module-path) needs this indirection.
 def mainClassName = 'de.schliweb.moveapiece.desktop.Launcher'
