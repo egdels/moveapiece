@@ -1,18 +1,23 @@
 name: Release
 
-# Builds release APKs signed with the real release key and attaches them to
-# the GitHub Release that triggered this workflow: one per ABI (see
-# app/build.gradle's splits.abi) plus a universal one for a single
-# no-thinking-required download. Unlike build.yml's debug builds (signed
-# with the committed, non-secret app/debug.keystore purely for
-# reproducibility testing), this needs the actual signing identity from
-# repository secrets. F-Droid does not use this workflow: it builds and
-# signs from source itself, picking up the per-ABI splits via its own
-# packaging metadata.
+# Triggered by pushing a version tag (v1.0.0, v1.0.0-rc1, ...), not by
+# creating a GitHub Release first - this job creates the Release itself.
+# Builds release APKs signed with the real release key and publishes them
+# as a GitHub Release for that tag: one per ABI (see app/build.gradle's
+# splits.abi) plus a universal one for a single no-thinking-required
+# download. Unlike build.yml's debug builds (signed with the committed,
+# non-secret app/debug.keystore purely for reproducibility testing), this
+# needs the actual signing identity from repository secrets. F-Droid does
+# not use this workflow: it builds and signs from source itself, picking
+# up the per-ABI splits via its own packaging metadata.
+#
+# A tag with a "-" suffix (e.g. "-rc1", "-beta1") is published as a
+# pre-release; a plain "vX.Y.Z" tag is a full release.
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - 'v*'
 
 env:
   NDK_VERSION: "28.0.13004108"
@@ -54,7 +59,13 @@ jobs:
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
         run: ./gradlew --no-daemon :app:assembleRelease
 
-      - name: Upload APKs to the release
+      - name: Create the GitHub Release and upload APKs
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ github.event.release.tag_name }}" app/build/outputs/apk/release/*.apk --clobber
+        run: |
+          TAG="${{ github.ref_name }}"
+          extra_args=(--title "$TAG" --generate-notes)
+          if [[ "$TAG" == *-* ]]; then
+            extra_args+=(--prerelease)
+          fi
+          gh release create "$TAG" app/build/outputs/apk/release/*.apk "${extra_args[@]}"
