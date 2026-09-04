@@ -11,6 +11,14 @@ def releaseKeyPassword = System.getenv("SIGNING_KEY_PASSWORD")
 def releaseStorePassword = System.getenv("SIGNING_STORE_PASSWORD")
 def hasReleaseSigning = releaseKeystorePath && releaseKeyAlias && releaseKeyPassword && releaseStorePassword
 
+// Derives versionCode from versionName instead of maintaining two numbers
+// by hand: "4.6.2" -> 4*10000 + 6*100 + 2 = 40602. Missing components (e.g.
+// a two-part "4.6") count as 0. Each component must stay below 100 (or the
+// major below 100 too) for this to not overflow into the next one - fine
+// for this project's versioning.
+def (major, minor, patch) = (project.appVersion as String).tokenize('.').collect { it as int } + [0, 0, 0]
+def baseVersionCode = major * 10000 + minor * 100 + patch
+
 android {
     namespace 'de.schliweb.moveapiece'
     compileSdk 36
@@ -28,9 +36,10 @@ android {
         // require API 26+.
         minSdk 26
         targetSdk 36
-        versionCode 1
         // Shared with the desktop app's --app-version (see packaging.gradle);
-        // the actual value lives in the root gradle.properties.
+        // the actual value lives in the root gradle.properties. versionCode
+        // is derived from it above, not maintained separately.
+        versionCode baseVersionCode
         versionName project.appVersion
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
@@ -143,16 +152,16 @@ android {
     }
 }
 
-// Assigns each ABI split's versionCode as baseCode*10 + abiCode, so a device
-// always resolves to the split matching its own ABI, and a future baseCode
-// bump (e.g. 1 -> 2) still outranks every split of every older baseCode
-// (10-14 < 20-24). The universal APK has no ABI filter, so it doesn't match
-// any abiCodes entry and is left at baseCode unchanged, same as AGP's
-// default. "x86" has no entry in stockfish.gradle's abiConfigs (nothing
-// builds a 32-bit x86 binary) and isn't in splits.abi's include list above
-// - kept in this map only so the code->ABI ordering matches F-Droid's
-// documented recommendation (armeabi-v7a < arm64-v8a < x86 < x86_64).
-def baseCode = android.defaultConfig.versionCode ?: 1
+// Assigns each ABI split's versionCode as baseVersionCode*10 + abiCode, so a
+// device always resolves to the split matching its own ABI, and any future
+// version bump (baseVersionCode strictly increasing) still outranks every
+// split of every older version, since abiCode always stays a single digit.
+// The universal APK has no ABI filter, so it doesn't match any abiCodes
+// entry and is left at baseVersionCode unchanged, same as AGP's default.
+// "x86" has no entry in stockfish.gradle's abiConfigs (nothing builds a
+// 32-bit x86 binary) and isn't in splits.abi's include list above - kept in
+// this map only so the code->ABI ordering matches F-Droid's documented
+// recommendation (armeabi-v7a < arm64-v8a < x86 < x86_64).
 def abiCodes = [
         "armeabi-v7a": 1,
         "arm64-v8a" : 2,
@@ -168,7 +177,7 @@ androidComponents {
             }?.identifier
             def abiCode = abiCodes[abi]
             if (abiCode != null) {
-                output.versionCode.set(baseCode * 10 + abiCode)
+                output.versionCode.set(baseVersionCode * 10 + abiCode)
             }
         }
     }
