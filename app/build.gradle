@@ -2,6 +2,15 @@ plugins {
     id 'com.android.application'
 }
 
+// Release signing comes from CI secrets (see .github/workflows/release.yml),
+// never from local defaults - unset locally, so a plain `assembleRelease`
+// outside that workflow builds an unsigned APK instead of failing.
+def releaseKeystorePath = System.getenv("RELEASE_KEYSTORE_PATH")
+def releaseKeyAlias = System.getenv("SIGNING_KEY_ALIAS")
+def releaseKeyPassword = System.getenv("SIGNING_KEY_PASSWORD")
+def releaseStorePassword = System.getenv("SIGNING_STORE_PASSWORD")
+def hasReleaseSigning = releaseKeystorePath && releaseKeyAlias && releaseKeyPassword && releaseStorePassword
+
 android {
     namespace 'de.schliweb.moveapiece'
     compileSdk 36
@@ -43,6 +52,14 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        if (hasReleaseSigning) {
+            release {
+                storeFile file(releaseKeystorePath)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
     }
 
     buildTypes {
@@ -54,6 +71,9 @@ android {
             // differ between our CI and the F-Droid build server.
             vcsInfo {
                 include false
+            }
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
             }
         }
         debug {

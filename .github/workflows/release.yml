@@ -1,0 +1,57 @@
+name: Release
+
+# Builds a release APK signed with the real release key and attaches it to
+# the GitHub Release that triggered this workflow. Unlike build.yml's debug
+# builds (signed with the committed, non-secret app/debug.keystore purely
+# for reproducibility testing), this needs the actual signing identity from
+# repository secrets - for a direct-download APK on the GitHub Releases
+# page. F-Droid does not use this: it builds and signs from source itself.
+
+on:
+  release:
+    types: [published]
+
+env:
+  NDK_VERSION: "28.0.13004108"
+  BUILD_TOOLS_VERSION: "36.1.0"
+  PLATFORM_VERSION: "android-36"
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-sign:
+    name: Build & sign release APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install pinned SDK components
+        run: sdkmanager --install "platforms;${PLATFORM_VERSION}" "build-tools;${BUILD_TOOLS_VERSION}" "ndk;${NDK_VERSION}"
+
+      - name: Decode release keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+
+      - name: Build signed release APK
+        env:
+          RELEASE_KEYSTORE_PATH: ${{ runner.temp }}/release.keystore
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+        run: ./gradlew --no-daemon :app:assembleRelease
+
+      - name: Upload APK to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" app/build/outputs/apk/release/app-release.apk --clobber
