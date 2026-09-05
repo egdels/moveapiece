@@ -4,7 +4,10 @@
     <string name="menu_undo">Annulla mossa</string>
     <string name="menu_flip_board">Ruota scacchiera</string>
     <string name="menu_opening_library">Libreria delle aperture</string>
+    <string name="menu_hint">Suggerimento</string>
     <string name="menu_opponent">Avversario</string>
+    <string name="menu_pegasus_connect">Connetti scacchiera Pegasus…</string>
+    <string name="menu_pegasus_disconnect">Disconnetti scacchiera Pegasus</string>
 
     <string name="dialog_new_game_title">Nuova partita</string>
     <string name="opponent_human">Umano (2 giocatori)</string>
@@ -34,11 +37,27 @@
     <string name="evaluation_toggle_label">Mostra valutazione</string>
     <string name="evaluation_mate_format">Matto in %1$d (%2$s)</string>
 
+    <string name="move_quality_inaccuracy">Imprecisione</string>
+    <string name="move_quality_mistake">Errore</string>
+    <string name="move_quality_blunder">Svista</string>
+    <string name="move_quality_format">%1$s (%2$.1f)</string>
+
+    <string name="hint_alternatives_label">Anche buono: %1$s</string>
+    <string name="hint_alternative_format">%1$s (%2$+.1f)</string>
+
     <string name="action_export_pgn">Esporta PGN</string>
     <string name="action_import_pgn">Importa PGN</string>
     <string name="pgn_import_failed">Impossibile leggere il PGN</string>
     <string name="pgn_import_progress">Importazione PGN in corso…</string>
     <string name="pgn_select_game_title">Seleziona partita</string>
+
+    <string name="action_analyze_game">Analizza partita</string>
+    <string name="action_analyzing_format">Analisi in corso… (%1$d/%2$d)</string>
+    <string name="analysis_dialog_title">Analisi della partita</string>
+    <string name="analysis_side_summary_format">%1$s: Ø %2$.1f — %3$d imprecisioni, %4$d errori, %5$d sviste</string>
+    <string name="analysis_flagged_moves_header">Mosse segnalate:</string>
+    <string name="analysis_no_flagged_moves">Nessun errore rilevante – ben giocato!</string>
+    <string name="analysis_flagged_move_format">%1$s %2$s — %3$s (%4$.1f)</string>
 
     <string name="dialog_training_complete_title">Apertura completata</string>
     <string name="dialog_training_complete_message_format">«%1$s» è terminata.</string>
@@ -57,6 +76,15 @@
     <string name="action_ok">OK</string>
     <string name="action_cancel">Annulla</string>
 
+    <string name="dialog_pegasus_title">Connetti scacchiera Pegasus</string>
+    <string name="pegasus_scan_empty">Ricerca dispositivi…</string>
+    <string name="pegasus_scan_failed">Ricerca Bluetooth non riuscita</string>
+    <string name="pegasus_connected">Scacchiera Pegasus connessa</string>
+    <string name="pegasus_disconnected">Scacchiera Pegasus disconnessa</string>
+    <string name="pegasus_permission_required">Autorizzazione Bluetooth necessaria</string>
+    <string name="pegasus_error_format">Errore Pegasus: %1$s</string>
+    <string name="pegasus_battery_format">Batteria scacchiera Pegasus: %1$d %%</string>
+    <string name="pegasus_ambiguous_title">Mossa ambigua – seleziona</string>
 
     <string name="opening_ruy_lopez">Apertura spagnola (Ruy López)</string>
     <string name="opening_italian">Partita italiana</string>

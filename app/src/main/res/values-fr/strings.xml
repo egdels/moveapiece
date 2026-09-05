@@ -4,7 +4,10 @@
     <string name="menu_undo">Annuler le coup</string>
     <string name="menu_flip_board">Retourner l\'échiquier</string>
     <string name="menu_opening_library">Bibliothèque d\'ouvertures</string>
+    <string name="menu_hint">Indice</string>
     <string name="menu_opponent">Adversaire</string>
+    <string name="menu_pegasus_connect">Connecter l\'échiquier Pegasus…</string>
+    <string name="menu_pegasus_disconnect">Déconnecter l\'échiquier Pegasus</string>
 
     <string name="dialog_new_game_title">Nouvelle partie</string>
     <string name="opponent_human">Humain (2 joueurs)</string>
@@ -34,11 +37,27 @@
     <string name="evaluation_toggle_label">Afficher l\'évaluation</string>
     <string name="evaluation_mate_format">Mat en %1$d (%2$s)</string>
 
+    <string name="move_quality_inaccuracy">Imprécision</string>
+    <string name="move_quality_mistake">Erreur</string>
+    <string name="move_quality_blunder">Gaffe</string>
+    <string name="move_quality_format">%1$s (%2$.1f)</string>
+
+    <string name="hint_alternatives_label">Aussi bon : %1$s</string>
+    <string name="hint_alternative_format">%1$s (%2$+.1f)</string>
+
     <string name="action_export_pgn">Exporter en PGN</string>
     <string name="action_import_pgn">Importer un PGN</string>
     <string name="pgn_import_failed">Impossible de lire le PGN</string>
     <string name="pgn_import_progress">Importation du PGN…</string>
     <string name="pgn_select_game_title">Sélectionner la partie</string>
+
+    <string name="action_analyze_game">Analyser la partie</string>
+    <string name="action_analyzing_format">Analyse en cours… (%1$d/%2$d)</string>
+    <string name="analysis_dialog_title">Analyse de la partie</string>
+    <string name="analysis_side_summary_format">%1$s : Ø %2$.1f — %3$d imprécisions, %4$d erreurs, %5$d gaffes</string>
+    <string name="analysis_flagged_moves_header">Coups signalés :</string>
+    <string name="analysis_no_flagged_moves">Aucune erreur notable – bien joué !</string>
+    <string name="analysis_flagged_move_format">%1$s %2$s — %3$s (%4$.1f)</string>
 
     <string name="dialog_training_complete_title">Ouverture terminée</string>
     <string name="dialog_training_complete_message_format">« %1$s » est terminée.</string>
@@ -57,6 +76,15 @@
     <string name="action_ok">OK</string>
     <string name="action_cancel">Annuler</string>
 
+    <string name="dialog_pegasus_title">Connecter l\'échiquier Pegasus</string>
+    <string name="pegasus_scan_empty">Recherche d\'appareils…</string>
+    <string name="pegasus_scan_failed">Échec de la recherche Bluetooth</string>
+    <string name="pegasus_connected">Échiquier Pegasus connecté</string>
+    <string name="pegasus_disconnected">Échiquier Pegasus déconnecté</string>
+    <string name="pegasus_permission_required">Autorisation Bluetooth requise</string>
+    <string name="pegasus_error_format">Erreur Pegasus : %1$s</string>
+    <string name="pegasus_battery_format">Batterie de l\'échiquier Pegasus : %1$d %%</string>
+    <string name="pegasus_ambiguous_title">Coup ambigu – veuillez choisir</string>
 
     <string name="opening_ruy_lopez">Partie espagnole (Ruy Lopez)</string>
     <string name="opening_italian">Partie italienne</string>

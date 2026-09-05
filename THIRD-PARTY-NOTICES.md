@@ -69,3 +69,40 @@ used here for that reason. `sfx` is one of the few sound directories `lila`
 itself documents under a free license.
 
 No modifications made beyond selecting three of the set's files.
+
+## Pegasus board integration
+
+`pegasus-core/` and `app/src/main/java/de/schliweb/pegasus/bluetooth/` are
+copied verbatim from the user's own separate "pegasus" project (BLE
+transport, DGT protocol parsing, occupancy-based move detection, LED
+guidance for the physical DGT Pegasus chess board), not a third-party
+dependency. License: GPLv3, same as MoveAPiece itself. Copied wholesale rather
+than referenced as a git submodule so MoveAPiece's build and CI stay fully
+reproducible from MoveAPiece's own git history alone; the source project's own
+remote is a private, CI-unreachable NAS. `pegasus-core` is a plain
+`java-library` module with zero runtime dependencies and includes that
+project's own JUnit test suite (chess rules verified via perft, move
+detection, protocol parsing).
+
+### Protocol knowledge sources
+
+The DGT/Pegasus wire protocol implementation in `pegasus-core`
+(`PegasusCommands`, `PegasusUuids`, `PegasusFrameParser`,
+`PegasusMessageType`, `FieldUpdate`, `BatteryStatus` and related classes) was
+developed from protocol *knowledge* documented by two open-source projects —
+BLE service/characteristic UUIDs, message framing, command bytes, and
+message-type semantics. **No source code from either project was copied or
+translated**; each fact was independently re-implemented in Java and, where
+noted in the source Javadoc's `CONFIRMED_ON_HARDWARE` /
+`CONFIRMED_BY_REFERENCE_IMPLEMENTATION` / `INFERRED` / `UNKNOWN` evidence
+labels, separately verified against real Pegasus hardware:
+
+- [DGTCentaurMods](https://github.com/DGTCentaurMods/DGTCentaurMods)
+  (`DGTCentaurMods/opt/DGTCentaurMods/game/pegasus.py`, a Pegasus BLE
+  emulation that interoperates with the official DGT app), GPL-3.0
+- [picochess](https://github.com/ffalcinelli/picochess) (`dgt/board.py`,
+  the classic DGT electronic-board serial protocol that the Pegasus BLE
+  protocol extends), GPL-3.0
+
+No binaries from either project are included in this repository or in the
+built app; nothing beyond the protocol facts above was reused.

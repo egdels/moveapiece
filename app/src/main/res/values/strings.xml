@@ -6,7 +6,10 @@
     <string name="menu_undo">Undo Move</string>
     <string name="menu_flip_board">Flip Board</string>
     <string name="menu_opening_library">Opening Library</string>
+    <string name="menu_hint">Hint</string>
     <string name="menu_opponent">Opponent</string>
+    <string name="menu_pegasus_connect">Connect Pegasus Board…</string>
+    <string name="menu_pegasus_disconnect">Disconnect Pegasus Board</string>
 
     <string name="dialog_new_game_title">New Game</string>
     <string name="opponent_human">Human (2 Players)</string>
@@ -36,11 +39,27 @@
     <string name="evaluation_toggle_label">Show evaluation</string>
     <string name="evaluation_mate_format">Mate in %1$d (%2$s)</string>
 
+    <string name="move_quality_inaccuracy">Inaccuracy</string>
+    <string name="move_quality_mistake">Mistake</string>
+    <string name="move_quality_blunder">Blunder</string>
+    <string name="move_quality_format">%1$s (%2$.1f)</string>
+
+    <string name="hint_alternatives_label">Also good: %1$s</string>
+    <string name="hint_alternative_format">%1$s (%2$+.1f)</string>
+
     <string name="action_export_pgn">Export PGN</string>
     <string name="action_import_pgn">Import PGN</string>
     <string name="pgn_import_failed">Could not read PGN</string>
     <string name="pgn_import_progress">Importing PGN…</string>
     <string name="pgn_select_game_title">Select Game</string>
+
+    <string name="action_analyze_game">Analyze Game</string>
+    <string name="action_analyzing_format">Analyzing… (%1$d/%2$d)</string>
+    <string name="analysis_dialog_title">Game Analysis</string>
+    <string name="analysis_side_summary_format">%1$s: avg %2$.1f — %3$d inaccuracies, %4$d mistakes, %5$d blunders</string>
+    <string name="analysis_flagged_moves_header">Flagged moves:</string>
+    <string name="analysis_no_flagged_moves">No notable mistakes – well played!</string>
+    <string name="analysis_flagged_move_format">%1$s %2$s — %3$s (%4$.1f)</string>
 
     <string name="dialog_training_complete_title">Opening complete</string>
     <string name="dialog_training_complete_message_format">“%1$s” is complete.</string>
@@ -59,6 +78,15 @@
     <string name="action_ok">OK</string>
     <string name="action_cancel">Cancel</string>
 
+    <string name="dialog_pegasus_title">Connect Pegasus Board</string>
+    <string name="pegasus_scan_empty">Searching for devices…</string>
+    <string name="pegasus_scan_failed">Bluetooth scan failed</string>
+    <string name="pegasus_connected">Pegasus board connected</string>
+    <string name="pegasus_disconnected">Pegasus board disconnected</string>
+    <string name="pegasus_permission_required">Bluetooth permission required</string>
+    <string name="pegasus_error_format">Pegasus error: %1$s</string>
+    <string name="pegasus_battery_format">Pegasus board battery: %1$d %%</string>
+    <string name="pegasus_ambiguous_title">Ambiguous move – please choose</string>
 
     <string name="opening_ruy_lopez">Ruy Lopez (Spanish Opening)</string>
     <string name="opening_italian">Italian Game</string>

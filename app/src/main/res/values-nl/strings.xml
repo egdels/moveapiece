@@ -4,7 +4,10 @@
     <string name="menu_undo">Zet terugnemen</string>
     <string name="menu_flip_board">Bord draaien</string>
     <string name="menu_opening_library">Openingsbibliotheek</string>
+    <string name="menu_hint">Hint</string>
     <string name="menu_opponent">Tegenstander</string>
+    <string name="menu_pegasus_connect">Pegasus-bord verbinden…</string>
+    <string name="menu_pegasus_disconnect">Pegasus-bord loskoppelen</string>
 
     <string name="dialog_new_game_title">Nieuw spel</string>
     <string name="opponent_human">Mens (2 spelers)</string>
@@ -34,11 +37,27 @@
     <string name="evaluation_toggle_label">Waardering tonen</string>
     <string name="evaluation_mate_format">Mat in %1$d (%2$s)</string>
 
+    <string name="move_quality_inaccuracy">Onnauwkeurigheid</string>
+    <string name="move_quality_mistake">Fout</string>
+    <string name="move_quality_blunder">Blunder</string>
+    <string name="move_quality_format">%1$s (%2$.1f)</string>
+
+    <string name="hint_alternatives_label">Ook goed: %1$s</string>
+    <string name="hint_alternative_format">%1$s (%2$+.1f)</string>
+
     <string name="action_export_pgn">PGN exporteren</string>
     <string name="action_import_pgn">PGN importeren</string>
     <string name="pgn_import_failed">PGN kon niet worden gelezen</string>
     <string name="pgn_import_progress">PGN wordt geïmporteerd…</string>
     <string name="pgn_select_game_title">Partij selecteren</string>
+
+    <string name="action_analyze_game">Partij analyseren</string>
+    <string name="action_analyzing_format">Analyseren… (%1$d/%2$d)</string>
+    <string name="analysis_dialog_title">Partij-analyse</string>
+    <string name="analysis_side_summary_format">%1$s: Ø %2$.1f — %3$d onnauwkeurigheden, %4$d fouten, %5$d blunders</string>
+    <string name="analysis_flagged_moves_header">Opvallende zetten:</string>
+    <string name="analysis_no_flagged_moves">Geen opvallende fouten – goed gespeeld!</string>
+    <string name="analysis_flagged_move_format">%1$s %2$s — %3$s (%4$.1f)</string>
 
     <string name="dialog_training_complete_title">Opening voltooid</string>
     <string name="dialog_training_complete_message_format">‘%1$s’ is voltooid.</string>
@@ -57,6 +76,15 @@
     <string name="action_ok">OK</string>
     <string name="action_cancel">Annuleren</string>
 
+    <string name="dialog_pegasus_title">Pegasus-bord verbinden</string>
+    <string name="pegasus_scan_empty">Apparaten zoeken…</string>
+    <string name="pegasus_scan_failed">Bluetooth-zoekopdracht mislukt</string>
+    <string name="pegasus_connected">Pegasus-bord verbonden</string>
+    <string name="pegasus_disconnected">Pegasus-bord losgekoppeld</string>
+    <string name="pegasus_permission_required">Bluetooth-toestemming vereist</string>
+    <string name="pegasus_error_format">Pegasus-fout: %1$s</string>
+    <string name="pegasus_battery_format">Accu Pegasus-bord: %1$d %%</string>
+    <string name="pegasus_ambiguous_title">Onduidelijke zet – kies een optie</string>
 
     <string name="opening_ruy_lopez">Spaans (Ruy Lopez)</string>
     <string name="opening_italian">Italiaanse partij</string>

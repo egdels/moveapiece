@@ -7,6 +7,7 @@ package de.schliweb.moveapiece.logic;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import com.github.bhlangonijr.chesslib.Piece;
@@ -82,11 +83,12 @@ public class ChessGameTest {
     }
 
     /**
-     * Regression test for a crash seen when applying a UCI move string whose origin square has
-     * drifted from MoveAPiece's actual board (e.g. from a stale external move source) -
-     * applyUciMove must reject that gracefully rather than crash. chesslib's Board.doMove(move) (no
-     * full validation) skips the null-piece guard in isMoveLegal() and NPEs when the origin square
-     * is empty; applyUciMove must use full validation.
+     * Regression test for a crash seen with a physical DGT Pegasus board: PegasusGameBridge tracks
+     * its own parallel position and can confirm a move (e.g. after a reconnect resync) whose origin
+     * square has since drifted from MoveAPiece's actual board - applyUciMove must reject that
+     * gracefully rather than crash. chesslib's Board.doMove(move) (no full validation) skips the
+     * null-piece guard in isMoveLegal() and NPEs when the origin square is empty; applyUciMove must
+     * use full validation.
      */
     @Test
     public void applyUciMove_withEmptyOriginSquareIsRejectedNotCrash() {
@@ -215,6 +217,31 @@ public class ChessGameTest {
         assertEquals(Piece.WHITE_PAWN, game.pieceAt(Square.E2));
         assertEquals(0, game.moveCount());
         assertEquals("", game.toSan());
+    }
+
+    /**
+     * PegasusGameBridge.syncBoardToPosition() feeds this FEN straight into pegasus-core's own
+     * ChessPosition.fromFen() to resynchronize a physical board after a reconnect; this only works
+     * if the two libraries agree on FEN format.
+     */
+    @Test
+    public void toFen_isParsableByPegasusCoreChessPosition() {
+        ChessGame game = new ChessGame();
+        game.applyMove(Square.E2, Square.E4, null);
+        game.applyMove(Square.E7, Square.E5, null);
+
+        String fen = game.toFen();
+        de.schliweb.pegasus.core.chess.ChessPosition parsed =
+                de.schliweb.pegasus.core.chess.ChessPosition.fromFen(fen);
+
+        assertEquals(de.schliweb.pegasus.core.chess.PieceColor.WHITE, parsed.sideToMove());
+        assertEquals(
+                de.schliweb.pegasus.core.chess.Piece.WHITE_PAWN,
+                parsed.pieceAt(de.schliweb.pegasus.core.protocol.BoardState.squareIndex("e4")));
+        assertEquals(
+                de.schliweb.pegasus.core.chess.Piece.BLACK_PAWN,
+                parsed.pieceAt(de.schliweb.pegasus.core.protocol.BoardState.squareIndex("e5")));
+        assertNull(parsed.pieceAt(de.schliweb.pegasus.core.protocol.BoardState.squareIndex("e2")));
     }
 
     @Test

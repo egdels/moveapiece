@@ -16,5 +16,6 @@ dependencyResolutionManagement {
 
 rootProject.name = 'MoveAPiece'
 include ':app'
+include ':pegasus-core'
 include ':core'
 include ':desktop'

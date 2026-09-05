@@ -7,27 +7,17 @@
     android:layout_height="match_parent"
     android:fitsSystemWindows="true">
 
-    <com.google.android.material.appbar.MaterialToolbar
-        android:id="@+id/toolbar"
-        android:layout_width="0dp"
-        android:layout_height="?attr/actionBarSize"
-        android:background="@color/brand_primary"
-        android:theme="@style/ThemeOverlay.Material3.Dark.ActionBar"
-        app:title="@string/app_name"
-        app:titleTextColor="@android:color/white"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
-
-    <!-- Everything below the app bar scrolls as one column, so nothing
-         becomes unreachable on short/landscape screens where the square
-         board plus controls don't all fit in the viewport at once. -->
+    <!-- No app bar (matches the layout-land variant): the title adds nothing a launcher icon
+         doesn't already say, and reclaiming its ~56dp keeps more of the board/controls column
+         on-screen before scrolling is needed. Everything below scrolls as one column, so nothing
+         becomes unreachable on short screens where the square board plus controls don't all fit
+         in the viewport at once. -->
     <ScrollView
         android:id="@+id/contentScroll"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:fillViewport="true"
-        app:layout_constraintTop_toBottomOf="@id/toolbar"
+        app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
@@ -101,13 +91,27 @@
 
             </LinearLayout>
 
+            <TextView
+                android:id="@+id/moveQualityText"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:textAppearance="?attr/textAppearanceBodyMedium"
+                android:textStyle="bold"
+                android:visibility="gone"
+                tools:text="Patzer (-3.2)"
+                tools:visibility="visible"
+                app:layout_constraintTop_toBottomOf="@id/evaluationRow"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent" />
+
             <de.schliweb.moveapiece.ui.BoardView
                 android:id="@+id/boardView"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_margin="12dp"
                 android:contentDescription="@string/cd_chess_board"
-                app:layout_constraintTop_toBottomOf="@id/evaluationRow"
+                app:layout_constraintTop_toBottomOf="@id/moveQualityText"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent" />
 
@@ -124,10 +128,13 @@
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/newGameButton"
+                    style="@style/Widget.Material3.Button.IconButton.Outlined"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginEnd="8dp"
-                    android:text="@string/menu_new_game" />
+                    android:contentDescription="@string/menu_new_game"
+                    app:icon="@drawable/ic_new_game"
+                    app:iconPadding="0dp" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/undoButton"
@@ -154,37 +161,106 @@
                     style="@style/Widget.Material3.Button.IconButton.Outlined"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
                     android:contentDescription="@string/menu_opening_library"
+                    app:icon="@drawable/ic_analyze"
+                    app:iconPadding="0dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/hintButton"
+                    style="@style/Widget.Material3.Button.IconButton.Outlined"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:contentDescription="@string/menu_hint"
+                    app:icon="@drawable/ic_hint"
+                    app:iconPadding="0dp" />
+
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/hintAlternativesText"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="4dp"
+                android:gravity="center"
+                android:textAppearance="?attr/textAppearanceBodySmall"
+                android:visibility="gone"
+                tools:text="Auch gut: d2-d4 (+0.3), g1-f3 (+0.2)"
+                tools:visibility="visible"
+                app:layout_constraintTop_toBottomOf="@id/buttonBar"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent" />
+
+            <!-- Icon-only, like buttonBar above - keeps this row compact regardless of system
+                 font/display scale, unlike the text buttons it replaces (whose labels would grow
+                 with font scale and risk wrapping/truncating on narrow screens). Pegasus keeps its
+                 connect/disconnect meaning via contentDescription + icon tint (see
+                 updatePegasusButtonLabel), not visible text. -->
+            <LinearLayout
+                android:id="@+id/secondaryButtonBar"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:paddingBottom="4dp"
+                app:layout_constraintTop_toBottomOf="@id/hintAlternativesText"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/pegasusButton"
+                    style="@style/Widget.Material3.Button.IconButton.Outlined"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    android:contentDescription="@string/menu_pegasus_connect"
+                    app:icon="@drawable/ic_pegasus"
+                    app:iconPadding="0dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/exportPgnButton"
+                    style="@style/Widget.Material3.Button.IconButton.Outlined"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    android:contentDescription="@string/action_export_pgn"
+                    app:icon="@drawable/ic_export"
+                    app:iconPadding="0dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/importPgnButton"
+                    style="@style/Widget.Material3.Button.IconButton.Outlined"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    android:contentDescription="@string/action_import_pgn"
+                    app:icon="@drawable/ic_import"
+                    app:iconPadding="0dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/analyzeGameButton"
+                    style="@style/Widget.Material3.Button.IconButton.Outlined"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:contentDescription="@string/action_analyze_game"
                     app:icon="@drawable/ic_opening_library"
                     app:iconPadding="0dp" />
 
             </LinearLayout>
 
-            <LinearLayout
-                android:id="@+id/pgnButtonRow"
+            <TextView
+                android:id="@+id/analysisProgressText"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
+                android:layout_marginBottom="4dp"
                 android:gravity="center"
-                app:layout_constraintTop_toBottomOf="@id/buttonBar"
+                android:textAppearance="?attr/textAppearanceBodySmall"
+                android:visibility="gone"
+                tools:text="Analysiere… (2/7)"
+                tools:visibility="visible"
+                app:layout_constraintTop_toBottomOf="@id/secondaryButtonBar"
                 app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintEnd_toEndOf="parent">
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/exportPgnButton"
-                    style="@style/Widget.Material3.Button.TextButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/action_export_pgn" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/importPgnButton"
-                    style="@style/Widget.Material3.Button.TextButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/action_import_pgn" />
-
-            </LinearLayout>
+                app:layout_constraintEnd_toEndOf="parent" />
 
             <TextView
                 android:id="@+id/moveHistoryLabel"
@@ -194,7 +270,7 @@
                 android:layout_marginHorizontal="20dp"
                 android:text="@string/move_history_title"
                 android:textAppearance="?attr/textAppearanceLabelLarge"
-                app:layout_constraintTop_toBottomOf="@id/pgnButtonRow"
+                app:layout_constraintTop_toBottomOf="@id/analysisProgressText"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent" />
 

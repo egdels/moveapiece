@@ -72,14 +72,16 @@ jobs:
         run: sdkmanager --install "platforms;${PLATFORM_VERSION}" "build-tools;${BUILD_TOOLS_VERSION}" "ndk;${NDK_VERSION}"
 
       - name: Run JVM unit tests
-        run: ./gradlew --no-daemon :app:testDebugUnitTest
+        run: ./gradlew --no-daemon :pegasus-core:test :app:testDebugUnitTest
 
       - name: Upload test report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: unit-test-results
-          path: app/build/test-results/testDebugUnitTest
+          path: |
+            app/build/test-results/testDebugUnitTest
+            pegasus-core/build/test-results/test
 
   instrumented-tests:
     name: Instrumented tests (emulator)

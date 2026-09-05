@@ -4,7 +4,10 @@
     <string name="menu_undo">Deshacer jugada</string>
     <string name="menu_flip_board">Girar tablero</string>
     <string name="menu_opening_library">Biblioteca de aperturas</string>
+    <string name="menu_hint">Pista</string>
     <string name="menu_opponent">Rival</string>
+    <string name="menu_pegasus_connect">Conectar tablero Pegasus…</string>
+    <string name="menu_pegasus_disconnect">Desconectar tablero Pegasus</string>
 
     <string name="dialog_new_game_title">Partida nueva</string>
     <string name="opponent_human">Humano (2 jugadores)</string>
@@ -34,11 +37,27 @@
     <string name="evaluation_toggle_label">Mostrar evaluación</string>
     <string name="evaluation_mate_format">Mate en %1$d (%2$s)</string>
 
+    <string name="move_quality_inaccuracy">Imprecisión</string>
+    <string name="move_quality_mistake">Error</string>
+    <string name="move_quality_blunder">Error garrafal</string>
+    <string name="move_quality_format">%1$s (%2$.1f)</string>
+
+    <string name="hint_alternatives_label">También bueno: %1$s</string>
+    <string name="hint_alternative_format">%1$s (%2$+.1f)</string>
+
     <string name="action_export_pgn">Exportar PGN</string>
     <string name="action_import_pgn">Importar PGN</string>
     <string name="pgn_import_failed">No se pudo leer el PGN</string>
     <string name="pgn_import_progress">Importando PGN…</string>
     <string name="pgn_select_game_title">Seleccionar partida</string>
+
+    <string name="action_analyze_game">Analizar partida</string>
+    <string name="action_analyzing_format">Analizando… (%1$d/%2$d)</string>
+    <string name="analysis_dialog_title">Análisis de la partida</string>
+    <string name="analysis_side_summary_format">%1$s: Ø %2$.1f — %3$d imprecisiones, %4$d errores, %5$d errores garrafales</string>
+    <string name="analysis_flagged_moves_header">Jugadas destacadas:</string>
+    <string name="analysis_no_flagged_moves">Sin errores destacables – ¡bien jugado!</string>
+    <string name="analysis_flagged_move_format">%1$s %2$s — %3$s (%4$.1f)</string>
 
     <string name="dialog_training_complete_title">Apertura completada</string>
     <string name="dialog_training_complete_message_format">«%1$s» ha finalizado.</string>
@@ -57,6 +76,15 @@
     <string name="action_ok">Aceptar</string>
     <string name="action_cancel">Cancelar</string>
 
+    <string name="dialog_pegasus_title">Conectar tablero Pegasus</string>
+    <string name="pegasus_scan_empty">Buscando dispositivos…</string>
+    <string name="pegasus_scan_failed">Error en la búsqueda Bluetooth</string>
+    <string name="pegasus_connected">Tablero Pegasus conectado</string>
+    <string name="pegasus_disconnected">Tablero Pegasus desconectado</string>
+    <string name="pegasus_permission_required">Se requiere permiso de Bluetooth</string>
+    <string name="pegasus_error_format">Error de Pegasus: %1$s</string>
+    <string name="pegasus_battery_format">Batería del tablero Pegasus: %1$d %%</string>
+    <string name="pegasus_ambiguous_title">Jugada ambigua – elige una opción</string>
 
     <string name="opening_ruy_lopez">Apertura española (Ruy López)</string>
     <string name="opening_italian">Partida italiana</string>

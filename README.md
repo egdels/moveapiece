@@ -7,6 +7,10 @@ built for eventual distribution via [F-Droid](https://f-droid.org); the
 desktop app is packaged as a native, double-clickable application image via
 the JDK's own `jpackage`.
 
+Optionally connects to a physical [DGT Pegasus](https://digitalgametechnology.com/)
+chess board over Bluetooth LE (Android only), so you can play Stockfish on a
+real board instead of tapping the screen.
+
 ## Features
 
 - Local play: human vs. human, or human vs. Stockfish
@@ -14,7 +18,8 @@ the JDK's own `jpackage`.
   well-known openings (Ruy Lopez, Italian, Sicilian Najdorf, Queen's Gambit
   Declined, King's Indian, Catalan, Trompowsky, ...). The app plays out the
   book side's moves and only accepts the trainee's correct move — matched
-  on-screen by tap/click
+  on-screen by tap/click, or (Android + a connected Pegasus board) guided
+  physically via the same LED mechanism used for Stockfish's replies
 - Searchable opening library: a read-only, step-through reference viewer
   over the same 20 lines, separate from the trainer
 - Adjustable Stockfish playing strength (UCI_LimitStrength / UCI_Elo,
@@ -29,6 +34,12 @@ the JDK's own `jpackage`.
   by White/Black/date so you can choose which one to import)
 - Move/capture/check sound effects
 - Localized UI: English (default), German, French, Spanish, Italian, Dutch
+- **Android only:** physical board support (DGT Pegasus, BLE) — physical
+  moves are detected from occupancy changes and applied to the game;
+  Stockfish's replies are shown via LEDs on the board. On-screen tap-to-move
+  stays fully usable at the same time — the board is a second, redundant
+  input, not a replacement — and picks back up correctly after a disconnect
+  or a screen move made while it was away. Portrait and landscape layouts.
 
 ## Tech stack
 
@@ -39,6 +50,7 @@ the JDK's own `jpackage`.
 | Desktop UI | JavaFX, styled with a custom stylesheet using the Android app's own Material 3 colors (`desktop/.../app.css`) |
 | Chess rules | [chesslib](https://github.com/bhlangonijr/chesslib) (MIT) |
 | Engine | [Stockfish](https://github.com/official-stockfish/Stockfish) (GPLv3), built from source, driven over UCI through `ProcessBuilder` — via the NDK on Android, via the host's native toolchain (Makefile `COMP=gcc`/`clang`/`mingw`) on desktop |
+| Physical board | Vendored from a companion project's `core`/BLE-transport modules (GPLv3, own code — see [Third-Party Notices](THIRD-PARTY-NOTICES.md)); Android only |
 | License | GPLv3 (required by the Stockfish dependency) |
 
 ## Building
@@ -114,7 +126,7 @@ Linux (x86-64 and arm64), macOS (Apple Silicon and Intel), and Windows.
 ## Testing
 
 ```sh
-./gradlew :core:test :app:testDebugUnitTest                       # JVM unit tests
+./gradlew :core:test :pegasus-core:test :app:testDebugUnitTest    # JVM unit tests
 ./gradlew :app:connectedDebugAndroidTest                          # instrumented tests, needs a device/emulator
 ```
 
@@ -136,7 +148,9 @@ core/                    Platform-agnostic chess logic, shared by :app and
 app/                    Android application module
 ├── src/main/java/de/schliweb/moveapiece/
 │   ├── ui/               Board view, sound effects, opening library/preview screens
+│   ├── pegasus/          Bridge between the physical board and ChessGame
 │   └── MainActivity.java
+├── src/main/java/de/schliweb/pegasus/bluetooth/  BLE transport (vendored)
 ├── src/main/cpp/stockfish/                       Stockfish, pinned git submodule
 └── stockfish.gradle                              Drives Stockfish's own Makefile via the NDK
 
@@ -153,6 +167,12 @@ desktop/                JavaFX desktop application module
 │   ├── pieces/, sounds/, icon.png   Same artwork/audio as the Android app
 ├── stockfish.gradle       Builds Stockfish for the host OS/arch (no NDK)
 └── packaging.gradle       jpackage app-image + per-OS icon generation
+
+pegasus-core/            Physical-board protocol/chess-rules/move-detection
+                         module (plain java-library, zero dependencies,
+                         vendored — see Third-Party Notices); used by
+                         :app (Pegasus support) and by :core's own tests
+                         (cross-checking FEN output against it)
 ```
 
 ## License
@@ -169,10 +189,8 @@ what that means in practice.
 
 ## Status
 
-Android: core app is feature-complete and verified (automated tests +
-real-hardware testing). Desktop: covers the same feature set, verified
-locally on macOS (Apple Silicon); the Linux/Windows/Intel-Mac legs of
-`desktop.yml` are new and not yet verified against a real CI run.
-
-Not yet published: the repo isn't hosted on GitHub yet and F-Droid metadata
-hasn't been created — both require a public repository URL first.
+Android: core app and physical-board support are feature-complete and
+verified (automated tests + real-hardware testing). Desktop: covers the
+same feature set except physical-board support, verified locally on macOS
+(Apple Silicon); the Linux/Windows/Intel-Mac legs of `desktop.yml` are new
+and not yet verified against a real CI run.

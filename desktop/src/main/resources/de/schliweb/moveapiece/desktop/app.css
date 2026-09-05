@@ -184,6 +184,11 @@
     -fx-font-style: italic;
 }
 
+.move-quality-label {
+    -fx-text-fill: -danger;
+    -fx-font-weight: bold;
+}
+
 /* ---- dialogs ----------------------------------------------------------*/
 
 .dialog-pane {

@@ -4,7 +4,10 @@
     <string name="menu_undo">Zug zurücknehmen</string>
     <string name="menu_flip_board">Brett drehen</string>
     <string name="menu_opening_library">Eröffnungsbibliothek</string>
+    <string name="menu_hint">Tipp</string>
     <string name="menu_opponent">Gegner</string>
+    <string name="menu_pegasus_connect">Pegasus-Brett verbinden…</string>
+    <string name="menu_pegasus_disconnect">Pegasus-Brett trennen</string>
 
     <string name="dialog_new_game_title">Neues Spiel</string>
     <string name="opponent_human">Mensch (2 Spieler)</string>
@@ -34,11 +37,27 @@
     <string name="evaluation_toggle_label">Bewertung anzeigen</string>
     <string name="evaluation_mate_format">Matt in %1$d (%2$s)</string>
 
+    <string name="move_quality_inaccuracy">Ungenauigkeit</string>
+    <string name="move_quality_mistake">Fehler</string>
+    <string name="move_quality_blunder">Patzer</string>
+    <string name="move_quality_format">%1$s (%2$.1f)</string>
+
+    <string name="hint_alternatives_label">Auch gut: %1$s</string>
+    <string name="hint_alternative_format">%1$s (%2$+.1f)</string>
+
     <string name="action_export_pgn">PGN exportieren</string>
     <string name="action_import_pgn">PGN importieren</string>
     <string name="pgn_import_failed">PGN konnte nicht gelesen werden</string>
     <string name="pgn_import_progress">PGN wird importiert…</string>
     <string name="pgn_select_game_title">Partie auswählen</string>
+
+    <string name="action_analyze_game">Partie analysieren</string>
+    <string name="action_analyzing_format">Analysiere… (%1$d/%2$d)</string>
+    <string name="analysis_dialog_title">Partie-Analyse</string>
+    <string name="analysis_side_summary_format">%1$s: Ø %2$.1f — %3$d Ungenauigkeiten, %4$d Fehler, %5$d Patzer</string>
+    <string name="analysis_flagged_moves_header">Auffällige Züge:</string>
+    <string name="analysis_no_flagged_moves">Keine auffälligen Fehler – gut gespielt!</string>
+    <string name="analysis_flagged_move_format">%1$s %2$s — %3$s (%4$.1f)</string>
 
     <string name="dialog_training_complete_title">Eröffnung abgeschlossen</string>
     <string name="dialog_training_complete_message_format">„%1$s“ ist beendet.</string>
@@ -57,6 +76,15 @@
     <string name="action_ok">OK</string>
     <string name="action_cancel">Abbrechen</string>
 
+    <string name="dialog_pegasus_title">Pegasus-Brett verbinden</string>
+    <string name="pegasus_scan_empty">Suche nach Geräten …</string>
+    <string name="pegasus_scan_failed">Bluetooth-Suche fehlgeschlagen</string>
+    <string name="pegasus_connected">Pegasus-Brett verbunden</string>
+    <string name="pegasus_disconnected">Pegasus-Brett getrennt</string>
+    <string name="pegasus_permission_required">Bluetooth-Berechtigung erforderlich</string>
+    <string name="pegasus_error_format">Pegasus-Fehler: %1$s</string>
+    <string name="pegasus_battery_format">Pegasus-Brett Akku: %1$d %%</string>
+    <string name="pegasus_ambiguous_title">Mehrdeutiger Zug – bitte wählen</string>
 
     <string name="opening_ruy_lopez">Spanische Partie (Ruy Lopez)</string>
     <string name="opening_italian">Italienische Partie</string>
