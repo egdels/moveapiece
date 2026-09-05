@@ -177,8 +177,8 @@ final class GameController implements BoardCanvas.MoveSource, EngineListener {
     /**
      * Snapshot of {@link #lastPositionEvalCp}/{@link #lastPositionEvalMoveCount} taken by {@link
      * #recordMoveQualityBaseline} right before a graded move is applied - compared against the eval
-     * of the resulting position once that comes in (see {@link #maybeFinalizeMoveQuality}). -1 means
-     * "not currently grading a move".
+     * of the resulting position once that comes in (see {@link #maybeFinalizeMoveQuality}). -1
+     * means "not currently grading a move".
      */
     private int moveQualityBaselineCp;
 
@@ -210,7 +210,9 @@ final class GameController implements BoardCanvas.MoveSource, EngineListener {
     /** Raw (side-to-move-relative) eval collected so far, one per position (size = ply + 1). */
     private List<Integer> postGamePositionEvals;
 
-    /** Latest raw score seen for the position currently being searched during post-game analysis. */
+    /**
+     * Latest raw score seen for the position currently being searched during post-game analysis.
+     */
     private int postGameLiveScoreCp;
 
     private final Deque<PendingSearch> pendingSearches = new ArrayDeque<>();
@@ -665,14 +667,16 @@ final class GameController implements BoardCanvas.MoveSource, EngineListener {
     }
 
     /**
-     * Records one MultiPV line's move+score, indexed by its 1-based {@code multipv} rank (see {@link
-     * UciInfoParser#parseMultiPv}) - only called while {@link #multiPvSearchActive}. Later lines for
-     * the same rank (deeper iterations) simply overwrite earlier ones, so what's left once the search
-     * ends is the converged answer.
+     * Records one MultiPV line's move+score, indexed by its 1-based {@code multipv} rank (see
+     * {@link UciInfoParser#parseMultiPv}) - only called while {@link #multiPvSearchActive}. Later
+     * lines for the same rank (deeper iterations) simply overwrite earlier ones, so what's left
+     * once the search ends is the converged answer.
      */
     private void captureMultiPvCandidate(String infoLine) {
         OptionalInt multiPv = UciInfoParser.parseMultiPv(infoLine);
-        if (multiPv.isEmpty() || multiPv.getAsInt() < 1 || multiPv.getAsInt() > HINT_MULTI_PV_LINES) {
+        if (multiPv.isEmpty()
+                || multiPv.getAsInt() < 1
+                || multiPv.getAsInt() > HINT_MULTI_PV_LINES) {
             return;
         }
         Optional<String> pvMove = UciInfoParser.parsePvFirstMove(infoLine);
@@ -680,7 +684,8 @@ final class GameController implements BoardCanvas.MoveSource, EngineListener {
             return;
         }
         OptionalInt mate = UciInfoParser.parseScoreMate(infoLine);
-        OptionalInt cp = mate.isPresent() ? OptionalInt.empty() : UciInfoParser.parseScoreCp(infoLine);
+        OptionalInt cp =
+                mate.isPresent() ? OptionalInt.empty() : UciInfoParser.parseScoreCp(infoLine);
         if (mate.isEmpty() && cp.isEmpty()) {
             return;
         }
@@ -693,10 +698,15 @@ final class GameController implements BoardCanvas.MoveSource, EngineListener {
         hintButton.setVisible(mode != Mode.TRAINING);
         hintButton.setManaged(mode != Mode.TRAINING);
         hintButton.setDisable(
-                !engineReady || waitingForHint || postGameUciMoves != null || !isBoardInteractiveNow());
+                !engineReady
+                        || waitingForHint
+                        || postGameUciMoves != null
+                        || !isBoardInteractiveNow());
     }
 
-    /** Converts a "mate in N" score to a centipawn-scale value that still dominates normal evals. */
+    /**
+     * Converts a "mate in N" score to a centipawn-scale value that still dominates normal evals.
+     */
     private static int mateToCp(int mateIn) {
         int magnitude = 100000 - Math.min(Math.abs(mateIn), 100) * 100;
         return mateIn >= 0 ? magnitude : -magnitude;
@@ -711,9 +721,9 @@ final class GameController implements BoardCanvas.MoveSource, EngineListener {
      * Snapshots {@link #lastPositionEvalCp} for the position about to be left, so {@link
      * #maybeFinalizeMoveQuality} can grade the move once a fresh eval for the resulting position
      * comes in. Called right before any move is committed to {@link #game} (human move or engine
-     * move); silently skips grading this move (baseline left at -1) in training mode or when no eval
-     * is known for exactly the current position - e.g. right after toggling evaluation display back
-     * on, or the game's very first ply before any search has finished.
+     * move); silently skips grading this move (baseline left at -1) in training mode or when no
+     * eval is known for exactly the current position - e.g. right after toggling evaluation display
+     * back on, or the game's very first ply before any search has finished.
      */
     private void recordMoveQualityBaseline() {
         if (mode == Mode.TRAINING || lastPositionEvalMoveCount != game.moveCount()) {
@@ -742,7 +752,9 @@ final class GameController implements BoardCanvas.MoveSource, EngineListener {
         showMoveQualityIfNotable(cpLoss);
     }
 
-    /** Move-quality Messages key for a given centipawn loss, or null if not notable enough to flag. */
+    /**
+     * Move-quality Messages key for a given centipawn loss, or null if not notable enough to flag.
+     */
     private static String moveQualityLabelKey(int cpLoss) {
         if (cpLoss >= BLUNDER_CP_LOSS) {
             return "move_quality_blunder";
@@ -770,16 +782,19 @@ final class GameController implements BoardCanvas.MoveSource, EngineListener {
 
     /**
      * Replays the finished game from the start, one ply at a time, grading every move the same way
-     * live blunder-check does ({@link #moveQualityLabelKey}) and showing a summary dialog once done.
-     * Always searches at full strength, restored afterwards in {@link #advancePostGameAnalysis}.
-     * Requires {@link ChessGame#isGameOver()} rather than just some moves played - unlike every other
-     * search this method starts, it doesn't call {@link StockfishEngine#newGame()} (which would send
-     * "isready" and re-enter {@link #onReadyOk}, and if it were still someone's turn in the live game,
-     * fire off an unwanted real move), so nothing may still be live for it to accidentally interfere
-     * with.
+     * live blunder-check does ({@link #moveQualityLabelKey}) and showing a summary dialog once
+     * done. Always searches at full strength, restored afterwards in {@link
+     * #advancePostGameAnalysis}. Requires {@link ChessGame#isGameOver()} rather than just some
+     * moves played - unlike every other search this method starts, it doesn't call {@link
+     * StockfishEngine#newGame()} (which would send "isready" and re-enter {@link #onReadyOk}, and
+     * if it were still someone's turn in the live game, fire off an unwanted real move), so nothing
+     * may still be live for it to accidentally interfere with.
      */
     private void startPostGameAnalysis() {
-        if (!engineReady || mode == Mode.TRAINING || !game.isGameOver() || postGameUciMoves != null) {
+        if (!engineReady
+                || mode == Mode.TRAINING
+                || !game.isGameOver()
+                || postGameUciMoves != null) {
             return;
         }
         abandonPendingSearches();
@@ -793,13 +808,14 @@ final class GameController implements BoardCanvas.MoveSource, EngineListener {
 
     /**
      * The final replayed position is the live game's own current one - if it's checkmate/stalemate,
-     * it has no legal moves for Stockfish to search (in practice: no "info score" line ever arrives,
-     * silently leaving {@link #postGameLiveScoreCp} stuck on the previous position's stale value, which
-     * would badly mis-grade the final move). Score it directly from the game's own verdict instead:
-     * very bad for whoever's mated, neutral for a stalemate.
+     * it has no legal moves for Stockfish to search (in practice: no "info score" line ever
+     * arrives, silently leaving {@link #postGameLiveScoreCp} stuck on the previous position's stale
+     * value, which would badly mis-grade the final move). Score it directly from the game's own
+     * verdict instead: very bad for whoever's mated, neutral for a stalemate.
      */
     private void requestPostGameEvalFor(int positionIndex) {
-        if (positionIndex == postGameUciMoves.size() && (game.isCheckmate() || game.isStalemate())) {
+        if (positionIndex == postGameUciMoves.size()
+                && (game.isCheckmate() || game.isStalemate())) {
             recordPostGameEval(game.isCheckmate() ? -mateToCp(0) : 0);
             return;
         }
@@ -917,7 +933,9 @@ final class GameController implements BoardCanvas.MoveSource, EngineListener {
             }
             String avgLossText =
                     String.format(
-                            Locale.ROOT, "%.1f", plies[side] == 0 ? 0.0 : lossSum[side] / plies[side] / 100.0);
+                            Locale.ROOT,
+                            "%.1f",
+                            plies[side] == 0 ? 0.0 : lossSum[side] / plies[side] / 100.0);
             report.append(
                     Messages.get(
                             "analysis_side_summary_format",
@@ -1568,7 +1586,8 @@ final class GameController implements BoardCanvas.MoveSource, EngineListener {
             return;
         }
         OptionalInt mate = UciInfoParser.parseScoreMate(infoLine);
-        OptionalInt cp = mate.isPresent() ? OptionalInt.empty() : UciInfoParser.parseScoreCp(infoLine);
+        OptionalInt cp =
+                mate.isPresent() ? OptionalInt.empty() : UciInfoParser.parseScoreCp(infoLine);
         if (mate.isEmpty() && cp.isEmpty()) {
             return;
         }

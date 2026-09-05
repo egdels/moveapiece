@@ -35,12 +35,16 @@ public final class UciInfoParser {
         return parse(SCORE_MATE, infoLine);
     }
 
-    /** 1-based rank of this line's principal variation, e.g. 1 for the best line, 2 for the next. */
+    /**
+     * 1-based rank of this line's principal variation, e.g. 1 for the best line, 2 for the next.
+     */
     public static OptionalInt parseMultiPv(String infoLine) {
         return parse(MULTIPV, infoLine);
     }
 
-    /** The first (i.e. the move to actually play) move of this line's principal variation, in UCI. */
+    /**
+     * The first (i.e. the move to actually play) move of this line's principal variation, in UCI.
+     */
     public static Optional<String> parsePvFirstMove(String infoLine) {
         if (infoLine == null) {
             return Optional.empty();

@@ -90,7 +90,7 @@ public class MainActivity extends AppCompatActivity
     private final ChessGame game = new ChessGame();
     private StockfishEngine engine;
     private MoveSoundPlayer soundPlayer;
-	private Settings settings;
+    private Settings settings;
     private PegasusGameBridge pegasusBridge;
     private ActivityResultLauncher<String[]> blePermissionLauncher;
     private ActivityResultLauncher<String> pgnImportLauncher;
@@ -162,7 +162,9 @@ public class MainActivity extends AppCompatActivity
     /** Raw (side-to-move-relative) eval collected so far, one per position (size = ply + 1). */
     private List<Integer> postGamePositionEvals;
 
-    /** Latest raw score seen for the position currently being searched during post-game analysis. */
+    /**
+     * Latest raw score seen for the position currently being searched during post-game analysis.
+     */
     private int postGameLiveScoreCp;
 
     private static final int POST_GAME_MOVETIME_MS = 400;
@@ -1139,8 +1141,8 @@ public class MainActivity extends AppCompatActivity
 
     /**
      * Asks Stockfish for the best move in the current position and shows it as a board highlight
-     * (reusing {@link BoardView#setTrainingHint}) without applying it - the human decides whether to
-     * play it. Always searches at full strength, regardless of {@link #engineElo}, then restores
+     * (reusing {@link BoardView#setTrainingHint}) without applying it - the human decides whether
+     * to play it. Always searches at full strength, regardless of {@link #engineElo}, then restores
      * that strength for whatever search comes next (see {@link #onBestMove}), so a low-Elo opponent
      * doesn't leak into the hint.
      */
@@ -1189,7 +1191,9 @@ public class MainActivity extends AppCompatActivity
                             + uci.substring(2, 4).toLowerCase(Locale.ROOT);
             alternatives.add(
                     getString(
-                            R.string.hint_alternative_format, squares, multiPvCpByRank[rank] / 100.0));
+                            R.string.hint_alternative_format,
+                            squares,
+                            multiPvCpByRank[rank] / 100.0));
         }
         if (alternatives.isEmpty()) {
             binding.hintAlternativesText.setVisibility(android.view.View.GONE);
@@ -1201,14 +1205,16 @@ public class MainActivity extends AppCompatActivity
     }
 
     /**
-     * Records one MultiPV line's move+score, indexed by its 1-based {@code multipv} rank (see {@link
-     * UciInfoParser#parseMultiPv}) - only called while {@link #multiPvSearchActive}. Later lines for
-     * the same rank (deeper iterations) simply overwrite earlier ones, so what's left once the search
-     * ends is the converged answer.
+     * Records one MultiPV line's move+score, indexed by its 1-based {@code multipv} rank (see
+     * {@link UciInfoParser#parseMultiPv}) - only called while {@link #multiPvSearchActive}. Later
+     * lines for the same rank (deeper iterations) simply overwrite earlier ones, so what's left
+     * once the search ends is the converged answer.
      */
     private void captureMultiPvCandidate(String infoLine) {
         OptionalInt multiPv = UciInfoParser.parseMultiPv(infoLine);
-        if (multiPv.isEmpty() || multiPv.getAsInt() < 1 || multiPv.getAsInt() > HINT_MULTI_PV_LINES) {
+        if (multiPv.isEmpty()
+                || multiPv.getAsInt() < 1
+                || multiPv.getAsInt() > HINT_MULTI_PV_LINES) {
             return;
         }
         Optional<String> pvMove = UciInfoParser.parsePvFirstMove(infoLine);
@@ -1216,7 +1222,8 @@ public class MainActivity extends AppCompatActivity
             return;
         }
         OptionalInt mate = UciInfoParser.parseScoreMate(infoLine);
-        OptionalInt cp = mate.isPresent() ? OptionalInt.empty() : UciInfoParser.parseScoreCp(infoLine);
+        OptionalInt cp =
+                mate.isPresent() ? OptionalInt.empty() : UciInfoParser.parseScoreCp(infoLine);
         if (mate.isEmpty() && cp.isEmpty()) {
             return;
         }
@@ -1230,10 +1237,15 @@ public class MainActivity extends AppCompatActivity
                 mode == GameMode.TRAINING ? android.view.View.GONE : android.view.View.VISIBLE;
         binding.hintButton.setVisibility(visibility);
         binding.hintButton.setEnabled(
-                engineReady && !waitingForHint && postGameUciMoves == null && isBoardInteractiveNow());
+                engineReady
+                        && !waitingForHint
+                        && postGameUciMoves == null
+                        && isBoardInteractiveNow());
     }
 
-    /** Converts a "mate in N" score to a centipawn-scale value that still dominates normal evals. */
+    /**
+     * Converts a "mate in N" score to a centipawn-scale value that still dominates normal evals.
+     */
     private static int mateToCp(int mateIn) {
         int magnitude = 100000 - Math.min(Math.abs(mateIn), 100) * 100;
         return mateIn >= 0 ? magnitude : -magnitude;
@@ -1279,7 +1291,9 @@ public class MainActivity extends AppCompatActivity
         showMoveQualityIfNotable(cpLoss);
     }
 
-    /** Move-quality string resource for a given centipawn loss, or 0 if not notable enough to flag. */
+    /**
+     * Move-quality string resource for a given centipawn loss, or 0 if not notable enough to flag.
+     */
     private static int moveQualityLabelRes(int cpLoss) {
         if (cpLoss >= BLUNDER_CP_LOSS) {
             return R.string.move_quality_blunder;
@@ -1306,13 +1320,14 @@ public class MainActivity extends AppCompatActivity
 
     /**
      * Replays the finished game from the start, one ply at a time, grading every move the same way
-     * live blunder-check does ({@link #moveQualityLabelRes}) and showing a summary dialog once done.
-     * Always searches at full strength, restored afterwards in {@link #advancePostGameAnalysis}.
-     * Requires {@link ChessGame#isGameOver()} rather than just some moves played - unlike every other
-     * search this method starts, it doesn't call {@link StockfishEngine#newGame()} (which would send
-     * "isready" and re-enter {@link #onReadyOk}, undoing the full-strength setting and, if it were
-     * still someone's turn in the live game, firing off an unwanted real move), so nothing may still
-     * be live for it to accidentally interfere with.
+     * live blunder-check does ({@link #moveQualityLabelRes}) and showing a summary dialog once
+     * done. Always searches at full strength, restored afterwards in {@link
+     * #advancePostGameAnalysis}. Requires {@link ChessGame#isGameOver()} rather than just some
+     * moves played - unlike every other search this method starts, it doesn't call {@link
+     * StockfishEngine#newGame()} (which would send "isready" and re-enter {@link #onReadyOk},
+     * undoing the full-strength setting and, if it were still someone's turn in the live game,
+     * firing off an unwanted real move), so nothing may still be live for it to accidentally
+     * interfere with.
      */
     private void startPostGameAnalysis() {
         if (!engineReady
@@ -1322,8 +1337,7 @@ public class MainActivity extends AppCompatActivity
             return;
         }
         abandonPendingSearches();
-        postGameUciMoves =
-                java.util.Arrays.asList(game.toUciMoveList().split(" "));
+        postGameUciMoves = java.util.Arrays.asList(game.toUciMoveList().split(" "));
         postGamePositionEvals = new ArrayList<>(postGameUciMoves.size() + 1);
         updateHintButtonState();
         updateAnalyzeGameButtonState();
@@ -1333,13 +1347,14 @@ public class MainActivity extends AppCompatActivity
 
     /**
      * The final replayed position is the live game's own current one - if it's checkmate/stalemate,
-     * it has no legal moves for Stockfish to search (in practice: no "info score" line ever arrives,
-     * silently leaving {@link #postGameLiveScoreCp} stuck on the previous position's stale value, which
-     * would badly mis-grade the final move). Score it directly from the game's own verdict instead:
-     * very bad for whoever's mated, neutral for a stalemate.
+     * it has no legal moves for Stockfish to search (in practice: no "info score" line ever
+     * arrives, silently leaving {@link #postGameLiveScoreCp} stuck on the previous position's stale
+     * value, which would badly mis-grade the final move). Score it directly from the game's own
+     * verdict instead: very bad for whoever's mated, neutral for a stalemate.
      */
     private void requestPostGameEvalFor(int positionIndex) {
-        if (positionIndex == postGameUciMoves.size() && (game.isCheckmate() || game.isStalemate())) {
+        if (positionIndex == postGameUciMoves.size()
+                && (game.isCheckmate() || game.isStalemate())) {
             recordPostGameEval(game.isCheckmate() ? -mateToCp(0) : 0);
             return;
         }
@@ -1908,7 +1923,8 @@ public class MainActivity extends AppCompatActivity
             return;
         }
         OptionalInt mate = UciInfoParser.parseScoreMate(infoLine);
-        OptionalInt cp = mate.isPresent() ? OptionalInt.empty() : UciInfoParser.parseScoreCp(infoLine);
+        OptionalInt cp =
+                mate.isPresent() ? OptionalInt.empty() : UciInfoParser.parseScoreCp(infoLine);
         if (mate.isEmpty() && cp.isEmpty()) {
             return;
         }

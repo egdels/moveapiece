@@ -104,9 +104,10 @@ public class StockfishEngine {
 
     /**
      * Number of principal variations to search and report per {@link #go}, via "info ... multipv N
-     * ... pv ...:" lines ({@link UciInfoParser#parseMultiPv}/{@link UciInfoParser#parsePvFirstMove}).
-     * 1 (the default) reports only the best line - callers that raise this for a one-off "show top
-     * moves" search should restore it to 1 afterwards, since every extra line is extra search work.
+     * ... pv ...:" lines ({@link UciInfoParser#parseMultiPv}/{@link
+     * UciInfoParser#parsePvFirstMove}). 1 (the default) reports only the best line - callers that
+     * raise this for a one-off "show top moves" search should restore it to 1 afterwards, since
+     * every extra line is extra search work.
      */
     public void setMultiPv(int lines) {
         writeLineAsync("setoption name MultiPV value " + lines);
