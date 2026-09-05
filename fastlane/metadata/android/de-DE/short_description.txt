@@ -1,1 +1,0 @@
-Offline-Schach gegen Stockfish, optional mit echtem DGT-Pegasus-Brett

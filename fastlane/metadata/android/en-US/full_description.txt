@@ -1,0 +1,31 @@
+MoveAPiece is a native Android chess app that plays against a locally
+bundled Stockfish engine – fully offline, without accounts, without
+network access, and without proprietary services.
+
+Optionally, MoveAPiece can connect via Bluetooth LE to a physical
+DGT Pegasus chess board, so you can play against Stockfish on a real
+board instead of on the screen.
+
+Features:
+
+* Local play: human vs. human or human vs. Stockfish
+* Opening training: practice fixed lines from a built-in library of 20
+  well-known openings
+* Adjustable Stockfish playing strength (UCI_LimitStrength / UCI_Elo,
+  1320–3190)
+* Move history in algebraic notation, take back a move
+* Evaluation display: optionally shows Stockfish's assessment of the
+  current position (can be toggled on/off)
+* PGN import/export: export games via the share dialog or load a game
+  from a PGN file and continue playing
+* Detection of check, checkmate, stalemate, and draws (repetition,
+  50-move rule, insufficient material)
+* Move, capture, and check sound effects
+* Portrait and landscape orientation
+* Available in German, English, French, Spanish, Italian, and Dutch
+* Support for physical boards (DGT Pegasus, BLE): moves on the board
+  are automatically detected and applied, and Stockfish's responses
+  are shown via LEDs on the board. Full touchscreen control remains
+  available at all times.
+
+MoveAPiece is licensed under the GPLv3.

@@ -1,8 +1,0 @@
-Erste Veröffentlichung.
-
-* Lokales Spiel gegen Stockfish oder gegen einen zweiten Menschen
-* Eröffnungstraining mit fester Linienbibliothek
-* Bewertungsanzeige, PGN-Import/-Export
-* Physisches DGT-Pegasus-Brett per Bluetooth LE
-* Verfügbar auf Deutsch, Englisch, Französisch, Spanisch, Italienisch und
-  Niederländisch

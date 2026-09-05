@@ -1,0 +1,7 @@
+Initial release.
+
+* Local play against Stockfish or against a second human
+* Opening training with a fixed line library
+* Evaluation display, PGN import/export
+* Physical DGT Pegasus board via Bluetooth LE
+* Available in German, English, French, Spanish, Italian, and Dutch
