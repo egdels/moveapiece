@@ -82,6 +82,7 @@
     <string name="pegasus_connected">Échiquier Pegasus connecté</string>
     <string name="pegasus_disconnected">Échiquier Pegasus déconnecté</string>
     <string name="pegasus_permission_required">Autorisation Bluetooth requise</string>
+    <string name="pegasus_location_required">Activez la localisation pour rechercher des appareils Bluetooth</string>
     <string name="pegasus_error_format">Erreur Pegasus : %1$s</string>
     <string name="pegasus_battery_format">Batterie de l\'échiquier Pegasus : %1$d %%</string>
     <string name="pegasus_ambiguous_title">Coup ambigu – veuillez choisir</string>

@@ -82,6 +82,7 @@
     <string name="pegasus_connected">Pegasus-bord verbonden</string>
     <string name="pegasus_disconnected">Pegasus-bord losgekoppeld</string>
     <string name="pegasus_permission_required">Bluetooth-toestemming vereist</string>
+    <string name="pegasus_location_required">Zet locatie aan om naar Bluetooth-apparaten te zoeken</string>
     <string name="pegasus_error_format">Pegasus-fout: %1$s</string>
     <string name="pegasus_battery_format">Accu Pegasus-bord: %1$d %%</string>
     <string name="pegasus_ambiguous_title">Onduidelijke zet – kies een optie</string>

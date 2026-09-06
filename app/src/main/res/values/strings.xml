@@ -84,6 +84,7 @@
     <string name="pegasus_connected">Pegasus board connected</string>
     <string name="pegasus_disconnected">Pegasus board disconnected</string>
     <string name="pegasus_permission_required">Bluetooth permission required</string>
+    <string name="pegasus_location_required">Turn on device location to scan for Bluetooth devices</string>
     <string name="pegasus_error_format">Pegasus error: %1$s</string>
     <string name="pegasus_battery_format">Pegasus board battery: %1$d %%</string>
     <string name="pegasus_ambiguous_title">Ambiguous move – please choose</string>

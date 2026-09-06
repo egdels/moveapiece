@@ -1,0 +1,7 @@
+Bugfix release.
+
+* Fix: the Pegasus board could fail to appear when scanning on Android 11 and
+  earlier if the device's system location service was turned off (required by
+  Android for Bluetooth LE scanning on these versions). The app now detects
+  this and shows a clear message telling you to turn location on, instead of
+  scanning silently forever.

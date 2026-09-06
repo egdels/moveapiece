@@ -8,6 +8,7 @@ package de.schliweb.pegasus.core.transport;
 /** Explicit, non-silent error conditions of the BLE transport. */
 public enum TransportError {
     BLUETOOTH_DISABLED,
+    LOCATION_DISABLED,
     PERMISSION_DENIED,
     SCAN_FAILED,
     CONNECT_FAILED,

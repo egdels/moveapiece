@@ -82,6 +82,7 @@
     <string name="pegasus_connected">Scacchiera Pegasus connessa</string>
     <string name="pegasus_disconnected">Scacchiera Pegasus disconnessa</string>
     <string name="pegasus_permission_required">Autorizzazione Bluetooth necessaria</string>
+    <string name="pegasus_location_required">Attiva la posizione per cercare dispositivi Bluetooth</string>
     <string name="pegasus_error_format">Errore Pegasus: %1$s</string>
     <string name="pegasus_battery_format">Batteria scacchiera Pegasus: %1$d %%</string>
     <string name="pegasus_ambiguous_title">Mossa ambigua – seleziona</string>

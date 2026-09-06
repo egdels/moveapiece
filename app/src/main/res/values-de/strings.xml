@@ -82,6 +82,7 @@
     <string name="pegasus_connected">Pegasus-Brett verbunden</string>
     <string name="pegasus_disconnected">Pegasus-Brett getrennt</string>
     <string name="pegasus_permission_required">Bluetooth-Berechtigung erforderlich</string>
+    <string name="pegasus_location_required">Bitte Standort aktivieren, um nach Bluetooth-Geräten zu suchen</string>
     <string name="pegasus_error_format">Pegasus-Fehler: %1$s</string>
     <string name="pegasus_battery_format">Pegasus-Brett Akku: %1$d %%</string>
     <string name="pegasus_ambiguous_title">Mehrdeutiger Zug – bitte wählen</string>

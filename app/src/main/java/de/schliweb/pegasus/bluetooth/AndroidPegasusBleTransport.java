@@ -21,11 +21,13 @@ import android.bluetooth.le.ScanCallback;
 import android.bluetooth.le.ScanResult;
 import android.bluetooth.le.ScanSettings;
 import android.content.Context;
+import android.location.LocationManager;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.ParcelUuid;
 import android.util.Log;
+import androidx.core.location.LocationManagerCompat;
 import de.schliweb.pegasus.core.transport.ConnectionState;
 import de.schliweb.pegasus.core.transport.DeviceRegistry;
 import de.schliweb.pegasus.core.transport.DiscoveredDevice;
@@ -107,6 +109,20 @@ public final class AndroidPegasusBleTransport implements PegasusTransport {
         if (adapter == null || !adapter.isEnabled()) {
             listener.onScanFailed(TransportError.BLUETOOTH_DISABLED, "Bluetooth is disabled");
             return;
+        }
+        // On API <= 30, BLUETOOTH_SCAN results are silently withheld by the OS
+        // (no error, scan just never reports anything) unless the system location
+        // toggle is also on. API 31+ requests BLUETOOTH_SCAN with neverForLocation,
+        // which lifts that requirement.
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            LocationManager locationManager =
+                    (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
+            if (locationManager == null
+                    || !LocationManagerCompat.isLocationEnabled(locationManager)) {
+                listener.onScanFailed(
+                        TransportError.LOCATION_DISABLED, "System location services are off");
+                return;
+            }
         }
         BluetoothLeScanner scanner = adapter.getBluetoothLeScanner();
         if (scanner == null) {

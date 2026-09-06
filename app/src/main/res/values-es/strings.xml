@@ -82,6 +82,7 @@
     <string name="pegasus_connected">Tablero Pegasus conectado</string>
     <string name="pegasus_disconnected">Tablero Pegasus desconectado</string>
     <string name="pegasus_permission_required">Se requiere permiso de Bluetooth</string>
+    <string name="pegasus_location_required">Activa la ubicación para buscar dispositivos Bluetooth</string>
     <string name="pegasus_error_format">Error de Pegasus: %1$s</string>
     <string name="pegasus_battery_format">Batería del tablero Pegasus: %1$d %%</string>
     <string name="pegasus_ambiguous_title">Jugada ambigua – elige una opción</string>

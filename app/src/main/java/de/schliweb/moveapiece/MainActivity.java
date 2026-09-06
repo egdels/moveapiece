@@ -439,12 +439,24 @@ public class MainActivity extends AppCompatActivity
 
                     @Override
                     public void onScanFailed(TransportError error, String detail) {
+                        int messageRes;
+                        switch (error) {
+                            case LOCATION_DISABLED:
+                                messageRes = R.string.pegasus_location_required;
+                                break;
+                            case PERMISSION_DENIED:
+                                messageRes = R.string.pegasus_permission_required;
+                                break;
+                            default:
+                                messageRes = R.string.pegasus_scan_failed;
+                                break;
+                        }
                         runOnUiThread(
                                 () ->
                                         Toast.makeText(
                                                         MainActivity.this,
-                                                        R.string.pegasus_scan_failed,
-                                                        Toast.LENGTH_SHORT)
+                                                        messageRes,
+                                                        Toast.LENGTH_LONG)
                                                 .show());
                     }
                 },
