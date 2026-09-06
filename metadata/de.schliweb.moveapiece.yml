@@ -1,0 +1,37 @@
+Categories:
+  - Board Game
+License: GPL-3.0-or-later
+AuthorName: egdels
+WebSite: https://github.com/egdels/moveapiece
+SourceCode: https://github.com/egdels/moveapiece
+IssueTracker: https://github.com/egdels/moveapiece/issues
+Changelog: https://github.com/egdels/moveapiece/releases
+
+AutoName: MoveAPiece
+
+RepoType: git
+Repo: https://github.com/egdels/moveapiece
+Binaries: 
+  https://github.com/egdels/moveapiece/releases/download/v%v/app-universal-release.apk
+
+Builds:
+  - versionName: 1.0.0
+    versionCode: 10000
+    commit: b4d6f03ce15d8fe93673f30902bee2cea9b12c27
+    submodules: true
+    sudo:
+      - apt-get update
+      - apt-get install -y make xz-utils
+    gradle:
+      - yes
+    output: app/build/outputs/apk/release/app-universal-release-unsigned.apk
+    binary: 
+      https://github.com/egdels/moveapiece/releases/download/v%v/app-universal-release.apk
+    ndk: 28.0.13004108
+
+AllowedAPKSigningKeys: ae322d3fb71afe21df4727e37a5c6803511d5a2fe1fc3135430cee0699fa1b34
+
+AutoUpdateMode: None
+UpdateCheckMode: Static
+CurrentVersion: 1.0.0
+CurrentVersionCode: 10000
