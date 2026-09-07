@@ -1,0 +1,124 @@
+/*
+ * Compiles the Windows Runtime/JNI bridge
+ * (src/main/native/windows/PegasusBleWin.cpp) into a DLL for
+ * WindowsPegasusBleTransport - see that class's Javadoc and
+ * PegasusBleWin.cpp's own header comment for the architecture and
+ * threading model.
+ *
+ * Windows only, by design (see the physical board section of README.md):
+ * macOS (CoreBluetooth) is already implemented, see pegasus-ble-macos.gradle;
+ * Linux (pure-Java BlueZ D-Bus, no native code needed) is separate,
+ * not-yet-implemented follow-up work. This script simply isn't applied on
+ * other hosts (see the os.isWindows() guard below), and
+ * WindowsPegasusBleTransport is never instantiated there either.
+ *
+ * Toolchain: MSVC + C++/WinRT (the Microsoft-documented way to consume
+ * Windows Runtime APIs from a classic desktop app), not the MinGW/MSYS2
+ * toolchain desktop/stockfish.gradle already uses on Windows - raw
+ * WinRT/COM interop via MinGW is comparatively unsupported and fragile.
+ * `cl.exe` and `cppwinrt.exe` are expected on PATH already (a "Developer
+ * Command Prompt for VS" locally, or the ilammy/msvc-dev-cmd GitHub Action
+ * in CI - see .github/workflows/desktop.yml/release.yml's Windows leg).
+ *
+ * Driven directly with ProcessBuilder, same rationale as stockfish.gradle's
+ * header comment (Gradle 9's task execution model disallows calling back
+ * into the Project instance from inside doLast).
+ */
+
+def os = org.gradle.internal.os.OperatingSystem.current()
+
+if (os.isWindows()) {
+    def nativeSrcDir = file("$projectDir/src/main/native/windows")
+    def nativeOutDir = layout.buildDirectory.dir('native').get().asFile
+    def cppwinrtGenDir = layout.buildDirectory.dir('cppwinrt-gen').get().asFile
+    def dllName = 'PegasusBleWin.dll'
+    def dllFile = new File(nativeOutDir, dllName)
+    def javaHome = System.getProperty('java.home')
+
+    // Consumed by packaging.gradle, which bundles this DLL into the
+    // jpackage image next to the app's own jar - see
+    // PegasusBleWinLibrary's Javadoc for why that's needed.
+    project.ext.pegasusBleWinDll = dllFile
+    project.ext.pegasusBleWinDllName = dllName
+
+    def runTool = { List<String> cmd, File workDir ->
+        def pb = new ProcessBuilder(cmd.collect { it.toString() })
+        pb.directory(workDir)
+        pb.redirectErrorStream(true)
+        Process proc = pb.start()
+        proc.inputStream.eachLine { logger.lifecycle(it) }
+        int exitCode = proc.waitFor()
+        if (exitCode != 0) {
+            throw new GradleException("Command failed (${exitCode}): ${cmd.join(' ')}")
+        }
+    }
+
+    // Generates the C++/WinRT projection headers (winrt/Windows.*.h) from
+    // the Windows SDK's metadata - the header-only C++/WinRT library isn't
+    // pre-generated in the SDK itself, unlike jni.h; a real Visual Studio
+    // project would pull this in automatically via the
+    // Microsoft.Windows.CppWinRT NuGet package's MSBuild target, which a
+    // plain cl.exe invocation (no .vcxproj here) doesn't have, so it's
+    // generated explicitly instead.
+    tasks.register('generateCppWinrtHeaders') {
+        outputs.dir(cppwinrtGenDir)
+        doLast {
+            cppwinrtGenDir.mkdirs()
+            runTool(['cppwinrt', '-input', 'sdk', '-output', cppwinrtGenDir.absolutePath], projectDir)
+        }
+    }
+
+    tasks.register('compilePegasusBleWin') {
+        dependsOn 'generateCppWinrtHeaders'
+        inputs.dir(nativeSrcDir)
+        inputs.property('javaHome', javaHome)
+        outputs.file(dllFile)
+
+        doLast {
+            nativeOutDir.mkdirs()
+            def cmd = [
+                'cl',
+                '/nologo',
+                '/std:c++20',
+                '/EHsc',
+                '/utf-8',
+                // Static CRT: jpackage already bundles a full JRE so the app
+                // needs nothing else installed to run - dynamically linking
+                // the MSVC runtime (cl's default for /LD) would silently
+                // require the Visual C++ Redistributable on the target
+                // machine too.
+                '/MT',
+                '/I', "${javaHome}\\include",
+                '/I', "${javaHome}\\include\\win32",
+                '/I', cppwinrtGenDir.absolutePath,
+                '/LD',
+                new File(nativeSrcDir, 'PegasusBleWin.cpp').absolutePath,
+                "/Fe:${dllFile.absolutePath}".toString(),
+                '/link', 'WindowsApp.lib',
+            ]
+            runTool(cmd, nativeOutDir)
+        }
+    }
+
+    // Exposed to WindowsPegasusBleTransport via a generated properties
+    // file, mirroring stockfish.gradle/pegasus-ble-macos.gradle's own
+    // writeXxxHomeProperties tasks - see PegasusBleWinLibrary's Javadoc for
+    // the two lookup locations (packaged vs. :desktop:run).
+    def pegasusBleWinHomeProps =
+            layout.buildDirectory.file('generated-pegasus-ble/pegasusBleWinHome.properties').get().asFile
+    tasks.register('writePegasusBleWinHomeProperties') {
+        dependsOn 'compilePegasusBleWin'
+        outputs.file(pegasusBleWinHomeProps)
+        doLast {
+            pegasusBleWinHomeProps.parentFile.mkdirs()
+            pegasusBleWinHomeProps.text =
+                    "pegasusBleWin.home=${nativeOutDir.absolutePath}\npegasusBleWin.lib=${dllName}\n"
+        }
+    }
+
+    sourceSets.main.resources.srcDirs += pegasusBleWinHomeProps.parentFile
+
+    tasks.matching { it.name == 'processResources' }.configureEach {
+        dependsOn 'writePegasusBleWinHomeProperties'
+    }
+}

@@ -10,6 +10,7 @@ import com.github.bhlangonijr.chesslib.Side;
 import com.github.bhlangonijr.chesslib.Square;
 import de.schliweb.moveapiece.desktop.pegasus.DesktopPegasusGameBridge;
 import de.schliweb.moveapiece.desktop.pegasus.MacosPegasusBleTransport;
+import de.schliweb.moveapiece.desktop.pegasus.WindowsPegasusBleTransport;
 import de.schliweb.moveapiece.engine.EngineListener;
 import de.schliweb.moveapiece.engine.NnueAssets;
 import de.schliweb.moveapiece.engine.StockfishEngine;
@@ -277,18 +278,21 @@ final class GameController
     }
 
     /**
-     * macOS only for now (see the physical-board section of README.md and {@link
-     * MacosPegasusBleTransport}'s Javadoc) - Windows (WinRT) and Linux (BlueZ D-Bus) are
-     * unimplemented follow-up work behind the same {@code PegasusTransport} seam, so this returns
-     * {@code null} there and every {@code pegasusBridge}-dependent call site below is guarded
-     * accordingly, exactly like the Android app guards every Pegasus call site on whether the board
-     * is currently connected.
+     * macOS ({@link MacosPegasusBleTransport}) and Windows ({@link WindowsPegasusBleTransport}) so
+     * far - Linux (BlueZ D-Bus) is unimplemented follow-up work behind the same {@code
+     * PegasusTransport} seam, so this returns {@code null} there and every {@code
+     * pegasusBridge}-dependent call site below is guarded accordingly, exactly like the Android app
+     * guards every Pegasus call site on whether the board is currently connected.
      */
     private DesktopPegasusGameBridge createPegasusBridgeIfSupported() {
-        if (!System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("mac")) {
-            return null;
+        String osName = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
+        if (osName.contains("mac")) {
+            return new DesktopPegasusGameBridge(new MacosPegasusBleTransport(), this);
         }
-        return new DesktopPegasusGameBridge(new MacosPegasusBleTransport(), this);
+        if (osName.contains("win")) {
+            return new DesktopPegasusGameBridge(new WindowsPegasusBleTransport(), this);
+        }
+        return null;
     }
 
     private static final double BOARD_HOLDER_PADDING = 14;

@@ -78,6 +78,17 @@ jobs:
           install: mingw-w64-x86_64-toolchain make xz
           path-type: inherit
 
+      # MSVC + C++/WinRT, not MinGW, for the Pegasus BLE bridge
+      # (pegasus-ble-windows.gradle) - see that file's header comment for
+      # why. This action exports cl.exe/cppwinrt.exe's environment via
+      # GITHUB_ENV/GITHUB_PATH, which later steps pick up regardless of
+      # their own shell (including the msys2 shell every step in this job
+      # defaults to, set up above with path-type: inherit specifically so
+      # Windows-native PATH entries like these remain usable from it).
+      - name: Set up MSVC toolchain (Windows, Pegasus BLE bridge)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
       # Two steps, not one: choco updates the machine-level WIX env var, which
       # only a freshly spawned process (i.e. the next step) picks up - not
       # this same install step's own already-running shell.

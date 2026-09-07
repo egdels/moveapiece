@@ -132,6 +132,12 @@ jobs:
           install: mingw-w64-x86_64-toolchain make xz
           path-type: inherit
 
+      # See desktop.yml: MSVC + C++/WinRT, not MinGW, for the Pegasus BLE
+      # bridge (pegasus-ble-windows.gradle).
+      - name: Set up MSVC toolchain (Windows, Pegasus BLE bridge)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
       # Two steps, not one: choco updates the machine-level WIX env var, which
       # only a freshly spawned process (i.e. the next step) picks up - not
       # this same install step's own already-running shell.

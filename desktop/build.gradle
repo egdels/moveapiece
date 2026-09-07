@@ -44,4 +44,5 @@ dependencies {
 
 apply from: 'stockfish.gradle'
 apply from: 'pegasus-ble-macos.gradle'
+apply from: 'pegasus-ble-windows.gradle'
 apply from: 'packaging.gradle'

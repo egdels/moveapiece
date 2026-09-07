@@ -176,6 +176,9 @@ tasks.register('prepareJpackageInput', Copy) {
     if (os.isMacOsX()) {
         dependsOn tasks.named('compilePegasusBleMac')
     }
+    if (os.isWindows()) {
+        dependsOn tasks.named('compilePegasusBleWin')
+    }
     // Copy never removes files that are no longer part of its inputs, so a
     // jar left behind by a dependency version bump (e.g. the old
     // javafx-*-21.0.2-*.jar files after bumping to 24.0.2) would otherwise
@@ -203,6 +206,15 @@ tasks.register('prepareJpackageInput', Copy) {
         from(project.ext.pegasusBleMacDylib.parentFile) {
             into 'native'
             include project.ext.pegasusBleMacDylibName
+        }
+    }
+    // Same idea, Windows: bundle the compiled Pegasus BLE DLL into
+    // app/native/ - PegasusBleWinLibrary resolves it there relative to its
+    // own jar at runtime. See pegasus-ble-windows.gradle's header comment.
+    if (os.isWindows()) {
+        from(project.ext.pegasusBleWinDll.parentFile) {
+            into 'native'
+            include project.ext.pegasusBleWinDllName
         }
     }
     into jpackageInputDir
