@@ -34,6 +34,7 @@
 
 #include <windows.h>
 #include <winrt/Windows.Foundation.h>
+#include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Devices.Bluetooth.h>
 #include <winrt/Windows.Devices.Bluetooth.Advertisement.h>
 #include <winrt/Windows.Devices.Bluetooth.GenericAttributeProfile.h>
@@ -296,7 +297,8 @@ class PegasusBleBridge {
 
     void OnAdvertisementReceived(BluetoothLEAdvertisementWatcher const&,
                                   BluetoothLEAdvertisementReceivedEventArgs const& args) {
-        ReportDeviceFound(FormatAddress(args.BluetoothAddress()), args.Advertisement().LocalName(),
+        winrt::hstring name = args.Advertisement().LocalName();
+        ReportDeviceFound(FormatAddress(args.BluetoothAddress()), std::wstring(name.c_str(), name.size()),
                            args.RawSignalStrengthInDBm());
     }
 
