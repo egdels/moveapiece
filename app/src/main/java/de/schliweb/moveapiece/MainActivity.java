@@ -1283,7 +1283,9 @@ public class MainActivity extends AppCompatActivity
         }
         moveQualityBaselineCp = lastPositionEvalCp;
         moveQualityBaselineMoveCount = game.moveCount();
-        binding.moveQualityText.setVisibility(android.view.View.GONE);
+        // INVISIBLE, not GONE: keeps this row's height reserved so the board below it (see
+        // activity_main.xml) doesn't shift every time a move-quality label appears/disappears.
+        binding.moveQualityText.setVisibility(android.view.View.INVISIBLE);
     }
 
     /**
@@ -1322,7 +1324,7 @@ public class MainActivity extends AppCompatActivity
     private void showMoveQualityIfNotable(int cpLoss) {
         int labelRes = moveQualityLabelRes(cpLoss);
         if (labelRes == 0) {
-            binding.moveQualityText.setVisibility(android.view.View.GONE);
+            binding.moveQualityText.setVisibility(android.view.View.INVISIBLE);
             return;
         }
         binding.moveQualityText.setText(
@@ -1525,7 +1527,7 @@ public class MainActivity extends AppCompatActivity
         moveQualityBaselineMoveCount = -1;
         postGameUciMoves = null;
         postGamePositionEvals = null;
-        binding.moveQualityText.setVisibility(android.view.View.GONE);
+        binding.moveQualityText.setVisibility(android.view.View.INVISIBLE);
         updateAnalyzeGameButtonState();
     }
 

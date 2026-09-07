@@ -18,277 +18,298 @@
          width split would give it). 340dp is only the floor, sized to what
          the content actually needs (buttons + move list); the panel grows
          past that to soak up the board's leftover space instead of leaving
-         it as dead background. -->
-    <ScrollView
+         it as dead background.
+
+         Everything in the panel down through moveHistoryLabel is fixed,
+         non-scrolling; only moveListScroll further down scrolls - so a long
+         move list can never hide the buttons behind a scroll, unlike the
+         previous design where buttons+move list shared one ScrollView. This
+         trades away that design's one guarantee (everything reachable via
+         scroll no matter how little vertical space there is) for buttons
+         that are always visible; on a panel too short for status+buttons to
+         fit at once, they could get clipped with no scroll fallback -
+         accepted as unlikely in practice given how compact this content is. -->
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/sidePanel"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:fillViewport="true"
         app:layout_constraintWidth_min="340dp"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toEndOf="@id/boardView"
         app:layout_constraintEnd_toEndOf="parent">
 
-        <androidx.constraintlayout.widget.ConstraintLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content">
+        <TextView
+            android:id="@+id/statusText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:gravity="center"
+            android:textAppearance="?attr/textAppearanceTitleMedium"
+            tools:text="@string/status_white_to_move"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
+
+        <TextView
+            android:id="@+id/trainingProgressText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:textAppearance="?attr/textAppearanceBodyMedium"
+            android:visibility="gone"
+            tools:text="Italienische Partie – Zug 3 von 10"
+            tools:visibility="visible"
+            app:layout_constraintTop_toBottomOf="@id/statusText"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
+
+        <TextView
+            android:id="@+id/engineStrengthText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:textAppearance="?attr/textAppearanceBodyMedium"
+            android:visibility="gone"
+            tools:text="Stockfish (Elo 1500)"
+            tools:visibility="visible"
+            app:layout_constraintTop_toBottomOf="@id/trainingProgressText"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
+
+        <LinearLayout
+            android:id="@+id/evaluationRow"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:paddingTop="4dp"
+            app:layout_constraintTop_toBottomOf="@id/engineStrengthText"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent">
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/evaluationSwitch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/evaluation_toggle_label" />
 
             <TextView
-                android:id="@+id/statusText"
-                android:layout_width="0dp"
+                android:id="@+id/evaluationText"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:gravity="center"
+                android:layout_marginStart="8dp"
                 android:textAppearance="?attr/textAppearanceTitleMedium"
-                tools:text="@string/status_white_to_move"
-                app:layout_constraintTop_toTopOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintEnd_toEndOf="parent" />
+                tools:text="+0.4" />
 
-            <TextView
-                android:id="@+id/trainingProgressText"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:gravity="center"
-                android:textAppearance="?attr/textAppearanceBodyMedium"
-                android:visibility="gone"
-                tools:text="Italienische Partie – Zug 3 von 10"
-                tools:visibility="visible"
-                app:layout_constraintTop_toBottomOf="@id/statusText"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintEnd_toEndOf="parent" />
+        </LinearLayout>
 
-            <TextView
-                android:id="@+id/engineStrengthText"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:gravity="center"
-                android:textAppearance="?attr/textAppearanceBodyMedium"
-                android:visibility="gone"
-                tools:text="Stockfish (Elo 1500)"
-                tools:visibility="visible"
-                app:layout_constraintTop_toBottomOf="@id/trainingProgressText"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintEnd_toEndOf="parent" />
+        <!-- INVISIBLE, not GONE: this row is reassigned VISIBLE/INVISIBLE (never GONE) after
+             every move in MainActivity, so its height stays reserved and nothing below it in
+             this panel shifts depending on whether a move-quality label happens to be showing. -->
+        <TextView
+            android:id="@+id/moveQualityText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:textAppearance="?attr/textAppearanceBodyMedium"
+            android:textStyle="bold"
+            android:visibility="invisible"
+            tools:text="Patzer (-3.2)"
+            tools:visibility="visible"
+            app:layout_constraintTop_toBottomOf="@id/evaluationRow"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
 
-            <LinearLayout
-                android:id="@+id/evaluationRow"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center"
-                android:paddingTop="4dp"
-                app:layout_constraintTop_toBottomOf="@id/engineStrengthText"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintEnd_toEndOf="parent">
+        <!-- All 9 action buttons in one Flow instead of two fixed LinearLayout rows: Flow
+             packs them left-to-right and only wraps to a further row once a row actually runs
+             out of horizontal space, so a wide panel gets a single row while a narrow one
+             still wraps - unlike a fixed two-row split, this adapts to whatever width is
+             actually available instead of a hardcoded breakpoint. Icon-only (no visible
+             labels) keeps every button compact regardless of system font/display scale;
+             Pegasus keeps its connect/disconnect meaning via contentDescription + icon tint
+             (see updatePegasusButtonLabel), not visible text. -->
+        <androidx.constraintlayout.helper.widget.Flow
+            android:id="@+id/actionButtonsFlow"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:padding="8dp"
+            app:flow_horizontalGap="8dp"
+            app:flow_verticalGap="8dp"
+            app:flow_horizontalStyle="packed"
+            app:flow_horizontalBias="0.5"
+            app:flow_wrapMode="chain"
+            app:constraint_referenced_ids="newGameButton,undoButton,flipBoardButton,openingLibraryButton,hintButton,pegasusButton,exportPgnButton,importPgnButton,analyzeGameButton"
+            app:layout_constraintTop_toBottomOf="@id/moveQualityText"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
 
-                <com.google.android.material.materialswitch.MaterialSwitch
-                    android:id="@+id/evaluationSwitch"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/evaluation_toggle_label" />
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/newGameButton"
+            style="@style/Widget.Material3.Button.IconButton.Outlined"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/menu_new_game"
+            app:icon="@drawable/ic_new_game"
+            app:iconPadding="0dp"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent" />
 
-                <TextView
-                    android:id="@+id/evaluationText"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:textAppearance="?attr/textAppearanceTitleMedium"
-                    tools:text="+0.4" />
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/undoButton"
+            style="@style/Widget.Material3.Button.IconButton.Outlined"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/menu_undo"
+            app:icon="@drawable/ic_undo"
+            app:iconPadding="0dp"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent" />
 
-            </LinearLayout>
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/flipBoardButton"
+            style="@style/Widget.Material3.Button.IconButton.Outlined"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/menu_flip_board"
+            app:icon="@drawable/ic_flip_board"
+            app:iconPadding="0dp"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent" />
 
-            <TextView
-                android:id="@+id/moveQualityText"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:gravity="center"
-                android:textAppearance="?attr/textAppearanceBodyMedium"
-                android:textStyle="bold"
-                android:visibility="gone"
-                tools:text="Patzer (-3.2)"
-                tools:visibility="visible"
-                app:layout_constraintTop_toBottomOf="@id/evaluationRow"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintEnd_toEndOf="parent" />
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/openingLibraryButton"
+            style="@style/Widget.Material3.Button.IconButton.Outlined"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/menu_opening_library"
+            app:icon="@drawable/ic_analyze"
+            app:iconPadding="0dp"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent" />
 
-            <LinearLayout
-                android:id="@+id/buttonBar"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center"
-                android:padding="12dp"
-                app:layout_constraintTop_toBottomOf="@id/moveQualityText"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintEnd_toEndOf="parent">
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/hintButton"
+            style="@style/Widget.Material3.Button.IconButton.Outlined"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/menu_hint"
+            app:icon="@drawable/ic_hint"
+            app:iconPadding="0dp"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent" />
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/newGameButton"
-                    style="@style/Widget.Material3.Button.IconButton.Outlined"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:contentDescription="@string/menu_new_game"
-                    app:icon="@drawable/ic_new_game"
-                    app:iconPadding="0dp" />
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/pegasusButton"
+            style="@style/Widget.Material3.Button.IconButton.Outlined"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/menu_pegasus_connect"
+            app:icon="@drawable/ic_pegasus"
+            app:iconPadding="0dp"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent" />
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/undoButton"
-                    style="@style/Widget.Material3.Button.IconButton.Outlined"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:contentDescription="@string/menu_undo"
-                    app:icon="@drawable/ic_undo"
-                    app:iconPadding="0dp" />
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/exportPgnButton"
+            style="@style/Widget.Material3.Button.IconButton.Outlined"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/action_export_pgn"
+            app:icon="@drawable/ic_export"
+            app:iconPadding="0dp"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent" />
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/flipBoardButton"
-                    style="@style/Widget.Material3.Button.IconButton.Outlined"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:contentDescription="@string/menu_flip_board"
-                    app:icon="@drawable/ic_flip_board"
-                    app:iconPadding="0dp" />
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/importPgnButton"
+            style="@style/Widget.Material3.Button.IconButton.Outlined"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/action_import_pgn"
+            app:icon="@drawable/ic_import"
+            app:iconPadding="0dp"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent" />
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/openingLibraryButton"
-                    style="@style/Widget.Material3.Button.IconButton.Outlined"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:contentDescription="@string/menu_opening_library"
-                    app:icon="@drawable/ic_analyze"
-                    app:iconPadding="0dp" />
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/analyzeGameButton"
+            style="@style/Widget.Material3.Button.IconButton.Outlined"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/action_analyze_game"
+            app:icon="@drawable/ic_opening_library"
+            app:iconPadding="0dp"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent" />
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/hintButton"
-                    style="@style/Widget.Material3.Button.IconButton.Outlined"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:contentDescription="@string/menu_hint"
-                    app:icon="@drawable/ic_hint"
-                    app:iconPadding="0dp" />
+        <TextView
+            android:id="@+id/hintAlternativesText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="4dp"
+            android:gravity="center"
+            android:textAppearance="?attr/textAppearanceBodySmall"
+            android:visibility="gone"
+            tools:text="Auch gut: d2-d4 (+0.3), g1-f3 (+0.2)"
+            tools:visibility="visible"
+            app:layout_constraintTop_toBottomOf="@id/actionButtonsFlow"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
 
-            </LinearLayout>
+        <TextView
+            android:id="@+id/analysisProgressText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="4dp"
+            android:gravity="center"
+            android:textAppearance="?attr/textAppearanceBodySmall"
+            android:visibility="gone"
+            tools:text="Analysiere… (2/7)"
+            tools:visibility="visible"
+            app:layout_constraintTop_toBottomOf="@id/hintAlternativesText"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
 
-            <TextView
-                android:id="@+id/hintAlternativesText"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="4dp"
-                android:gravity="center"
-                android:textAppearance="?attr/textAppearanceBodySmall"
-                android:visibility="gone"
-                tools:text="Auch gut: d2-d4 (+0.3), g1-f3 (+0.2)"
-                tools:visibility="visible"
-                app:layout_constraintTop_toBottomOf="@id/buttonBar"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintEnd_toEndOf="parent" />
+        <TextView
+            android:id="@+id/moveHistoryLabel"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:layout_marginHorizontal="20dp"
+            android:text="@string/move_history_title"
+            android:textAppearance="?attr/textAppearanceLabelLarge"
+            app:layout_constraintTop_toBottomOf="@id/analysisProgressText"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
 
-            <!-- Icon-only, like buttonBar above - keeps this row compact regardless of system
-                 font/display scale, unlike the text buttons it replaces (whose labels would grow
-                 with font scale and risk wrapping/truncating on narrow screens). Pegasus keeps its
-                 connect/disconnect meaning via contentDescription + icon tint (see
-                 updatePegasusButtonLabel), not visible text. -->
-            <LinearLayout
-                android:id="@+id/secondaryButtonBar"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center"
-                android:paddingBottom="4dp"
-                app:layout_constraintTop_toBottomOf="@id/hintAlternativesText"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintEnd_toEndOf="parent">
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/pegasusButton"
-                    style="@style/Widget.Material3.Button.IconButton.Outlined"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:contentDescription="@string/menu_pegasus_connect"
-                    app:icon="@drawable/ic_pegasus"
-                    app:iconPadding="0dp" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/exportPgnButton"
-                    style="@style/Widget.Material3.Button.IconButton.Outlined"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:contentDescription="@string/action_export_pgn"
-                    app:icon="@drawable/ic_export"
-                    app:iconPadding="0dp" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/importPgnButton"
-                    style="@style/Widget.Material3.Button.IconButton.Outlined"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:contentDescription="@string/action_import_pgn"
-                    app:icon="@drawable/ic_import"
-                    app:iconPadding="0dp" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/analyzeGameButton"
-                    style="@style/Widget.Material3.Button.IconButton.Outlined"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:contentDescription="@string/action_analyze_game"
-                    app:icon="@drawable/ic_opening_library"
-                    app:iconPadding="0dp" />
-
-            </LinearLayout>
-
-            <TextView
-                android:id="@+id/analysisProgressText"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="4dp"
-                android:gravity="center"
-                android:textAppearance="?attr/textAppearanceBodySmall"
-                android:visibility="gone"
-                tools:text="Analysiere… (2/7)"
-                tools:visibility="visible"
-                app:layout_constraintTop_toBottomOf="@id/secondaryButtonBar"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintEnd_toEndOf="parent" />
-
-            <TextView
-                android:id="@+id/moveHistoryLabel"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:layout_marginHorizontal="20dp"
-                android:text="@string/move_history_title"
-                android:textAppearance="?attr/textAppearanceLabelLarge"
-                app:layout_constraintTop_toBottomOf="@id/analysisProgressText"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintEnd_toEndOf="parent" />
+        <!-- The only thing that still scrolls: takes all remaining space down to the bottom of
+             the panel, so a long move list grows into its own scrollable area instead of pushing
+             the buttons above it out of view. -->
+        <ScrollView
+            android:id="@+id/moveListScroll"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:fillViewport="true"
+            app:layout_constraintTop_toBottomOf="@id/moveHistoryLabel"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent">
 
             <TextView
                 android:id="@+id/moveListText"
-                android:layout_width="0dp"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="20dp"
                 android:layout_marginTop="4dp"
                 android:layout_marginBottom="16dp"
                 android:textAppearance="?attr/textAppearanceBodyMedium"
                 android:lineSpacingExtra="4dp"
-                tools:text="1. e4 e5 2. Nf3 Nc6 3. Bb5"
-                app:layout_constraintTop_toBottomOf="@id/moveHistoryLabel"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintEnd_toEndOf="parent" />
+                tools:text="1. e4 e5 2. Nf3 Nc6 3. Bb5" />
 
-        </androidx.constraintlayout.widget.ConstraintLayout>
+        </ScrollView>
 
-    </ScrollView>
+    </androidx.constraintlayout.widget.ConstraintLayout>
 
     <!-- Fixed 340dp from the parent's end edge - matches sidePanel's own
          layout_constraintWidth_min, so the board's measure spec can never
