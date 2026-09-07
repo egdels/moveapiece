@@ -43,11 +43,8 @@ import javafx.scene.control.ButtonType;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ChoiceDialog;
 import javafx.scene.control.Label;
-import javafx.scene.control.RadioButton;
 import javafx.scene.control.Slider;
 import javafx.scene.control.TextArea;
-import javafx.scene.control.Toggle;
-import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
@@ -222,12 +219,6 @@ final class GameController implements BoardCanvas.MoveSource, EngineListener {
     private TrainingSession trainingSession;
     private PauseTransition pendingBookMove;
 
-    private Toggle vsHumanToggle;
-    private Toggle vsStockfishToggle;
-    private Toggle trainerToggle;
-    private Toggle lastConfirmedToggle;
-    private boolean suppressModeChange;
-
     /** Outlined, circular icon-only button (Material "icon button" look) from raw SVG path data. */
     private static Button iconButton(String svgPathData, String tooltipText) {
         SVGPath icon = new SVGPath();
@@ -276,54 +267,6 @@ final class GameController implements BoardCanvas.MoveSource, EngineListener {
     }
 
     private VBox buildSidebar() {
-        ToggleGroup modeGroup = new ToggleGroup();
-        RadioButton vsHuman = new RadioButton(Messages.get("mode_human_vs_human"));
-        RadioButton vsStockfish = new RadioButton(Messages.get("mode_human_vs_stockfish"));
-        RadioButton trainer = new RadioButton(Messages.get("mode_opening_trainer"));
-        vsHuman.setToggleGroup(modeGroup);
-        vsStockfish.setToggleGroup(modeGroup);
-        trainer.setToggleGroup(modeGroup);
-        vsStockfish.setSelected(true);
-        vsHumanToggle = vsHuman;
-        vsStockfishToggle = vsStockfish;
-        trainerToggle = trainer;
-        lastConfirmedToggle = vsStockfish;
-
-        modeGroup
-                .selectedToggleProperty()
-                .addListener(
-                        (obs, old, selected) -> {
-                            if (suppressModeChange) {
-                                return;
-                            }
-                            if (selected == trainer) {
-                                Optional<TrainingChoice> choice = TrainingSetupDialog.show(stage);
-                                if (choice.isPresent()) {
-                                    TrainingChoice c = choice.get();
-                                    startTraining(c.opening(), c.side(), c.hintsEnabled());
-                                    lastConfirmedToggle = trainer;
-                                } else {
-                                    suppressModeChange = true;
-                                    lastConfirmedToggle.setSelected(true);
-                                    suppressModeChange = false;
-                                }
-                                return;
-                            }
-                            mode =
-                                    selected == vsStockfish
-                                            ? Mode.HUMAN_VS_STOCKFISH
-                                            : Mode.HUMAN_VS_HUMAN;
-                            trainingSession = null;
-                            stopPendingBookMove();
-                            humanSide = Side.WHITE;
-                            boardFlipped = false;
-                            boardCanvas.setFlipped(false);
-                            boardCanvas.setTrainingHint(null, null);
-                            strengthSlider.setDisable(mode != Mode.HUMAN_VS_STOCKFISH);
-                            lastConfirmedToggle = selected;
-                            newGame();
-                        });
-
         flipBoardButton.setOnAction(
                 e -> {
                     boardFlipped = !boardFlipped;
@@ -371,18 +314,7 @@ final class GameController implements BoardCanvas.MoveSource, EngineListener {
         statusLabel.getStyleClass().add("status-label");
         trainingProgressLabel.getStyleClass().add("training-progress-label");
 
-        newGameButton.setOnAction(
-                e -> {
-                    if (mode == Mode.TRAINING) {
-                        TrainingSetupDialog.show(stage)
-                                .ifPresent(
-                                        c ->
-                                                startTraining(
-                                                        c.opening(), c.side(), c.hintsEnabled()));
-                    } else {
-                        newGame();
-                    }
-                });
+        newGameButton.setOnAction(e -> openGameSetupDialog());
         undoButton.setOnAction(e -> undo());
         importButton.setOnAction(e -> importPgn());
         exportButton.setOnAction(e -> exportPgn());
@@ -397,7 +329,6 @@ final class GameController implements BoardCanvas.MoveSource, EngineListener {
         analysisProgressLabel.setVisible(false);
         analysisProgressLabel.managedProperty().bind(analysisProgressLabel.visibleProperty());
 
-        VBox modeBox = new VBox(4, vsHuman, vsStockfish, trainer);
         HBox pgnBox = new HBox(8, importButton, exportButton, analyzeGameButton);
         pgnBox.setAlignment(Pos.CENTER_LEFT);
         HBox actionBox =
@@ -421,7 +352,6 @@ final class GameController implements BoardCanvas.MoveSource, EngineListener {
         VBox sidebar =
                 new VBox(
                         10,
-                        modeBox,
                         strengthLabel,
                         strengthSlider,
                         actionBox,
@@ -1024,6 +954,50 @@ final class GameController implements BoardCanvas.MoveSource, EngineListener {
         refresh();
     }
 
+    /**
+     * The single "New Game" entry point - opponent, color, and (for the trainer) opening/hints -
+     * mirrors the Android app's one {@code showNewGameDialog} used from both its "New Game" menu
+     * action and its training-complete "Pick opening" button. Unlike that dialog, engine strength
+     * stays out of it: it's a live sidebar slider on desktop, not a one-time setup choice.
+     */
+    private void openGameSetupDialog() {
+        GameSetupDialog.show(stage).ifPresent(this::applyGameSetupChoice);
+    }
+
+    private void applyGameSetupChoice(GameSetupDialog.Choice choice) {
+        switch (choice.opponent()) {
+            case HUMAN -> startHumanVsHuman();
+            case STOCKFISH -> startStockfishGame(choice.side());
+            case TRAINER -> startTraining(choice.opening(), choice.side(), choice.hintsEnabled());
+        }
+    }
+
+    private void startHumanVsHuman() {
+        mode = Mode.HUMAN_VS_HUMAN;
+        trainingSession = null;
+        stopPendingBookMove();
+        humanSide = Side.WHITE;
+        boardFlipped = false;
+        boardCanvas.setFlipped(false);
+        boardCanvas.setTrainingHint(null, null);
+        strengthSlider.setDisable(true);
+        newGame();
+    }
+
+    /** Starts a fresh Human vs Stockfish game with the human playing the given side. */
+    private void startStockfishGame(Side side) {
+        mode = Mode.HUMAN_VS_STOCKFISH;
+        trainingSession = null;
+        stopPendingBookMove();
+        humanSide = side;
+        boardFlipped = side == Side.BLACK;
+        boardCanvas.setFlipped(boardFlipped);
+        boardCanvas.setTrainingHint(null, null);
+        strengthSlider.setDisable(false);
+        newGame();
+        maybeStartEngineMove();
+    }
+
     private void undo() {
         if (mode == Mode.TRAINING) {
             undoTrainingMove();
@@ -1188,7 +1162,13 @@ final class GameController implements BoardCanvas.MoveSource, EngineListener {
             return;
         }
         if (trainingSession.isComplete()) {
-            showTrainingCompleteDialog();
+            // Deferred: reaching completion on the book side's own (auto-played) last move means
+            // this runs from a PauseTransition's onFinished handler, i.e. while JavaFX is still
+            // processing that animation - showAndWait() (inside showTrainingCompleteDialog) throws
+            // IllegalStateException ("not allowed during animation or layout processing") if called
+            // synchronously there, silently killing the dialog. Platform.runLater pushes it to a
+            // fresh pulse, after the animation has finished processing.
+            Platform.runLater(this::showTrainingCompleteDialog);
             return;
         }
         if (trainingSession.isHumanTurnNow()) {
@@ -1282,8 +1262,7 @@ final class GameController implements BoardCanvas.MoveSource, EngineListener {
         if (result.get() == repeatType) {
             startTraining(line, side, hintsEnabled);
         } else if (result.get() == pickType) {
-            TrainingSetupDialog.show(stage)
-                    .ifPresent(c -> startTraining(c.opening(), c.side(), c.hintsEnabled()));
+            openGameSetupDialog();
         } else if (result.get() == continueType) {
             continueFreePlay(side);
         }
@@ -1320,11 +1299,6 @@ final class GameController implements BoardCanvas.MoveSource, EngineListener {
         boolean vsStockfish = choice.get().vsStockfish();
         mode = vsStockfish ? Mode.HUMAN_VS_STOCKFISH : Mode.HUMAN_VS_HUMAN;
         humanSide = trainedSide;
-        suppressModeChange = true;
-        Toggle target = vsStockfish ? vsStockfishToggle : vsHumanToggle;
-        target.setSelected(true);
-        suppressModeChange = false;
-        lastConfirmedToggle = target;
         strengthSlider.setDisable(!vsStockfish);
         boardCanvas.setTrainingHint(null, null);
         refresh();
@@ -1431,10 +1405,6 @@ final class GameController implements BoardCanvas.MoveSource, EngineListener {
         trainingSession = null;
         mode = Mode.HUMAN_VS_HUMAN;
         humanSide = Side.WHITE;
-        suppressModeChange = true;
-        vsHumanToggle.setSelected(true);
-        suppressModeChange = false;
-        lastConfirmedToggle = vsHumanToggle;
         boardFlipped = false;
         boardCanvas.setFlipped(false);
         boardCanvas.setLastMove(null, null);
