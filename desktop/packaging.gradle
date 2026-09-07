@@ -173,6 +173,9 @@ tasks.register('generateIcons') {
 
 tasks.register('prepareJpackageInput', Copy) {
     dependsOn tasks.named('jar'), tasks.named('buildStockfishHost')
+    if (os.isMacOsX()) {
+        dependsOn tasks.named('compilePegasusBleMac')
+    }
     // Copy never removes files that are no longer part of its inputs, so a
     // jar left behind by a dependency version bump (e.g. the old
     // javafx-*-21.0.2-*.jar files after bumping to 24.0.2) would otherwise
@@ -191,6 +194,16 @@ tasks.register('prepareJpackageInput', Copy) {
     // ephemeral checkout), so an installed app silently had no engine.
     from(project.ext.stockfishOutDir) {
         into 'stockfish'
+    }
+    // Bundle the compiled Pegasus BLE dylib into Contents/app/native/ -
+    // PegasusBleMacLibrary resolves it there relative to its own jar at
+    // runtime, same idea as the Stockfish binary above. macOS only - see
+    // pegasus-ble-macos.gradle's header comment.
+    if (os.isMacOsX()) {
+        from(project.ext.pegasusBleMacDylib.parentFile) {
+            into 'native'
+            include project.ext.pegasusBleMacDylibName
+        }
     }
     into jpackageInputDir
     // Copy doesn't reliably preserve the exec bit across all OSes/Gradle
@@ -242,6 +255,13 @@ def runJpackage = { String type ->
     ]
     if (icon.exists()) {
         cmd += ['--icon', icon.absolutePath]
+    }
+    if (os.isMacOsX()) {
+        // Supplies src/main/jpackage-resources/Info.plist (a full override
+        // of jpackage's built-in Info-lite.plist.template, with an added
+        // NSBluetoothAlwaysUsageDescription key) - see that file's own
+        // comment for why it's required for the Pegasus board feature.
+        cmd += ['--resource-dir', file("$projectDir/src/main/jpackage-resources").absolutePath]
     }
     if (type == 'deb') {
         cmd += ['--linux-shortcut']

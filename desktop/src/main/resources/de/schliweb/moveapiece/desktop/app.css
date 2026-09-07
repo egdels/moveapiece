@@ -95,6 +95,16 @@
     -fx-fill: -primary-dark;
 }
 
+/* Toggled on the Pegasus board button while connected - carries state via
+   color instead of visible text, like the Android app's icon swap. */
+.icon-button-active {
+    -fx-border-color: -primary;
+}
+
+.icon-button-active .icon-shape {
+    -fx-fill: -primary;
+}
+
 /* ---- radio / check boxes, accented with the brand green ------------ */
 
 .radio-button:selected > .radio > .dot {

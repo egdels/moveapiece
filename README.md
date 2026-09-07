@@ -8,8 +8,9 @@ desktop app is packaged as a native, double-clickable application image via
 the JDK's own `jpackage`.
 
 Optionally connects to a physical [DGT Pegasus](https://digitalgametechnology.com/)
-chess board over Bluetooth LE (Android only), so you can play Stockfish on a
-real board instead of tapping the screen.
+chess board over Bluetooth LE (Android and desktop/macOS; desktop/Windows and
+desktop/Linux are unimplemented follow-up work), so you can play Stockfish on
+a real board instead of tapping the screen.
 
 ## Features
 
@@ -34,12 +35,15 @@ real board instead of tapping the screen.
   by White/Black/date so you can choose which one to import)
 - Move/capture/check sound effects
 - Localized UI: English (default), German, French, Spanish, Italian, Dutch
-- **Android only:** physical board support (DGT Pegasus, BLE) — physical
-  moves are detected from occupancy changes and applied to the game;
-  Stockfish's replies are shown via LEDs on the board. On-screen tap-to-move
-  stays fully usable at the same time — the board is a second, redundant
-  input, not a replacement — and picks back up correctly after a disconnect
-  or a screen move made while it was away. Portrait and landscape layouts.
+- **Android and desktop/macOS:** physical board support (DGT Pegasus, BLE) —
+  physical moves are detected from occupancy changes and applied to the
+  game; Stockfish's replies are shown via LEDs on the board. On-screen
+  tap-to-move stays fully usable at the same time — the board is a second,
+  redundant input, not a replacement — and picks back up correctly after a
+  disconnect or a screen move made while it was away. Portrait and
+  landscape layouts on Android. Desktop/Windows and desktop/Linux don't have
+  a BLE transport implementation yet (see the Tech stack table below) — the
+  physical-board button is simply hidden there for now.
 
 ## Tech stack
 
@@ -50,7 +54,7 @@ real board instead of tapping the screen.
 | Desktop UI | JavaFX, styled with a custom stylesheet using the Android app's own Material 3 colors (`desktop/.../app.css`) |
 | Chess rules | [chesslib](https://github.com/bhlangonijr/chesslib) (MIT) |
 | Engine | [Stockfish](https://github.com/official-stockfish/Stockfish) (GPLv3), built from source, driven over UCI through `ProcessBuilder` — via the NDK on Android, via the host's native toolchain (Makefile `COMP=gcc`/`clang`/`mingw`) on desktop |
-| Physical board | Vendored from a companion project's `core`/BLE-transport modules (GPLv3, own code — see [Third-Party Notices](THIRD-PARTY-NOTICES.md)); Android only |
+| Physical board | Vendored from a companion project's `core`/BLE-transport modules (GPLv3, own code — see [Third-Party Notices](THIRD-PARTY-NOTICES.md)). Transport implementations: Android (`android.bluetooth.*`), desktop/macOS (CoreBluetooth via a small in-house Objective-C/JNI bridge, `desktop/src/main/native/macos/`) — no third-party BLE library: the one mature cross-platform option (SimpleBLE) is BUSL-1.1-licensed, not GPL/FOSS. Windows and Linux desktop transports are unimplemented follow-up work behind the same `PegasusTransport` interface |
 | License | GPLv3 (required by the Stockfish dependency) |
 
 ## Building
@@ -122,6 +126,14 @@ unidentified developer on first launch.
 
 `.github/workflows/desktop.yml` builds and packages the desktop app across
 Linux (x86-64 and arm64), macOS (Apple Silicon and Intel), and Windows.
+
+On macOS, the build additionally compiles a small Objective-C/JNI bridge to
+CoreBluetooth for the physical-board feature (`desktop/pegasus-ble-macos.gradle`,
+`desktop/src/main/native/macos/`) — needs Xcode's Command Line Tools (`clang`)
+installed, which `desktop.yml`'s `macos-latest`/`macos-15-intel` runners
+already have preinstalled. The packaged app's `Info.plist` declares
+`NSBluetoothAlwaysUsageDescription` (macOS kills any process outright that
+touches CoreBluetooth without it - see `desktop/src/main/jpackage-resources/Info.plist`).
 
 ## Testing
 

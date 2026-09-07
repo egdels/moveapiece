@@ -1,0 +1,52 @@
+<?xml version="1.0" ?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "https://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+ <dict>
+  <key>LSMinimumSystemVersion</key>
+  <string>10.11</string>
+  <key>CFBundleDevelopmentRegion</key>
+  <string>English</string>
+  <key>CFBundleAllowMixedLocalizations</key>
+  <true/>
+  <key>CFBundleExecutable</key>
+  <string>DEPLOY_LAUNCHER_NAME</string>
+  <key>CFBundleIconFile</key>
+  <string>DEPLOY_ICON_FILE</string>
+  <key>CFBundleIdentifier</key>
+  <string>DEPLOY_BUNDLE_IDENTIFIER</string>
+  <key>CFBundleInfoDictionaryVersion</key>
+  <string>6.0</string>
+  <key>CFBundleName</key>
+  <string>DEPLOY_BUNDLE_NAME</string>
+  <key>CFBundlePackageType</key>
+  <string>APPL</string>
+  <key>CFBundleShortVersionString</key>
+  <string>DEPLOY_BUNDLE_SHORT_VERSION</string>
+  <key>CFBundleSignature</key>
+  <string>????</string>
+  <!-- See https://developer.apple.com/app-store/categories/ for list of AppStore categories -->
+  <key>LSApplicationCategoryType</key>
+  <string>DEPLOY_APP_CATEGORY</string>
+  <key>CFBundleVersion</key>
+  <string>DEPLOY_BUNDLE_CFBUNDLE_VERSION</string>
+  <key>NSHumanReadableCopyright</key>
+  <string>DEPLOY_BUNDLE_COPYRIGHT</string>DEPLOY_FILE_ASSOCIATIONS
+  <key>NSHighResolutionCapable</key>
+  <string>true</string>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>The application DEPLOY_LAUNCHER_NAME is requesting access to the microphone.</string>
+  <!-- Added for the Pegasus BLE board feature (macOS CoreBluetooth) - see
+       MacosPegasusBleTransport. Without this key, macOS's privacy framework
+       kills the process outright the moment it touches CoreBluetooth, with
+       no prompt and no way for the user to override it. This is otherwise
+       an unmodified copy of the JDK's own jdk.jpackage
+       Info-lite.plist.template resource (the file jpackage's
+       --resource-dir override picks up must be named plain "Info.plist",
+       not "Info-lite.plist.template" - confirmed via jpackage --verbose,
+       which logs the exact override filename it looked for). jpackage
+       replaces the whole file, not just individual keys, so the rest of
+       the default template has to be reproduced here in full too. -->
+  <key>NSBluetoothAlwaysUsageDescription</key>
+  <string>DEPLOY_LAUNCHER_NAME uses Bluetooth to connect to a physical DGT Pegasus chess board.</string>
+ </dict>
+</plist>

@@ -8,6 +8,8 @@ package de.schliweb.moveapiece.desktop;
 import com.github.bhlangonijr.chesslib.Piece;
 import com.github.bhlangonijr.chesslib.Side;
 import com.github.bhlangonijr.chesslib.Square;
+import de.schliweb.moveapiece.desktop.pegasus.DesktopPegasusGameBridge;
+import de.schliweb.moveapiece.desktop.pegasus.MacosPegasusBleTransport;
 import de.schliweb.moveapiece.engine.EngineListener;
 import de.schliweb.moveapiece.engine.NnueAssets;
 import de.schliweb.moveapiece.engine.StockfishEngine;
@@ -16,6 +18,8 @@ import de.schliweb.moveapiece.logic.ChessGame;
 import de.schliweb.moveapiece.logic.PgnGames;
 import de.schliweb.moveapiece.training.OpeningLine;
 import de.schliweb.moveapiece.training.TrainingSession;
+import de.schliweb.pegasus.core.transport.ConnectionState;
+import de.schliweb.pegasus.core.transport.TransportError;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -32,6 +36,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
@@ -56,6 +62,7 @@ import javafx.scene.layout.VBox;
 import javafx.scene.shape.SVGPath;
 import javafx.stage.FileChooser;
 import javafx.stage.Modality;
+import javafx.stage.Popup;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 
@@ -66,7 +73,10 @@ import javafx.util.Duration;
  * import/export. Mirrors the Android app's {@code MainActivity} orchestration at a much smaller
  * scope.
  */
-final class GameController implements BoardCanvas.MoveSource, EngineListener {
+final class GameController
+        implements BoardCanvas.MoveSource, EngineListener, DesktopPegasusGameBridge.Listener {
+
+    private static final Logger LOG = Logger.getLogger(GameController.class.getName());
 
     private enum Mode {
         HUMAN_VS_HUMAN,
@@ -125,6 +135,11 @@ final class GameController implements BoardCanvas.MoveSource, EngineListener {
             "M15.5,14h-0.79l-0.28,-0.27C15.41,12.59 16,11.11 16,9.5C16,5.91 13.09,3 9.5,3S3,5.91 "
                     + "3,9.5S5.91,16 9.5,16c1.61,0 3.09,-0.59 4.23,-1.57l0.27,0.28v0.79l5,4.99L20.49,19"
                     + "L15.5,14zM9.5,14C7.01,14 5,11.99 5,9.5S7.01,5 9.5,5S14,7.01 14,9.5S11.99,14 9.5,14z";
+    // Same Material "bluetooth" glyph as the Android app's ic_pegasus.xml/ic_pegasus_connected.xml.
+    private static final String PEGASUS_ICON_PATH =
+            "M17.71,7.71L12,2h-1v7.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L11,14.41V22h1l5.71,-5.71"
+                    + "l-4.3,-4.29L17.71,7.71zM13,5.83l1.88,1.88L13,9.59V5.83zM14.88,16.29L13,18.17v-3.76"
+                    + "L14.88,16.29z";
 
     private final Button undoButton = iconButton(UNDO_ICON_PATH, Messages.get("menu_undo"));
     private final Button newGameButton =
@@ -140,6 +155,8 @@ final class GameController implements BoardCanvas.MoveSource, EngineListener {
     private final Button flipBoardButton =
             iconButton(FLIP_BOARD_ICON_PATH, Messages.get("menu_flip_board"));
     private final Button hintButton = iconButton(HINT_ICON_PATH, Messages.get("menu_hint"));
+    private final Button pegasusButton =
+            iconButton(PEGASUS_ICON_PATH, Messages.get("menu_pegasus_connect"));
     private final CheckBox evaluationCheckbox =
             new CheckBox(Messages.get("evaluation_toggle_label"));
     private final Label evaluationLabel = new Label();
@@ -219,6 +236,28 @@ final class GameController implements BoardCanvas.MoveSource, EngineListener {
     private TrainingSession trainingSession;
     private PauseTransition pendingBookMove;
 
+    // ---- Pegasus board (macOS only for now - see MacosPegasusBleTransport) ------
+    /** Null on platforms without a transport implementation yet (Windows/Linux). */
+    private final DesktopPegasusGameBridge pegasusBridge;
+
+    /**
+     * True while a guided move currently in flight on the physical board is the trainee's own
+     * expected move (as opposed to the book side's) - mirrors the Android app's {@code
+     * MainActivity.guidingTrainingHumanMove}: once {@link #onEngineMoveGuidanceComplete} fires, the
+     * trainee's move still needs to be applied to {@link #game} here (the physical board only
+     * proved it was played correctly, it doesn't drive {@link #game} on its own the way {@link
+     * #onPhysicalMoveConfirmed} does for a non-guided move).
+     */
+    private boolean guidingTrainingHumanMove = false;
+
+    /**
+     * True while the book side's move has been applied to {@link #game} optimistically (so the
+     * screen updates immediately) but the physical board hasn't yet confirmed the piece was moved -
+     * mirrors {@code MainActivity.trainingBookMovePending}. {@link TrainingSession#advance()} is
+     * deferred until {@link #onEngineMoveGuidanceComplete} confirms it physically.
+     */
+    private boolean trainingBookMovePending = false;
+
     /** Outlined, circular icon-only button (Material "icon button" look) from raw SVG path data. */
     private static Button iconButton(String svgPathData, String tooltipText) {
         SVGPath icon = new SVGPath();
@@ -233,7 +272,23 @@ final class GameController implements BoardCanvas.MoveSource, EngineListener {
 
     GameController(Stage stage) {
         this.stage = stage;
+        pegasusBridge = createPegasusBridgeIfSupported();
         startEngine();
+    }
+
+    /**
+     * macOS only for now (see the physical-board section of README.md and {@link
+     * MacosPegasusBleTransport}'s Javadoc) - Windows (WinRT) and Linux (BlueZ D-Bus) are
+     * unimplemented follow-up work behind the same {@code PegasusTransport} seam, so this returns
+     * {@code null} there and every {@code pegasusBridge}-dependent call site below is guarded
+     * accordingly, exactly like the Android app guards every Pegasus call site on whether the board
+     * is currently connected.
+     */
+    private DesktopPegasusGameBridge createPegasusBridgeIfSupported() {
+        if (!System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("mac")) {
+            return null;
+        }
+        return new DesktopPegasusGameBridge(new MacosPegasusBleTransport(), this);
     }
 
     private static final double BOARD_HOLDER_PADDING = 14;
@@ -321,6 +376,12 @@ final class GameController implements BoardCanvas.MoveSource, EngineListener {
         analyzeGameButton.setOnAction(e -> startPostGameAnalysis());
         openingLibraryButton.setOnAction(e -> OpeningLibraryWindow.show(stage));
         hintButton.setOnAction(e -> requestHint());
+        pegasusButton.setOnAction(e -> onPegasusButtonClicked());
+        pegasusButton.setVisible(pegasusBridge != null);
+        pegasusButton.setManaged(pegasusBridge != null);
+        if (pegasusBridge != null) {
+            updatePegasusButtonState(pegasusBridge.getConnectionState());
+        }
         hintAlternativesLabel.getStyleClass().add("training-progress-label");
         hintAlternativesLabel.setWrapText(true);
         hintAlternativesLabel.setVisible(false);
@@ -338,7 +399,8 @@ final class GameController implements BoardCanvas.MoveSource, EngineListener {
                         undoButton,
                         flipBoardButton,
                         openingLibraryButton,
-                        hintButton);
+                        hintButton,
+                        pegasusButton);
         actionBox.setAlignment(Pos.CENTER_LEFT);
         HBox evalBox = new HBox(8, evaluationCheckbox, evaluationLabel);
         evalBox.setAlignment(Pos.CENTER_LEFT);
@@ -406,6 +468,7 @@ final class GameController implements BoardCanvas.MoveSource, EngineListener {
         boardCanvas.setLastMove(from, to);
         playMoveSound(wasCapture);
         refresh();
+        syncPegasusPosition();
         maybeStartEngineMove();
     }
 
@@ -515,6 +578,199 @@ final class GameController implements BoardCanvas.MoveSource, EngineListener {
         waitingForEngineMove = true;
         boardCanvas.setInteractive(false);
         startEngineSearch(true, MOVETIME_MS);
+    }
+
+    // ---- Pegasus board -----------------------------------------------------------
+
+    private void onPegasusButtonClicked() {
+        if (pegasusBridge.getConnectionState() == ConnectionState.CONNECTED) {
+            pegasusBridge.disconnect();
+            return;
+        }
+        PegasusConnectDialog.show(stage, pegasusBridge).ifPresent(pegasusBridge::connect);
+    }
+
+    /**
+     * Mirrors the Android app's icon-only Pegasus button: swaps to an "active" style class instead
+     * of visible text to carry connect/disconnect state.
+     */
+    private void updatePegasusButtonState(ConnectionState state) {
+        boolean connected = state == ConnectionState.CONNECTED;
+        pegasusButton.getStyleClass().removeAll("icon-button-active");
+        if (connected) {
+            pegasusButton.getStyleClass().add("icon-button-active");
+        }
+        pegasusButton.setTooltip(
+                new Tooltip(
+                        Messages.get(
+                                connected ? "menu_pegasus_disconnect" : "menu_pegasus_connect")));
+    }
+
+    /**
+     * Keeps the Pegasus bridge's own position tracking current whenever {@link #game} changes
+     * without it observing the move itself (tap-to-move, undo, PGN import) - see {@link
+     * DesktopPegasusGameBridge#syncBoardToPosition} for why this is needed.
+     */
+    private void syncPegasusPosition() {
+        if (pegasusBridge != null
+                && pegasusBridge.getConnectionState() == ConnectionState.CONNECTED) {
+            pegasusBridge.syncBoardToPosition(game.toFen());
+        }
+    }
+
+    /**
+     * Physical-board promotion: the board can only report that a pawn reached the back rank
+     * (occupancy-only, never piece identity), so the choice always comes from here - resolved via
+     * {@link DesktopPegasusGameBridge#selectPromotion}, reusing the same on-screen picker {@link
+     * #askPromotionPiece} shows for a tapped promotion.
+     */
+    private void showPhysicalPromotionDialog() {
+        Piece chosen = askPromotionPiece(game.sideToMove());
+        if (chosen != null) {
+            pegasusBridge.selectPromotion(toPegasusPieceType(chosen));
+        }
+    }
+
+    private static de.schliweb.pegasus.core.chess.PieceType toPegasusPieceType(Piece piece) {
+        return switch (piece) {
+            case WHITE_ROOK, BLACK_ROOK -> de.schliweb.pegasus.core.chess.PieceType.ROOK;
+            case WHITE_BISHOP, BLACK_BISHOP -> de.schliweb.pegasus.core.chess.PieceType.BISHOP;
+            case WHITE_KNIGHT, BLACK_KNIGHT -> de.schliweb.pegasus.core.chess.PieceType.KNIGHT;
+            default -> de.schliweb.pegasus.core.chess.PieceType.QUEEN;
+        };
+    }
+
+    /**
+     * Physical occupancy matches several legal moves at once (structurally near-unreachable in
+     * practice - see {@link DesktopPegasusGameBridge.Listener#onAmbiguousMove}), resolved via
+     * {@link DesktopPegasusGameBridge#selectCandidate}.
+     */
+    private void showAmbiguousMoveDialog(List<String> candidateUcis) {
+        ChoiceDialog<String> dialog = new ChoiceDialog<>(candidateUcis.get(0), candidateUcis);
+        dialog.initOwner(stage);
+        dialog.setTitle(Messages.get("pegasus_ambiguous_title"));
+        dialog.setHeaderText(null);
+        dialog.setContentText(Messages.get("pegasus_ambiguous_title"));
+        Styles.apply(dialog.getDialogPane());
+        dialog.showAndWait().ifPresent(pegasusBridge::selectCandidate);
+    }
+
+    // ---- DesktopPegasusGameBridge.Listener -----------------------------------------
+
+    @Override
+    public void onConnectionStateChanged(ConnectionState state) {
+        updatePegasusButtonState(state);
+        if (state == ConnectionState.CONNECTED) {
+            // The bridge only replays moves it actually observed (physical moves,
+            // guided engine moves); on-screen play while the board was disconnected
+            // leaves its own position stale. Push the authoritative position on
+            // every (re)connect so the board can resume physical play correctly -
+            // see DesktopPegasusGameBridge#syncBoardToPosition.
+            pegasusBridge.syncBoardToPosition(game.toFen());
+            if (mode == Mode.TRAINING) {
+                maybeAdvanceTraining();
+            }
+        }
+    }
+
+    @Override
+    public void onPhysicalMoveConfirmed(String uci) {
+        if (mode == Mode.TRAINING) {
+            // Training mode only ever applies moves via the guided-LED path
+            // (see maybeAdvanceTraining/onEngineMoveGuidanceComplete below) -
+            // while a guide is active, pegasus-core routes physical events to
+            // it exclusively, so this callback cannot fire during training.
+            return;
+        }
+        if (!applyUciToGame(uci)) {
+            refresh();
+            return;
+        }
+        refresh();
+        maybeStartEngineMove();
+    }
+
+    @Override
+    public void onBoardMismatch(boolean mismatched) {
+        // The board itself already shows the mismatched squares via LEDs; no
+        // additional on-screen indicator, matching the Android app.
+        if (!mismatched
+                && mode == Mode.TRAINING
+                && trainingSession != null
+                && !trainingSession.isComplete()
+                && trainingSession.isHumanTurnNow()) {
+            // Retries a guideEngineMove() that silently no-op'd because the
+            // physical board wasn't synced yet when maybeAdvanceTraining()
+            // first tried it. Safe unconditionally: while a guide is active,
+            // physical events are routed to it exclusively, so this callback
+            // cannot fire at all unless no guide is currently running.
+            maybeAdvanceTraining();
+        }
+    }
+
+    @Override
+    public void onPromotionRequired() {
+        showPhysicalPromotionDialog();
+    }
+
+    @Override
+    public void onAmbiguousMove(List<String> candidateUcis) {
+        showAmbiguousMoveDialog(candidateUcis);
+    }
+
+    @Override
+    public void onEngineMoveGuidanceComplete() {
+        if (mode == Mode.TRAINING && trainingSession != null) {
+            if (guidingTrainingHumanMove) {
+                // The trainee's own move was only guided (not yet applied) -
+                // the physical board just confirmed it was played correctly.
+                guidingTrainingHumanMove = false;
+                applyUciToGame(trainingSession.currentExpectedUci());
+            }
+            trainingBookMovePending = false;
+            trainingSession.advance();
+            refresh();
+            maybeAdvanceTraining();
+            return;
+        }
+        // GameController's own state was already updated when the engine move
+        // was applied in onBestMove(); nothing further to do here.
+    }
+
+    @Override
+    public void onTransportError(TransportError error, String detail) {
+        LOG.log(Level.WARNING, "Pegasus transport error {0}: {1}", new Object[] {error, detail});
+        showError(Messages.get("pegasus_error_format", error));
+    }
+
+    @Override
+    public void onBatteryStatus(int percent) {
+        LOG.log(Level.INFO, "Pegasus battery: {0}%", percent);
+        showToast(Messages.get("pegasus_battery_format", percent));
+    }
+
+    /**
+     * Self-dismissing, non-blocking notification anchored to the bottom of the window - the desktop
+     * equivalent of the Android app's {@code Toast.makeText(...).show()} (used there for this same
+     * battery report, plus connect/disconnect). A plain {@link Alert} would work too but blocks the
+     * game (modal {@code showAndWait()}), which a routine "battery: 42%" report doesn't warrant.
+     */
+    private void showToast(String message) {
+        Label label = new Label(message);
+        label.setStyle(
+                "-fx-background-color: rgba(33,33,33,0.92); -fx-text-fill: white; "
+                        + "-fx-padding: 8 16 8 16; -fx-background-radius: 6; -fx-font-size: 12px;");
+        Popup popup = new Popup();
+        popup.setAutoFix(true);
+        popup.getContent().add(label);
+        double width = label.prefWidth(-1);
+        double height = label.prefHeight(width);
+        double x = stage.getX() + (stage.getWidth() - width) / 2;
+        double y = stage.getY() + stage.getHeight() - height - 48;
+        popup.show(stage, x, y);
+        PauseTransition pause = new PauseTransition(Duration.seconds(3.5));
+        pause.setOnFinished(e -> popup.hide());
+        pause.play();
     }
 
     /**
@@ -951,6 +1207,9 @@ final class GameController implements BoardCanvas.MoveSource, EngineListener {
         abandonPendingSearches();
         game.reset();
         boardCanvas.setLastMove(null, null);
+        if (pegasusBridge != null) {
+            pegasusBridge.resetForNewGame();
+        }
         refresh();
     }
 
@@ -1014,6 +1273,7 @@ final class GameController implements BoardCanvas.MoveSource, EngineListener {
         }
         boardCanvas.setLastMove(null, null);
         refresh();
+        syncPegasusPosition();
     }
 
     private void refresh() {
@@ -1112,12 +1372,17 @@ final class GameController implements BoardCanvas.MoveSource, EngineListener {
         mode = Mode.TRAINING;
         humanSide = side;
         game.reset();
+        guidingTrainingHumanMove = false;
+        trainingBookMovePending = false;
         boardFlipped = side == Side.BLACK;
         boardCanvas.setFlipped(boardFlipped);
         boardCanvas.setLastMove(null, null);
         boardCanvas.setTrainingHint(null, null);
         boardCanvas.clearSelection();
         strengthSlider.setDisable(true);
+        if (pegasusBridge != null) {
+            pegasusBridge.resetForNewGame();
+        }
         refresh();
         maybeAdvanceTraining();
     }
@@ -1142,6 +1407,7 @@ final class GameController implements BoardCanvas.MoveSource, EngineListener {
         }
     }
 
+    /** Applies a training move confirmed by disconnected auto-play or an on-screen tap. */
     private void applyTrainingMove(String uci) {
         if (!applyUciToGame(uci)) {
             refresh();
@@ -1149,13 +1415,15 @@ final class GameController implements BoardCanvas.MoveSource, EngineListener {
         }
         trainingSession.advance();
         refresh();
+        syncPegasusPosition();
         maybeAdvanceTraining();
     }
 
     /**
-     * Drives the training line forward: leaves the board waiting for the trainee's own next move,
-     * or plays out the book side's move itself after a short delay so it doesn't feel
-     * instantaneous.
+     * Drives the training line forward: shows a hint for the trainee's own next move (applied only
+     * once the physical board confirms it - see {@link #onEngineMoveGuidanceComplete}), or plays
+     * out the book side's move immediately - guided physically if connected, after a short delay
+     * otherwise so it doesn't feel instantaneous.
      */
     private void maybeAdvanceTraining() {
         if (mode != Mode.TRAINING || trainingSession == null || game.isGameOver()) {
@@ -1171,8 +1439,28 @@ final class GameController implements BoardCanvas.MoveSource, EngineListener {
             Platform.runLater(this::showTrainingCompleteDialog);
             return;
         }
+        boolean connected =
+                pegasusBridge != null
+                        && pegasusBridge.getConnectionState() == ConnectionState.CONNECTED;
         if (trainingSession.isHumanTurnNow()) {
+            if (connected) {
+                guidingTrainingHumanMove = true;
+                pegasusBridge.guideEngineMove(
+                        trainingSession.currentExpectedUci(), trainingSession.hintsEnabled());
+            }
+            // Disconnected (or no transport on this platform): the board is
+            // already interactive and waits for a matching click.
             refresh();
+            return;
+        }
+        if (connected) {
+            String uci = trainingSession.currentExpectedUci();
+            applyUciToGame(uci);
+            refresh();
+            trainingBookMovePending = true;
+            pegasusBridge.guideEngineMove(uci);
+            // trainingSession.advance() happens in onEngineMoveGuidanceComplete,
+            // once physically confirmed.
             return;
         }
         refresh();
@@ -1188,20 +1476,36 @@ final class GameController implements BoardCanvas.MoveSource, EngineListener {
         }
     }
 
-    /** Steps the training line back to the trainee's own previous move so they can retry it. */
+    /**
+     * Steps the training line back to the trainee's own previous move so they can retry it. Rolls
+     * back an unconfirmed optimistic book-move apply first (see {@link #trainingBookMovePending})
+     * so {@link #game} and {@link #trainingSession} never disagree, then resyncs the physical board
+     * - any active guide is cancelled there too, and mismatch LEDs light up until the pieces are
+     * moved back; once they match, {@link #onBoardMismatch} re-issues the hint for the retried move
+     * on its own.
+     */
     private void undoTrainingMove() {
-        if (trainingSession == null || trainingSession.plyIndex() == 0) {
+        if (trainingSession == null
+                || (!trainingBookMovePending && trainingSession.plyIndex() == 0)) {
             return;
         }
         stopPendingBookMove();
-        game.undoLastMove();
-        trainingSession.retreat();
-        if (trainingSession.plyIndex() > 0 && !trainingSession.isHumanTurnNow()) {
+        guidingTrainingHumanMove = false;
+        if (trainingBookMovePending) {
+            game.undoLastMove();
+            trainingBookMovePending = false;
+        }
+        if (trainingSession.plyIndex() > 0) {
             game.undoLastMove();
             trainingSession.retreat();
+            if (trainingSession.plyIndex() > 0 && !trainingSession.isHumanTurnNow()) {
+                game.undoLastMove();
+                trainingSession.retreat();
+            }
         }
         boardCanvas.setLastMove(null, null);
         refresh();
+        syncPegasusPosition();
     }
 
     private void updateTrainingProgressLabel() {
@@ -1414,7 +1718,11 @@ final class GameController implements BoardCanvas.MoveSource, EngineListener {
         if (engineReady) {
             engine.newGame();
         }
+        if (pegasusBridge != null) {
+            pegasusBridge.resetForNewGame();
+        }
         refresh();
+        syncPegasusPosition();
     }
 
     private void exportPgn() {
@@ -1473,6 +1781,9 @@ final class GameController implements BoardCanvas.MoveSource, EngineListener {
     void shutdown() {
         if (engine != null) {
             engine.shutdown();
+        }
+        if (pegasusBridge != null) {
+            pegasusBridge.shutdown();
         }
     }
 
@@ -1546,6 +1857,10 @@ final class GameController implements BoardCanvas.MoveSource, EngineListener {
             return;
         }
         applyUciToGame(bestMoveUci);
+        if (pegasusBridge != null
+                && pegasusBridge.getConnectionState() == ConnectionState.CONNECTED) {
+            pegasusBridge.guideEngineMove(bestMoveUci);
+        }
         refresh();
     }
 

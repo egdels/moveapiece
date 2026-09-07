@@ -1,0 +1,84 @@
+/*
+ * Compiles the macOS CoreBluetooth/JNI bridge
+ * (src/main/native/macos/PegasusBleMac.m) into a dylib for
+ * MacosPegasusBleTransport - see that class's Javadoc and PegasusBleMac.m's
+ * own header comment for the architecture and threading model.
+ *
+ * macOS only, by design (see the "macOS first" decision in the physical
+ * board section of README.md): Windows (WinRT) and Linux (pure-Java BlueZ
+ * D-Bus, no native code needed) are separate, not-yet-implemented follow-up
+ * phases behind the same PegasusTransport seam. This script simply isn't
+ * applied on other hosts (see the os.isMacOsX() guard below), and
+ * MacosPegasusBleTransport is never instantiated there either.
+ *
+ * Driven directly with ProcessBuilder, same rationale as stockfish.gradle's
+ * header comment (Gradle 9's task execution model disallows calling back
+ * into the Project instance from inside doLast).
+ */
+
+def os = org.gradle.internal.os.OperatingSystem.current()
+
+if (os.isMacOsX()) {
+    def nativeSrcDir = file("$projectDir/src/main/native/macos")
+    def nativeOutDir = layout.buildDirectory.dir('native').get().asFile
+    def dylibName = 'libPegasusBleMac.dylib'
+    def dylibFile = new File(nativeOutDir, dylibName)
+    def javaHome = System.getProperty('java.home')
+
+    // Consumed by packaging.gradle, which bundles this dylib into the
+    // jpackage image next to the app's own jar - see
+    // PegasusBleMacLibrary's Javadoc for why that's needed.
+    project.ext.pegasusBleMacDylib = dylibFile
+    project.ext.pegasusBleMacDylibName = dylibName
+
+    tasks.register('compilePegasusBleMac') {
+        inputs.dir(nativeSrcDir)
+        inputs.property('javaHome', javaHome)
+        outputs.file(dylibFile)
+
+        doLast {
+            nativeOutDir.mkdirs()
+            def cmd = [
+                'clang',
+                '-dynamiclib',
+                '-fobjc-arc',
+                '-framework', 'CoreBluetooth',
+                '-framework', 'Foundation',
+                '-I', "${javaHome}/include",
+                '-I', "${javaHome}/include/darwin",
+                '-o', dylibFile.absolutePath,
+                new File(nativeSrcDir, 'PegasusBleMac.m').absolutePath,
+            ]
+            def pb = new ProcessBuilder(cmd.collect { it.toString() })
+            pb.redirectErrorStream(true)
+            Process proc = pb.start()
+            proc.inputStream.eachLine { logger.lifecycle(it) }
+            int exitCode = proc.waitFor()
+            if (exitCode != 0) {
+                throw new GradleException("clang failed (${exitCode}) building ${dylibFile}")
+            }
+        }
+    }
+
+    // Exposed to MacosPegasusBleTransport via a generated properties file,
+    // mirroring stockfish.gradle's writeStockfishHomeProperties - see
+    // PegasusBleMacLibrary's Javadoc for the two lookup locations (packaged
+    // vs. :desktop:run).
+    def pegasusBleHomeProps =
+            layout.buildDirectory.file('generated-pegasus-ble/pegasusBleMacHome.properties').get().asFile
+    tasks.register('writePegasusBleMacHomeProperties') {
+        dependsOn 'compilePegasusBleMac'
+        outputs.file(pegasusBleHomeProps)
+        doLast {
+            pegasusBleHomeProps.parentFile.mkdirs()
+            pegasusBleHomeProps.text =
+                    "pegasusBleMac.home=${nativeOutDir.absolutePath}\npegasusBleMac.lib=${dylibName}\n"
+        }
+    }
+
+    sourceSets.main.resources.srcDirs += pegasusBleHomeProps.parentFile
+
+    tasks.matching { it.name == 'processResources' }.configureEach {
+        dependsOn 'writePegasusBleMacHomeProperties'
+    }
+}
