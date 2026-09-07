@@ -11,6 +11,8 @@ This project (MoveAPiece) is licensed under the GNU General Public License v3.0
 | chesslib 1.3.7 | Apache 2.0 | https://github.com/bhlangonijr/chesslib |
 | AndroidX (appcompat, constraintlayout) | Apache 2.0 | https://developer.android.com/jetpack/androidx |
 | Material Components for Android | Apache 2.0 | https://github.com/material-components/material-components-android |
+| bluez-dbus 0.3.5 (`desktop`, Linux Pegasus BLE transport) | MIT | https://github.com/hypfvieh/bluez-dbus |
+| dbus-java-core / dbus-java-transport-native-unixsocket 5.2.0 (`desktop`, transitive/direct deps of bluez-dbus above) | MIT | https://github.com/hypfvieh/dbus-java |
 
 ## NNUE evaluation networks
 

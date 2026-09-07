@@ -9,6 +9,7 @@ import com.github.bhlangonijr.chesslib.Piece;
 import com.github.bhlangonijr.chesslib.Side;
 import com.github.bhlangonijr.chesslib.Square;
 import de.schliweb.moveapiece.desktop.pegasus.DesktopPegasusGameBridge;
+import de.schliweb.moveapiece.desktop.pegasus.LinuxPegasusBleTransport;
 import de.schliweb.moveapiece.desktop.pegasus.MacosPegasusBleTransport;
 import de.schliweb.moveapiece.desktop.pegasus.WindowsPegasusBleTransport;
 import de.schliweb.moveapiece.engine.EngineListener;
@@ -278,11 +279,13 @@ final class GameController
     }
 
     /**
-     * macOS ({@link MacosPegasusBleTransport}) and Windows ({@link WindowsPegasusBleTransport}) so
-     * far - Linux (BlueZ D-Bus) is unimplemented follow-up work behind the same {@code
-     * PegasusTransport} seam, so this returns {@code null} there and every {@code
-     * pegasusBridge}-dependent call site below is guarded accordingly, exactly like the Android app
-     * guards every Pegasus call site on whether the board is currently connected.
+     * All three desktop OSes now have a {@link de.schliweb.pegasus.core.transport.PegasusTransport}
+     * implementation: macOS ({@link MacosPegasusBleTransport}), Windows ({@link
+     * WindowsPegasusBleTransport}) and Linux ({@link LinuxPegasusBleTransport}). Every {@code
+     * pegasusBridge}-dependent call site below is still null-guarded, exactly like the Android app
+     * guards every Pegasus call site on whether the board is currently connected - useful should a
+     * transport's own constructor ever need to signal "not actually usable on this host" by some
+     * other means later (e.g. no D-Bus session reachable), not just by OS name.
      */
     private DesktopPegasusGameBridge createPegasusBridgeIfSupported() {
         String osName = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
@@ -291,6 +294,9 @@ final class GameController
         }
         if (osName.contains("win")) {
             return new DesktopPegasusGameBridge(new WindowsPegasusBleTransport(), this);
+        }
+        if (osName.contains("nux")) {
+            return new DesktopPegasusGameBridge(new LinuxPegasusBleTransport(), this);
         }
         return null;
     }

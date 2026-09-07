@@ -38,6 +38,17 @@ dependencies {
     implementation project(':core')
     implementation project(':pegasus-core')
     implementation 'com.github.bhlangonijr:chesslib:1.3.7'
+    // Linux only (see LinuxPegasusBleTransport's Javadoc) - unlike the
+    // macOS/Windows transports, BlueZ's whole D-Bus API is reachable from
+    // pure Java, so no native bridge is needed there at all. Both are
+    // MIT-licensed (unlike SimpleBLE's BUSL-1.1, see the physical board
+    // section of README.md) and harmless to include unconditionally: the
+    // classes simply go unused on other OSes, same as chesslib etc. above.
+    implementation 'com.github.hypfvieh:bluez-dbus:0.3.5'
+    // Pure-Java (java.net.UnixDomainSocketAddress, JDK 16+) unix-socket
+    // transport for dbus-java - no native/JNR/JNI component at all, unlike
+    // the jnr-unixsocket/junixsocket alternatives bluez-dbus also supports.
+    implementation 'com.github.hypfvieh:dbus-java-transport-native-unixsocket:5.2.0'
 
     testImplementation 'junit:junit:4.13.2'
 }

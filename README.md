@@ -8,9 +8,8 @@ desktop app is packaged as a native, double-clickable application image via
 the JDK's own `jpackage`.
 
 Optionally connects to a physical [DGT Pegasus](https://digitalgametechnology.com/)
-chess board over Bluetooth LE (Android, desktop/macOS, and desktop/Windows;
-desktop/Linux is unimplemented follow-up work), so you can play Stockfish on
-a real board instead of tapping the screen.
+chess board over Bluetooth LE (Android and all three desktop OSes), so you
+can play Stockfish on a real board instead of tapping the screen.
 
 ## Features
 
@@ -35,18 +34,17 @@ a real board instead of tapping the screen.
   by White/Black/date so you can choose which one to import)
 - Move/capture/check sound effects
 - Localized UI: English (default), German, French, Spanish, Italian, Dutch
-- **Android, desktop/macOS and desktop/Windows:** physical board support
-  (DGT Pegasus, BLE) — physical moves are detected from occupancy changes
-  and applied to the game; Stockfish's replies are shown via LEDs on the
-  board. On-screen tap-to-move stays fully usable at the same time — the
-  board is a second, redundant input, not a replacement — and picks back up
+- **Android and all three desktop OSes:** physical board support (DGT
+  Pegasus, BLE) — physical moves are detected from occupancy changes and
+  applied to the game; Stockfish's replies are shown via LEDs on the board.
+  On-screen tap-to-move stays fully usable at the same time — the board is
+  a second, redundant input, not a replacement — and picks back up
   correctly after a disconnect or a screen move made while it was away.
-  Portrait and landscape layouts on Android. Desktop/Linux doesn't have a
-  BLE transport implementation yet (see the Tech stack table below) — the
-  physical-board button is simply hidden there for now. The Windows
-  transport is implementation-complete but not yet hardware-verified (no
-  Windows machine + physical board available to test against so far,
-  unlike the macOS transport - see the Tech stack table).
+  Portrait and landscape layouts on Android. The macOS transport is
+  hardware-verified; the Windows and Linux transports are
+  implementation-complete but not yet hardware-verified (no Windows/Linux
+  machine + physical board available to test against so far - see the Tech
+  stack table).
 
 ## Tech stack
 
@@ -57,7 +55,7 @@ a real board instead of tapping the screen.
 | Desktop UI | JavaFX, styled with a custom stylesheet using the Android app's own Material 3 colors (`desktop/.../app.css`) |
 | Chess rules | [chesslib](https://github.com/bhlangonijr/chesslib) (MIT) |
 | Engine | [Stockfish](https://github.com/official-stockfish/Stockfish) (GPLv3), built from source, driven over UCI through `ProcessBuilder` — via the NDK on Android, via the host's native toolchain (Makefile `COMP=gcc`/`clang`/`mingw`) on desktop |
-| Physical board | Vendored from a companion project's `core`/BLE-transport modules (GPLv3, own code — see [Third-Party Notices](THIRD-PARTY-NOTICES.md)). Transport implementations: Android (`android.bluetooth.*`), desktop/macOS (CoreBluetooth via a small in-house Objective-C/JNI bridge, `desktop/src/main/native/macos/`), desktop/Windows (Windows Runtime `Windows.Devices.Bluetooth` via a small in-house C++/WinRT/JNI bridge, `desktop/src/main/native/windows/`, MSVC-built) — no third-party BLE library: the one mature cross-platform option (SimpleBLE) is BUSL-1.1-licensed, not GPL/FOSS. Linux desktop transport is unimplemented follow-up work behind the same `PegasusTransport` interface |
+| Physical board | Vendored from a companion project's `core`/BLE-transport modules (GPLv3, own code — see [Third-Party Notices](THIRD-PARTY-NOTICES.md)). Transport implementations: Android (`android.bluetooth.*`), desktop/macOS (CoreBluetooth via a small in-house Objective-C/JNI bridge, `desktop/src/main/native/macos/`), desktop/Windows (Windows Runtime `Windows.Devices.Bluetooth` via a small in-house C++/WinRT/JNI bridge, `desktop/src/main/native/windows/`, MSVC-built), desktop/Linux ([bluez-dbus](https://github.com/hypfvieh/bluez-dbus)/[dbus-java](https://github.com/hypfvieh/dbus-java), both MIT — pure Java, no native code, since BlueZ's GATT client API is fully reachable over D-Bus). No third-party dependency for macOS/Windows: the one mature cross-platform BLE library (SimpleBLE) is BUSL-1.1-licensed, not GPL/FOSS |
 | License | GPLv3 (required by the Stockfish dependency) |
 
 ## Building
