@@ -40,11 +40,10 @@ can play Stockfish on a real board instead of tapping the screen.
   On-screen tap-to-move stays fully usable at the same time — the board is
   a second, redundant input, not a replacement — and picks back up
   correctly after a disconnect or a screen move made while it was away.
-  Portrait and landscape layouts on Android. The macOS transport is
-  hardware-verified; the Windows and Linux transports are
-  implementation-complete but not yet hardware-verified (no Windows/Linux
-  machine + physical board available to test against so far - see the Tech
-  stack table).
+  Portrait and landscape layouts on Android. The macOS (Apple Silicon and
+  Intel) and Windows transports are hardware-verified; the Linux transport
+  is implementation-complete but not yet hardware-verified (not tested
+  against a physical board yet - see the Tech stack table).
 
 ## Tech stack
 
@@ -179,21 +178,29 @@ desktop/                JavaFX desktop application module
 ├── src/main/java/de/schliweb/moveapiece/desktop/
 │   ├── GameController.java    Wires ChessGame + StockfishEngine + the board together
 │   ├── BoardCanvas.java       Board rendering + click-to-move (Canvas/GraphicsContext)
-│   ├── OpeningLibraryWindow.java, OpeningPreviewWindow.java, TrainingSetupDialog.java
+│   ├── GameSetupDialog.java, PegasusConnectDialog.java, OpeningLibraryWindow.java,
+│   │   OpeningPreviewWindow.java
+│   ├── pegasus/          Bridge between the physical board and ChessGame, plus the
+│   │                     per-OS BLE transports (macOS/Windows/Linux)
 │   ├── Messages.java          Localized strings (i18n/Messages*.properties)
 │   └── DesktopApp.java, Launcher.java, Styles.java, MoveSoundPlayer.java, ...
+├── src/main/native/macos/, src/main/native/windows/   Objective-C/JNI and C++/WinRT/JNI
+│                         bridges to CoreBluetooth / Windows.Devices.Bluetooth (no native
+│                         code needed for Linux - see the Tech stack table)
 ├── src/main/resources/de/schliweb/moveapiece/desktop/
 │   ├── app.css            Visual theme (Android's own Material 3 colors)
 │   ├── i18n/               Messages.properties + _de/_fr/_es/_it/_nl
 │   ├── pieces/, sounds/, icon.png   Same artwork/audio as the Android app
 ├── stockfish.gradle       Builds Stockfish for the host OS/arch (no NDK)
+├── pegasus-ble-macos.gradle, pegasus-ble-windows.gradle   Compile the native BLE bridges
 └── packaging.gradle       jpackage app-image + per-OS icon generation
 
 pegasus-core/            Physical-board protocol/chess-rules/move-detection
                          module (plain java-library, zero dependencies,
                          vendored — see Third-Party Notices); used by
-                         :app (Pegasus support) and by :core's own tests
-                         (cross-checking FEN output against it)
+                         :app and :desktop (Pegasus support) and by
+                         :core's own tests (cross-checking FEN output
+                         against it)
 ```
 
 ## License
@@ -212,6 +219,9 @@ what that means in practice.
 
 Android: core app and physical-board support are feature-complete and
 verified (automated tests + real-hardware testing). Desktop: covers the
-same feature set except physical-board support, verified locally on macOS
-(Apple Silicon); the Linux/Windows/Intel-Mac legs of `desktop.yml` are new
-and not yet verified against a real CI run.
+same feature set, including physical-board support (DGT Pegasus BLE) on
+macOS, Windows, and Linux. Hardware-verified on macOS (Apple Silicon and
+Intel) and Windows; Linux is implementation-complete but not yet
+hardware-verified - see the Features section above. The Linux leg of
+`desktop.yml` is newer than the macOS/Windows legs and not yet verified
+against a real CI run.
