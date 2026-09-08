@@ -41,6 +41,7 @@
 #include <winrt/Windows.Storage.Streams.h>
 #include <jni.h>
 #include <string>
+#include <unordered_map>
 #include <vector>
 #include <cwchar>
 
@@ -150,6 +151,7 @@ class PegasusBleBridge {
 
     void StartScan() {
         StopScan();
+        knownNames_.clear();
         watcher_ = BluetoothLEAdvertisementWatcher();
         watcher_.ScanningMode(BluetoothLEScanningMode::Active);
         // No service filter: unknown Pegasus units may not advertise the
@@ -297,9 +299,32 @@ class PegasusBleBridge {
 
     void OnAdvertisementReceived(BluetoothLEAdvertisementWatcher const&,
                                   BluetoothLEAdvertisementReceivedEventArgs const& args) {
-        winrt::hstring name = args.Advertisement().LocalName();
-        ReportDeviceFound(FormatAddress(args.BluetoothAddress()), std::wstring(name.c_str(), name.size()),
-                           args.RawSignalStrengthInDBm());
+        // BluetoothLEAdvertisementWatcher.Received fires once per received
+        // packet, not once per device: in Active scanning mode (see
+        // StartScan) the primary advertisement and its scan response arrive
+        // as two separate events, and args.Advertisement().LocalName() only
+        // reflects whichever single packet triggered *this* call. Many
+        // peripherals - apparently including the Pegasus board - only carry
+        // their name in the scan response, so the primary-advertisement
+        // event alone would report an empty name and get silently dropped
+        // by PegasusConnectDialog's "unnamed devices are never the Pegasus
+        // board" filter before the named event ever arrives. Cache the last
+        // known name per address and report that instead of just this
+        // packet's, mirroring PegasusBleMac.m's
+        // `name ?: peripheral.name` fallback (CoreBluetooth keeps that cache
+        // for us; WinRT does not, so it's kept here).
+        uint64_t address = args.BluetoothAddress();
+        winrt::hstring packetName = args.Advertisement().LocalName();
+        std::wstring name(packetName.c_str(), packetName.size());
+        if (!name.empty()) {
+            knownNames_[address] = name;
+        } else {
+            auto it = knownNames_.find(address);
+            if (it != knownNames_.end()) {
+                name = it->second;
+            }
+        }
+        ReportDeviceFound(FormatAddress(address), name, args.RawSignalStrengthInDBm());
     }
 
     void OnConnectionStatusChanged(BluetoothLEDevice const& sender, winrt::Windows::Foundation::IInspectable const&) {
@@ -447,6 +472,7 @@ class PegasusBleBridge {
     winrt::guid notifyCharUuid_;
     BluetoothLEAdvertisementWatcher watcher_{nullptr};
     winrt::event_token receivedToken_{};
+    std::unordered_map<uint64_t, std::wstring> knownNames_;
     BluetoothLEDevice device_{nullptr};
     winrt::event_token connectionStatusToken_{};
     GattCharacteristic writeChar_{nullptr};
@@ -461,7 +487,20 @@ Java_de_schliweb_moveapiece_desktop_pegasus_WindowsPegasusBleTransport_nativeCre
         JNIEnv* env, jobject thiz, jstring uartServiceUuid, jstring writeCharUuid, jstring notifyCharUuid) {
     static bool apartmentInitialized = false;
     if (!apartmentInitialized) {
-        winrt::init_apartment(winrt::apartment_type::multi_threaded);
+        try {
+            winrt::init_apartment(winrt::apartment_type::multi_threaded);
+        } catch (winrt::hresult_error const&) {
+            // Most commonly RPC_E_CHANGED_MODE: JavaFX/Glass already
+            // initializes COM as STA on this same thread (drag-and-drop,
+            // clipboard, media), so asking for MTA here fails - but COM is
+            // already usable, just not in the mode we asked for. An
+            // uncaught winrt::hresult_error here crosses the JNI boundary as
+            // an uncaught C++ exception, which fatally crashes the whole JVM
+            // rather than just this feature, so swallow any init_apartment
+            // failure: the WinRT calls that actually need a live apartment
+            // (StartScan/Connect/...) each already catch and report their
+            // own hresult_error individually.
+        }
         apartmentInitialized = true;
     }
     auto* bridge = new PegasusBleBridge(env, thiz, JStringToWString(env, uartServiceUuid),
