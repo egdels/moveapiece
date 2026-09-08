@@ -1,0 +1,8 @@
+UI update.
+
+* Redesigned the game screen: the board and action buttons now stay fixed
+  while only the move list scrolls, so a long game can't push the buttons
+  out of view.
+* Action buttons now wrap to fit your screen width instead of a fixed
+  two-row layout.
+* Fixed the board shifting when a move-quality hint appears or disappears.
