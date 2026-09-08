@@ -232,14 +232,35 @@ tasks.register('prepareJpackageInput', Copy) {
 // bundling the *entire* JDK (~150 MB). Computed via:
 //   jdeps --multi-release <N> --ignore-missing-deps --print-module-deps \
 //     --class-path <all jpackage-input jars> <all jpackage-input jars>
-// against desktop.jar, core.jar, chesslib, commons-lang3 and the javafx-*
-// jars together (jdeps only reports *JDK platform* module deps - the
-// third-party jars themselves are simply bundled as-is, not part of the
-// runtime image). Re-run that whenever a new JDK API or dependency is
-// added and re-verify the app still works end-to-end (UI, engine moves,
-// move sounds, file dialogs) with the trimmed runtime - jdeps only sees
-// static bytecode references, not reflection/ServiceLoader-based ones.
-def runtimeModules = ['java.base', 'java.desktop', 'jdk.jfr', 'jdk.unsupported']
+// against every jar under build/jpackage-input/ (jdeps only reports *JDK
+// platform* module deps - the third-party jars themselves are simply
+// bundled as-is, not part of the runtime image). Re-run that whenever a
+// new JDK API or dependency is added and re-verify the app still works
+// end-to-end (UI, engine moves, move sounds, file dialogs) with the
+// trimmed runtime - jdeps only sees static bytecode references, not
+// reflection/ServiceLoader-based ones.
+//
+// java.logging/java.prefs/jdk.net/jdk.security.auth were missing here
+// until 2026-09-08 (java.util.logging.Logger used throughout the Pegasus
+// board code; java.prefs for desktop's own Settings.java, apparently never
+// actually caught before since nobody had launched a real jpackage build
+// until debugging this; jdk.net/jdk.security.auth pulled in by the Linux
+// Pegasus transport's D-Bus stack) - the trimmed runtime silently omitting
+// any of these doesn't fail the build, only crashes the *packaged* app at
+// first launch with a NoClassDefFoundError, while `:desktop:run` (a full,
+// untrimmed JDK) keeps working fine - always sanity-check a real
+// jpackageAppImage/jpackageDmg/jpackageMsi/jpackageDeb launch after
+// touching this list, not just that packaging itself succeeds.
+def runtimeModules = [
+    'java.base',
+    'java.desktop',
+    'java.logging',
+    'java.prefs',
+    'jdk.jfr',
+    'jdk.net',
+    'jdk.security.auth',
+    'jdk.unsupported',
+]
 
 def runJpackage = { String type ->
     jpackageDestDir.mkdirs()
