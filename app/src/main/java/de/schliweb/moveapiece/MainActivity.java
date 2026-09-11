@@ -525,6 +525,7 @@ public class MainActivity extends AppCompatActivity
         }
         setLastMove(from, to);
         playMoveSound(wasCapture);
+        scrollMoveHistoryToEnd = true;
         return true;
     }
 
@@ -887,13 +888,31 @@ public class MainActivity extends AppCompatActivity
             // "prove you know the move" hinting, so its history stays plain, unclickable text
             // (and only ever shows what's actually been played, not a redoable future).
             binding.moveListText.setText(game.toSan());
-            return;
+        } else {
+            // toFullSan(), not toSan(): after stepping back via undo/jumpToPly, the moves ahead
+            // are still redoable and must stay visible and clickable, or the user could never
+            // navigate back and forth in the history - only playing a genuinely new move should
+            // drop them.
+            binding.moveListText.setText(clickableMoveHistory(game.toFullSan()));
         }
-        // toFullSan(), not toSan(): after stepping back via undo/jumpToPly, the moves ahead are
-        // still redoable and must stay visible and clickable, or the user could never navigate
-        // back and forth in the history - only playing a genuinely new move should drop them.
-        binding.moveListText.setText(clickableMoveHistory(game.toFullSan()));
+        if (scrollMoveHistoryToEnd) {
+            scrollMoveHistoryToEnd = false;
+            // Posted, not called directly: the TextView hasn't been laid out with its new
+            // (possibly taller) content yet, so fullScroll() would scroll to the previous,
+            // shorter bottom instead of the true new one.
+            binding.moveListScroll.post(() -> binding.moveListScroll.fullScroll(View.FOCUS_DOWN));
+        }
     }
+
+    /**
+     * Set by {@link #applyUciToGame}/{@link #applyHumanMove} (a genuinely new move was just played
+     * - by a human tap, the engine, the physical board, or training auto-play) and by {@link
+     * #finishPgnImport} (a whole new game was just loaded), consumed by the next {@link
+     * #updateMoveHistory()} call to scroll the move list down to it. Deliberately not set by
+     * undo/redo/{@link #jumpToPly} - those are the user explicitly choosing to look at a specific
+     * point in the history, which auto-scrolling away from would defeat the purpose of.
+     */
+    private boolean scrollMoveHistoryToEnd;
 
     /**
      * Turns {@link ChessGame#toFullSan()}'s numbered movetext (e.g. "1. e4 e5 2. Nf3") into a
@@ -1303,6 +1322,7 @@ public class MainActivity extends AppCompatActivity
             engine.newGame();
             engine.setFullStrength();
         }
+        scrollMoveHistoryToEnd = true;
         refreshBoard();
         syncPegasusPosition();
     }
@@ -2038,6 +2058,7 @@ public class MainActivity extends AppCompatActivity
         }
         setLastMove(from, to);
         playMoveSound(wasCapture);
+        scrollMoveHistoryToEnd = true;
         refreshBoard();
         syncPegasusPosition();
         maybeTriggerEngineMove();

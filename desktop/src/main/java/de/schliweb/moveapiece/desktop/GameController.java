@@ -488,6 +488,7 @@ final class GameController
         }
         boardCanvas.setLastMove(from, to);
         playMoveSound(wasCapture);
+        scrollMoveHistoryToEnd = true;
         refresh();
         syncPegasusPosition();
         maybeStartEngineMove();
@@ -1382,37 +1383,54 @@ final class GameController
         moveListFlow.getChildren().clear();
         if (mode == Mode.TRAINING) {
             moveListFlow.getChildren().add(new Text(game.toSan()));
-            return;
-        }
-        int ply = 0;
-        int currentPly = game.moveCount();
-        int currentRoundStart =
-                mode == Mode.HUMAN_VS_STOCKFISH && currentPly > 1 ? currentPly - 1 : currentPly;
-        boolean first = true;
-        for (String token : game.toFullSan().split("\\s+")) {
-            if (token.isEmpty()) {
-                continue;
-            }
-            if (!first) {
-                moveListFlow.getChildren().add(new Text(" "));
-            }
-            first = false;
-            if (token.matches("\\d+\\.")) {
-                moveListFlow.getChildren().add(new Text(token));
-            } else {
-                ply++;
-                int targetPly = ply;
-                Text moveText = new Text(token);
-                moveText.getStyleClass().add("move-history-link");
-                if (ply >= currentRoundStart && ply <= currentPly) {
-                    moveText.getStyleClass().add("move-history-current");
+        } else {
+            int ply = 0;
+            int currentPly = game.moveCount();
+            int currentRoundStart =
+                    mode == Mode.HUMAN_VS_STOCKFISH && currentPly > 1 ? currentPly - 1 : currentPly;
+            boolean first = true;
+            for (String token : game.toFullSan().split("\\s+")) {
+                if (token.isEmpty()) {
+                    continue;
                 }
-                moveText.setCursor(Cursor.HAND);
-                moveText.setOnMouseClicked(e -> jumpToPly(targetPly));
-                moveListFlow.getChildren().add(moveText);
+                if (!first) {
+                    moveListFlow.getChildren().add(new Text(" "));
+                }
+                first = false;
+                if (token.matches("\\d+\\.")) {
+                    moveListFlow.getChildren().add(new Text(token));
+                } else {
+                    ply++;
+                    int targetPly = ply;
+                    Text moveText = new Text(token);
+                    moveText.getStyleClass().add("move-history-link");
+                    if (ply >= currentRoundStart && ply <= currentPly) {
+                        moveText.getStyleClass().add("move-history-current");
+                    }
+                    moveText.setCursor(Cursor.HAND);
+                    moveText.setOnMouseClicked(e -> jumpToPly(targetPly));
+                    moveListFlow.getChildren().add(moveText);
+                }
             }
+        }
+        if (scrollMoveHistoryToEnd) {
+            scrollMoveHistoryToEnd = false;
+            // Deferred, not called directly: the ScrollPane hasn't been laid out against
+            // moveListFlow's new (possibly taller) content yet, so setVvalue(1.0) now would
+            // scroll to the previous, shorter bottom instead of the true new one.
+            Platform.runLater(() -> moveListScroll.setVvalue(1.0));
         }
     }
+
+    /**
+     * Set by {@link #applyUciToGame}/{@link #onMoveChosen} (a genuinely new move was just played -
+     * by a human click, the engine, the physical board, or training auto-play) and by {@link
+     * #finishPgnImport} (a whole new game was just loaded), consumed by the next {@link
+     * #updateMoveHistory()} call to scroll the move list down to it. Deliberately not set by
+     * undo/redo/{@link #jumpToPly} - those are the user explicitly choosing to look at a specific
+     * point in the history, which auto-scrolling away from would defeat the purpose of.
+     */
+    private boolean scrollMoveHistoryToEnd;
 
     /**
      * Jumps the game to the position right after ply {@code targetPly} (1-based, matching a move's
@@ -1807,6 +1825,7 @@ final class GameController
         }
         boardCanvas.setLastMove(from, to);
         playMoveSound(wasCapture);
+        scrollMoveHistoryToEnd = true;
         return true;
     }
 
@@ -1906,6 +1925,7 @@ final class GameController
         if (pegasusBridge != null) {
             pegasusBridge.resetForNewGame();
         }
+        scrollMoveHistoryToEnd = true;
         refresh();
         syncPegasusPosition();
     }
