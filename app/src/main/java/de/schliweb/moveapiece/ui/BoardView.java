@@ -49,6 +49,13 @@ public class BoardView extends View {
     private final Paint checkPaint = new Paint();
     private final Paint trainingHintPaint = new Paint();
     private final Paint piecePaint = new Paint();
+
+    /** File/rank labels drawn in a light square's corner - dark, for contrast. */
+    private final Paint coordOnLightPaint = new Paint();
+
+    /** File/rank labels drawn in a dark square's corner - light, for contrast. */
+    private final Paint coordOnDarkPaint = new Paint();
+
     private final RectF reusablePieceRect = new RectF();
 
     private final EnumMap<Piece, Integer> pieceDrawableIds = new EnumMap<>(Piece.class);
@@ -87,6 +94,12 @@ public class BoardView extends View {
         lastMovePaint.setColor(getResources().getColor(R.color.board_last_move, null));
         checkPaint.setColor(getResources().getColor(R.color.board_check, null));
         trainingHintPaint.setColor(getResources().getColor(R.color.board_training_hint, null));
+        // Reuses the board's own two colors swapped, rather than a fixed gray, so the
+        // labels always read clearly against whichever square they sit on.
+        coordOnLightPaint.setColor(getResources().getColor(R.color.board_dark, null));
+        coordOnLightPaint.setAntiAlias(true);
+        coordOnDarkPaint.setColor(getResources().getColor(R.color.board_light, null));
+        coordOnDarkPaint.setAntiAlias(true);
         // Piece bitmaps are fixed 256x256 sources scaled to whatever the board's
         // current square size is; without filtering, that scale (almost never an
         // exact match) produces visibly jagged/pixelated edges on curves like the
@@ -169,6 +182,9 @@ public class BoardView extends View {
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
         squareSize = Math.min(w, h) / 8f;
+        float coordTextSize = squareSize * 0.22f;
+        coordOnLightPaint.setTextSize(coordTextSize);
+        coordOnDarkPaint.setTextSize(coordTextSize);
     }
 
     @Override
@@ -200,6 +216,7 @@ public class BoardView extends View {
                 float left = col * squareSize;
                 float top = row * squareSize;
                 canvas.drawRect(left, top, left + squareSize, top + squareSize, base);
+                drawCoordinateLabels(canvas, row, col, left, top, isLight);
 
                 if (square == lastMoveFrom || square == lastMoveTo) {
                     canvas.drawRect(left, top, left + squareSize, top + squareSize, lastMovePaint);
@@ -237,6 +254,32 @@ public class BoardView extends View {
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * File letter (bottom row only, bottom-right corner) and rank number (left column only,
+     * top-left corner) for the square at {@code (row, col)}, honoring {@link #flipped} the same way
+     * {@link #squareAt} does.
+     */
+    private void drawCoordinateLabels(
+            Canvas canvas, int row, int col, float left, float top, boolean isLight) {
+        Paint paint = isLight ? coordOnLightPaint : coordOnDarkPaint;
+        float padding = squareSize * 0.06f;
+        if (row == 7) {
+            char fileChar = (char) ('a' + (flipped ? 7 - col : col));
+            paint.setTextAlign(Paint.Align.RIGHT);
+            canvas.drawText(
+                    String.valueOf(fileChar),
+                    left + squareSize - padding,
+                    top + squareSize - padding,
+                    paint);
+        }
+        if (col == 0) {
+            int rankNumber = (flipped ? row : 7 - row) + 1;
+            paint.setTextAlign(Paint.Align.LEFT);
+            canvas.drawText(
+                    String.valueOf(rankNumber), left + padding, top + paint.getTextSize(), paint);
         }
     }
 

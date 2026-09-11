@@ -14,6 +14,8 @@ import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.image.Image;
 import javafx.scene.paint.Color;
+import javafx.scene.text.Font;
+import javafx.scene.text.TextAlignment;
 
 /**
  * Renders an 8x8 chess board and turns clicks into move requests. Holds no chess rules itself: it
@@ -171,6 +173,7 @@ public class BoardCanvas extends Canvas {
 
                 gc.setFill(isLight ? LIGHT : DARK);
                 gc.fillRect(left, top, squareSize, squareSize);
+                drawCoordinateLabels(gc, row, col, left, top, squareSize, isLight);
 
                 if (square == lastMoveFrom || square == lastMoveTo) {
                     gc.setFill(LAST_MOVE);
@@ -213,6 +216,39 @@ public class BoardCanvas extends Canvas {
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * File letter (bottom row only, bottom-right corner) and rank number (left column only,
+     * top-left corner) for the square at {@code (row, col)}, honoring {@code flipped} the same way
+     * {@link #squareAt} does. Reuses the board's own two colors swapped (dark text on light
+     * squares, light text on dark squares) so the labels always read clearly.
+     */
+    private void drawCoordinateLabels(
+            GraphicsContext gc,
+            int row,
+            int col,
+            double left,
+            double top,
+            double squareSize,
+            boolean isLight) {
+        gc.setFill(isLight ? DARK : LIGHT);
+        gc.setFont(Font.font(squareSize * 0.22));
+        double padding = squareSize * 0.06;
+        if (row == 7) {
+            char fileChar = (char) ('a' + (flipped ? 7 - col : col));
+            gc.setTextAlign(TextAlignment.RIGHT);
+            gc.fillText(
+                    String.valueOf(fileChar),
+                    left + squareSize - padding,
+                    top + squareSize - padding);
+        }
+        if (col == 0) {
+            int rankNumber = (flipped ? row : 7 - row) + 1;
+            gc.setTextAlign(TextAlignment.LEFT);
+            gc.fillText(
+                    String.valueOf(rankNumber), left + padding, top + squareSize * 0.22 + padding);
         }
     }
 
