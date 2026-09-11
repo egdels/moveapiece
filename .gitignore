@@ -24,3 +24,8 @@ local.properties
 /app/src/main/cpp/stockfish/src/*.o
 /app/src/main/cpp/stockfish/src/stockfish
 /app/src/main/cpp/stockfish/src/nn-*.nnue
+
+# DGT's official protocol document, shared privately by DGT Support after
+# our heads-up email (see 2026-09-10 reply) - confidential, not ours to
+# redistribute, must never be committed.
+/MAN_72002_DGT Chessboard CommunicationProtocol_v1.2.1.pdf

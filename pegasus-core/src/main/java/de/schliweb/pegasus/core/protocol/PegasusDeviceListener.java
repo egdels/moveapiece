@@ -16,6 +16,9 @@ public interface PegasusDeviceListener {
 
     void onBatteryStatus(BatteryStatus status);
 
+    /** Response to {@link PegasusCommands#encodeDevKeyStateRequest()}: was the dev key accepted? */
+    void onDevKeyState(boolean accepted);
+
     /** ASCII identity message (trademark, serial numbers). */
     void onIdentity(int messageType, String text);
 

@@ -66,6 +66,11 @@ public class PegasusDeviceTest {
         public void onUnknownFrame(PegasusFrame frame) {
             events.add("unknown:" + String.format("0x%02X", frame.type()));
         }
+
+        @Override
+        public void onDevKeyState(boolean accepted) {
+            events.add("devkey:" + (accepted ? "accepted" : "rejected"));
+        }
     }
 
     private static byte[] frame(int type, byte[] payload) {
@@ -158,6 +163,15 @@ public class PegasusDeviceTest {
         assertEquals("identity:TRADEMARK:Digital Game Technology", listener.events.get(0));
         assertEquals("version:VERSION:1.2", listener.events.get(1));
         assertEquals("version:HARDWARE_VERSION:3.4", listener.events.get(2));
+    }
+
+    @Test
+    public void dispatchesDevKeyState() {
+        device.onDataReceived(frame(PegasusMessageType.DEVKEY_STATE, new byte[] {1}));
+        device.onDataReceived(frame(PegasusMessageType.DEVKEY_STATE, new byte[] {0}));
+
+        assertEquals("devkey:accepted", listener.events.get(0));
+        assertEquals("devkey:rejected", listener.events.get(1));
     }
 
     @Test

@@ -181,7 +181,7 @@ public class PegasusGameBridgeTest {
         }
 
         @Override
-        public void onBatteryStatus(int percent) {
+        public void onBatteryStatus(int percent, boolean criticallyLow) {
             // Not exercised by these tests.
         }
     }

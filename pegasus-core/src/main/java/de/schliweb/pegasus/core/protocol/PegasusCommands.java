@@ -64,6 +64,16 @@ public final class PegasusCommands {
         };
     }
 
+    /**
+     * Encodes the devkey-state request 0x5A → DGT_MSG_DEVKEY_STATE (0xA5), the manufacturer's
+     * documented way to check whether {@link #encodeDevKey()} was accepted (payload byte: 0 = no
+     * key provided, 1 = accepted). CONFIRMED_BY_MANUFACTURER_SPEC (DGT Chessboard Communication
+     * Protocol v1.2.1).
+     */
+    public static byte[] encodeDevKeyStateRequest() {
+        return new byte[] {0x5A};
+    }
+
     /** Encodes 'G' (0x47) → DGT_MSG_TRADEMARK (0x92). CONFIRMED_BY_REFERENCE_IMPLEMENTATION. */
     public static byte[] encodeTrademarkRequest() {
         return new byte[] {0x47};

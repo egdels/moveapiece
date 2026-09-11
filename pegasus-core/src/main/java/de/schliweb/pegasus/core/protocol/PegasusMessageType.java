@@ -20,6 +20,7 @@ public final class PegasusMessageType {
     public static final int HARDWARE_VERSION = 0x96;
     public static final int BATTERY_STATUS = 0xA0;
     public static final int LONG_SERIALNR = 0xA2;
+    public static final int DEVKEY_STATE = 0xA5;
 
     private PegasusMessageType() {}
 
@@ -42,6 +43,8 @@ public final class PegasusMessageType {
                 return "BATTERY_STATUS";
             case LONG_SERIALNR:
                 return "LONG_SERIALNR";
+            case DEVKEY_STATE:
+                return "DEVKEY_STATE";
             default:
                 return String.format("UNKNOWN_0x%02X", type);
         }

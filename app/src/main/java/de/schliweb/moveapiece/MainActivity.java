@@ -620,9 +620,12 @@ public class MainActivity extends AppCompatActivity
     }
 
     @Override
-    public void onBatteryStatus(int percent) {
-        Toast.makeText(this, getString(R.string.pegasus_battery_format, percent), Toast.LENGTH_LONG)
-                .show();
+    public void onBatteryStatus(int percent, boolean criticallyLow) {
+        int messageRes =
+                criticallyLow
+                        ? R.string.pegasus_battery_critical_format
+                        : R.string.pegasus_battery_format;
+        Toast.makeText(this, getString(messageRes, percent), Toast.LENGTH_LONG).show();
     }
 
     // ---- New game setup ----------------------------------------------------

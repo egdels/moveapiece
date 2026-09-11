@@ -85,6 +85,7 @@
     <string name="pegasus_location_required">Activa la ubicación para buscar dispositivos Bluetooth</string>
     <string name="pegasus_error_format">Error de Pegasus: %1$s</string>
     <string name="pegasus_battery_format">Batería del tablero Pegasus: %1$d %%</string>
+    <string name="pegasus_battery_critical_format">Batería del tablero Pegasus muy baja (%1$d %%): se apagará pronto</string>
     <string name="pegasus_ambiguous_title">Jugada ambigua – elige una opción</string>
 
     <string name="opening_ruy_lopez">Apertura española (Ruy López)</string>

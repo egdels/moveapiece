@@ -10,9 +10,11 @@ import de.schliweb.pegasus.core.util.HexUtil;
 /**
  * Decoded DGT_MSG_BATTERY_STATUS (0xA0), 9-byte payload.
  *
- * <p>Byte 0 is presumed to be the charge percentage (0x58 ≈ 88 observed as "about 100 %" in the
- * reference emulation — INFERRED); the remaining bytes are UNKNOWN and kept raw for hardware
- * verification (docs/PEGASUS_PROTOCOL.md).
+ * <p>Byte 0 (percentage) and byte 8 (status bits) are CONFIRMED_BY_MANUFACTURER_SPEC (DGT
+ * Chessboard Communication Protocol v1.2.1): byte 0 is the charge percentage, byte 8 has bit 2 =
+ * "battery low" (yellow) and bit 3 = "battery empty" (red). Per that document, if both bits are
+ * set the board shuts itself down within about 3 minutes. The remaining bytes (running/on/standby
+ * time fields) are documented as "currently not used" and kept only in the raw payload.
  */
 public final class BatteryStatus {
 
@@ -36,9 +38,32 @@ public final class BatteryStatus {
         return new BatteryStatus(payload.clone());
     }
 
-    /** Presumed charge percentage (byte 0, semantics INFERRED). */
+    /** Charge percentage (byte 0). */
     public int percent() {
         return raw[0] & 0xFF;
+    }
+
+    /** Status bits (byte 8 of the payload = byte 11 of the message, see class javadoc). */
+    private int statusBits() {
+        return raw[8] & 0xFF;
+    }
+
+    /** Bit 2: "battery low" (yellow) condition. */
+    public boolean isLow() {
+        return (statusBits() & 0x04) != 0;
+    }
+
+    /** Bit 3: "battery empty" (red) condition. */
+    public boolean isEmpty() {
+        return (statusBits() & 0x08) != 0;
+    }
+
+    /**
+     * Both the "low" and "empty" bits are set: per the manufacturer's protocol document, the board
+     * will shut itself down within about 3 minutes.
+     */
+    public boolean isCriticallyLow() {
+        return isLow() && isEmpty();
     }
 
     /** Full raw payload for logging/verification. Defensive copy. */

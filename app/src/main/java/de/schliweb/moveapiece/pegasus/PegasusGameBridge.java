@@ -84,8 +84,12 @@ public class PegasusGameBridge {
 
         void onTransportError(TransportError error, String detail);
 
-        /** Reported once per connect, from the init sequence's battery request. */
-        void onBatteryStatus(int percent);
+        /**
+         * Reported once per connect, from the init sequence's battery request. {@code
+         * criticallyLow} mirrors {@link BatteryStatus#isCriticallyLow()}: per DGT's protocol
+         * document, the board shuts itself down within about 3 minutes once this is true.
+         */
+        void onBatteryStatus(int percent, boolean criticallyLow);
     }
 
     private static final long INIT_COMMAND_SPACING_MS = 1500;
@@ -318,11 +322,17 @@ public class PegasusGameBridge {
      * (docs/PEGASUS_PROTOCOL.md in external/pegasus): reset, dev key, three unlabeled bytes,
      * board-state request, and update mode — spaced 1.5s apart. Denser spacing made the board stop
      * responding to the whole burst on real hardware.
+     *
+     * <p>The dev-key-state query (0x5A, added after the manufacturer shared their protocol
+     * document — DGT Chessboard Communication Protocol v1.2.1) is not part of that captured
+     * burst; it is a read-only status request, so inserting it does not change what the official
+     * app itself writes to the board. Its response is handled in {@link #onProtocolData}.
      */
     private void sendOfficialInitSequence() {
         byte[][] seq = {
             PegasusCommands.encodeReset(),
             PegasusCommands.encodeDevKey(),
+            PegasusCommands.encodeDevKeyStateRequest(),
             {0x55},
             {0x47},
             PegasusCommands.encodeBoardStateRequest(),
@@ -379,12 +389,36 @@ public class PegasusGameBridge {
                         Log.i(TAG, "battery: " + status);
                         Listener l = listener();
                         if (l != null) {
-                            l.onBatteryStatus(status.percent());
+                            l.onBatteryStatus(status.percent(), status.isCriticallyLow());
                         }
                     }
                     break;
+                case PegasusMessageType.DEVKEY_STATE:
+                    onDevKeyStateFrame(frame);
+                    break;
                 default:
                     break;
+            }
+        }
+    }
+
+    /**
+     * Handles the response to {@link PegasusCommands#encodeDevKeyStateRequest()}: without a
+     * developer key accepted by the board, all subsequent board dumps/field updates are withheld
+     * (see {@link PegasusCommands#encodeDevKey()}), which otherwise looks like a silently stuck
+     * connection rather than a rejected key.
+     */
+    private void onDevKeyStateFrame(PegasusFrame frame) {
+        byte[] payload = frame.payload();
+        if (payload.length != 1) {
+            return;
+        }
+        boolean accepted = payload[0] == 1;
+        Log.i(TAG, "dev key state: " + (accepted ? "accepted" : "rejected"));
+        if (!accepted) {
+            Listener l = listener();
+            if (l != null) {
+                l.onTransportError(TransportError.DEVKEY_REJECTED, null);
             }
         }
     }

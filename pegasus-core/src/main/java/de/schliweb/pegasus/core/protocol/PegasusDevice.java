@@ -91,6 +91,14 @@ public final class PegasusDevice {
                 case PegasusMessageType.BATTERY_STATUS:
                     listener.onBatteryStatus(BatteryStatus.fromPayload(frame.payload()));
                     break;
+                case PegasusMessageType.DEVKEY_STATE:
+                    byte[] devKeyPayload = frame.payload();
+                    if (devKeyPayload.length != 1) {
+                        listener.onUnknownFrame(frame);
+                    } else {
+                        listener.onDevKeyState(devKeyPayload[0] == 1);
+                    }
+                    break;
                 case PegasusMessageType.TRADEMARK:
                 case PegasusMessageType.SERIALNR:
                 case PegasusMessageType.LONG_SERIALNR:

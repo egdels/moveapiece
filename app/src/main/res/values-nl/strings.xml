@@ -85,6 +85,7 @@
     <string name="pegasus_location_required">Zet locatie aan om naar Bluetooth-apparaten te zoeken</string>
     <string name="pegasus_error_format">Pegasus-fout: %1$s</string>
     <string name="pegasus_battery_format">Accu Pegasus-bord: %1$d %%</string>
+    <string name="pegasus_battery_critical_format">Accu Pegasus-bord kritiek laag (%1$d %%) — schakelt binnenkort uit</string>
     <string name="pegasus_ambiguous_title">Onduidelijke zet – kies een optie</string>
 
     <string name="opening_ruy_lopez">Spaans (Ruy Lopez)</string>

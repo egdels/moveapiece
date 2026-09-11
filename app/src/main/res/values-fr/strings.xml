@@ -85,6 +85,7 @@
     <string name="pegasus_location_required">Activez la localisation pour rechercher des appareils Bluetooth</string>
     <string name="pegasus_error_format">Erreur Pegasus : %1$s</string>
     <string name="pegasus_battery_format">Batterie de l\'échiquier Pegasus : %1$d %%</string>
+    <string name="pegasus_battery_critical_format">Batterie de l\'échiquier Pegasus critique (%1$d %%) — extinction imminente</string>
     <string name="pegasus_ambiguous_title">Coup ambigu – veuillez choisir</string>
 
     <string name="opening_ruy_lopez">Partie espagnole (Ruy Lopez)</string>
