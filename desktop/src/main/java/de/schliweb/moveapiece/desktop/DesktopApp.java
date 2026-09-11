@@ -8,7 +8,7 @@ package de.schliweb.moveapiece.desktop;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.Taskbar;
-import java.awt.geom.RoundRectangle2D;
+import java.awt.geom.Path2D;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -105,27 +105,98 @@ public class DesktopApp extends Application {
     }
 
     /**
-     * Pads and rounds a plain square icon to approximate macOS's Big Sur+ "squircle" app-icon
-     * shape. The packaged .app's .icns gets that treatment automatically from Finder/Dock whenever
-     * the app isn't running; the Dock tile set at runtime (see {@link #setDockIcon}) shows exactly
-     * the pixels it's given - unmasked - so without this, the running app's Dock icon would look
-     * like a plain square next to its own rounded icon everywhere else (Finder, Launchpad, the
-     * not-yet-running Dock icon).
+     * Apple's documented Big Sur+ icon template: a 1024x1024 canvas, an 824x824 icon tile (100px
+     * margin per side - ~9.77%), 185.4 corner radius. The same fractions drive {@code
+     * packaging.gradle}'s {@code generateIcons} task, which bakes this shape into the bundled
+     * .icns - see {@link #maskToMacSquircle} for why both places need it independently.
+     */
+    private static final double ICON_PADDING_FRACTION = 100.0 / 1024.0;
+
+    private static final double ICON_RADIUS_FRACTION = 185.4 / 824.0;
+
+    /** Apple's corners have continuous curvature, not a circular arc - this is a reasonable fit. */
+    private static final double ICON_SUPERELLIPSE_N = 5.0;
+
+    /**
+     * Pads and clips a plain square icon to approximate macOS's Big Sur+ "continuous corner"
+     * app-icon shape (a superellipse-cornered rounded square - flat edges, smoothly curved
+     * corners; not a plain circular-arc round-rect, which looks noticeably more geometric/angular
+     * by comparison). {@code java.awt.Taskbar}'s runtime Dock tile (see {@link #setDockIcon}) shows
+     * exactly the pixels it's given, unmasked - unlike a small handful of macOS surfaces that apply
+     * their own cosmetic framing to a *pinned, not-running* app tile, nothing softens a *running*
+     * app's Dock icon at all. Without this, it would look like a plain square next to the properly
+     * shaped one shown everywhere else once the icon isn't running.
      */
     private static BufferedImage maskToMacSquircle(BufferedImage source) {
         int size = Math.max(source.getWidth(), source.getHeight());
-        int padding = Math.round(size * 0.1f);
-        int content = size - 2 * padding;
-        int arc = Math.round(size * 0.44f);
+        double padding = size * ICON_PADDING_FRACTION;
+        double content = size - 2 * padding;
 
         BufferedImage result = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = result.createGraphics();
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g.setRenderingHint(
                 RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-        g.setClip(new RoundRectangle2D.Float(0, 0, size, size, arc, arc));
-        g.drawImage(source, padding, padding, content, content, null);
+        g.setClip(appleSquirclePath(size));
+        g.drawImage(
+                source,
+                (int) Math.round(padding),
+                (int) Math.round(padding),
+                (int) Math.round(content),
+                (int) Math.round(content),
+                null);
         g.dispose();
         return result;
+    }
+
+    /**
+     * Traces Apple's icon-tile outline (see {@link #maskToMacSquircle}) at the given canvas size:
+     * the 100px-margin content box, superellipse-cornered rather than circular-arc-cornered. Each
+     * corner is a quarter of the superellipse {@code |x/r|^n + |y/r|^n = 1}, parametrized as
+     * {@code (r*cos(t)^(2/n), r*sin(t)^(2/n))} for {@code t} in {@code [0, pi/2]} - flatter/more
+     * "continuous" than a quarter-circle (which this formula reduces to at n=2) - swept per corner
+     * in clockwise path order and connected by the tile's straight edges.
+     */
+    private static Path2D appleSquirclePath(double size) {
+        double padding = size * ICON_PADDING_FRACTION;
+        double content = size - 2 * padding;
+        double r = content * ICON_RADIUS_FRACTION;
+        int steps = 24;
+
+        // {cornerX, cornerY, signX, signY, thetaStart, thetaEnd} - corner center in content-local
+        // coordinates, which quadrant its curve bulges into, and its clockwise sweep direction
+        // (from the tangent point on the incoming edge to the one on the outgoing edge).
+        double[][] corners = {
+            {content - r, r, +1, -1, Math.PI / 2, 0}, // top-right
+            {content - r, content - r, +1, +1, 0, Math.PI / 2}, // bottom-right
+            {r, content - r, -1, +1, Math.PI / 2, 0}, // bottom-left
+            {r, r, -1, -1, 0, Math.PI / 2}, // top-left
+        };
+
+        Path2D.Double path = new Path2D.Double();
+        boolean first = true;
+        for (double[] corner : corners) {
+            double cx = corner[0];
+            double cy = corner[1];
+            double signX = corner[2];
+            double signY = corner[3];
+            double t0 = corner[4];
+            double t1 = corner[5];
+            for (int i = 0; i <= steps; i++) {
+                double t = t0 + (t1 - t0) * i / steps;
+                double dx = r * Math.pow(Math.cos(t), 2.0 / ICON_SUPERELLIPSE_N);
+                double dy = r * Math.pow(Math.sin(t), 2.0 / ICON_SUPERELLIPSE_N);
+                double x = padding + cx + signX * dx;
+                double y = padding + cy + signY * dy;
+                if (first) {
+                    path.moveTo(x, y);
+                    first = false;
+                } else {
+                    path.lineTo(x, y);
+                }
+            }
+        }
+        path.closePath();
+        return path;
     }
 }

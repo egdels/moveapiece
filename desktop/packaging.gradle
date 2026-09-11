@@ -59,6 +59,56 @@ def mainClassName = 'de.schliweb.moveapiece.desktop.Launcher'
 // unpinned, jpackage generates a random one per build.
 def WIN_UPGRADE_UUID = 'B7D289C7-B828-43F3-AAB5-392C2E796CB5'
 
+// Apple's documented Big Sur+ icon template: a 1024x1024 canvas, an 824x824 icon tile (100px
+// margin per side - ~9.77%), 185.4 corner radius. Mirrored exactly in DesktopApp's own
+// maskToMacSquircle()/appleSquirclePath() for the runtime Dock tile (java.awt.Taskbar) - see that
+// method's Javadoc for why both places need it independently: pre-Tahoe macOS renders .icns
+// artwork literally (no automatic corner-rounding mask), so a plain square source image would
+// produce a plain square .icns, not the rounded "continuous corner" shape every native-looking
+// Mac app ships baked into its own icon artwork.
+def ICON_PADDING_FRACTION = 100.0 / 1024.0
+def ICON_RADIUS_FRACTION = 185.4 / 824.0
+def ICON_SUPERELLIPSE_N = 5.0
+
+// Builds the same superellipse-cornered rounded-square clip as DesktopApp's
+// appleSquirclePath(double), at the given canvas size.
+def appleSquirclePath = { double size ->
+    double padding = size * ICON_PADDING_FRACTION
+    double content = size - 2 * padding
+    double r = content * ICON_RADIUS_FRACTION
+    int steps = 24
+
+    // {cornerX, cornerY, signX, signY, thetaStart, thetaEnd} - see DesktopApp.appleSquirclePath.
+    def corners = [
+        [content - r, r, 1, -1, Math.PI / 2, 0d],
+        [content - r, content - r, 1, 1, 0d, Math.PI / 2],
+        [r, content - r, -1, 1, Math.PI / 2, 0d],
+        [r, r, -1, -1, 0d, Math.PI / 2],
+    ]
+
+    def path = new java.awt.geom.Path2D.Double()
+    boolean first = true
+    corners.each { corner ->
+        double cx = corner[0], cy = corner[1], signX = corner[2], signY = corner[3]
+        double t0 = corner[4], t1 = corner[5]
+        (0..steps).each { i ->
+            double t = t0 + (t1 - t0) * i / steps
+            double dx = r * Math.pow(Math.cos(t), 2.0 / ICON_SUPERELLIPSE_N)
+            double dy = r * Math.pow(Math.sin(t), 2.0 / ICON_SUPERELLIPSE_N)
+            double x = padding + cx + signX * dx
+            double y = padding + cy + signY * dy
+            if (first) {
+                path.moveTo(x, y)
+                first = false
+            } else {
+                path.lineTo(x, y)
+            }
+        }
+    }
+    path.closePath()
+    return path
+}
+
 def sourceIconPng = file("$projectDir/src/main/resources/de/schliweb/moveapiece/desktop/icon.png")
 def iconsDir = layout.buildDirectory.dir('icons').get().asFile
 def jpackageInputDir = layout.buildDirectory.dir('jpackage-input').get().asFile
@@ -153,9 +203,18 @@ tasks.register('generateIcons') {
             sizes.each { name, size ->
                 def scaled = new java.awt.image.BufferedImage(size, size, java.awt.image.BufferedImage.TYPE_INT_ARGB)
                 def g = scaled.createGraphics()
+                g.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING,
+                        java.awt.RenderingHints.VALUE_ANTIALIAS_ON)
                 g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION,
                         java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR)
-                g.drawImage(source, 0, 0, size, size, null)
+                // Bake Apple's rounded "continuous corner" tile shape directly into the
+                // artwork - pre-Tahoe macOS applies no automatic mask to .icns files, so an
+                // edge-to-edge square source image would otherwise produce a plain square icon.
+                double padding = size * ICON_PADDING_FRACTION
+                double content = size - 2 * padding
+                g.setClip(appleSquirclePath((double) size))
+                g.drawImage(source, Math.round(padding) as int, Math.round(padding) as int,
+                        Math.round(content) as int, Math.round(content) as int, null)
                 g.dispose()
                 javax.imageio.ImageIO.write(scaled, 'png', new File(iconset, name))
             }
