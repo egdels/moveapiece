@@ -2134,6 +2134,16 @@ public class MainActivity extends AppCompatActivity
             postGameLiveScoreCp = rawCp;
             return;
         }
+        // engine.stop() (see abandonPendingSearches()) is fire-and-forget - Stockfish can still
+        // emit a few more "info" lines for the search just abandoned before it finally replies
+        // with "bestmove" (which onBestMove() already discards via this same check). Without this,
+        // one of those stale lines could land here after analysisSideToMove has already moved on
+        // to a new position (e.g. one reached by undo/redo/a history click) and get displayed - and
+        // fed into recordPositionEval() below - as if it were a fresh eval for that new position.
+        PendingSearch activeSearch = pendingSearches.peek();
+        if (activeSearch == null || activeSearch.generation != searchGeneration) {
+            return;
+        }
         if (!evaluationEnabled || mode == GameMode.TRAINING || analysisSideToMove == null) {
             return;
         }
