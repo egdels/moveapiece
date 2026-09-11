@@ -85,9 +85,14 @@ public class PegasusGameBridge {
         void onTransportError(TransportError error, String detail);
 
         /**
-         * Reported once per connect, from the init sequence's battery request. {@code
-         * criticallyLow} mirrors {@link BatteryStatus#isCriticallyLow()}: per DGT's protocol
-         * document, the board shuts itself down within about 3 minutes once this is true.
+         * Reported once per connect (from the init sequence's battery request), and again on any
+         * later transition into a critically low battery. Real Pegasus hardware also pushes a
+         * fresh reading spontaneously whenever the percentage changes by 1% (CONFIRMED_ON_HARDWARE
+         * 2026-09-11) - those routine drift updates are intentionally not forwarded here (would
+         * mean a UI notification every few minutes for the whole session); see {@code
+         * batteryReportPending} in the implementation for the exact gating. {@code criticallyLow}
+         * mirrors {@link BatteryStatus#isCriticallyLow()}: per DGT's protocol document, the board
+         * shuts itself down within about 3 minutes once this is true.
          */
         void onBatteryStatus(int percent, boolean criticallyLow);
     }
@@ -141,6 +146,20 @@ public class PegasusGameBridge {
                     });
 
     private BoardState physicalBoard;
+
+    /**
+     * Whether the first battery reading of the current connection is still unreported to {@link
+     * Listener#onBatteryStatus} - true right after (re)connect. Real Pegasus hardware pushes a
+     * fresh battery status spontaneously every time the percentage changes by 1% (CONFIRMED_ON_HARDWARE
+     * 2026-09-11, minutes apart, no re-request needed), not just once per connect as originally
+     * assumed; reporting every one of those to the UI would mean a toast every few minutes for the
+     * whole session, so only the first reading and later transitions into {@link
+     * BatteryStatus#isCriticallyLow()} are forwarded - see {@link #lastBatteryCritical}.
+     */
+    private boolean batteryReportPending;
+
+    /** Last {@link BatteryStatus#isCriticallyLow()} seen this connection; see {@link #batteryReportPending}. */
+    private boolean lastBatteryCritical;
 
     /**
      * Whether the currently active guide (if any) is allowed to light LEDs for the plain expected
@@ -210,6 +229,8 @@ public class PegasusGameBridge {
                                         ledController.resetTracking();
                                         squaresSeenEmpty.clear();
                                         moveDetector.reset(moveDetector.position(), null);
+                                        batteryReportPending = true;
+                                        lastBatteryCritical = false;
                                         mainHandler.removeCallbacks(keepalivePollRunnable);
                                         sendOfficialInitSequence();
                                     }
@@ -387,9 +408,18 @@ public class PegasusGameBridge {
                     if (frame.payloadLength() == BatteryStatus.PAYLOAD_LENGTH) {
                         BatteryStatus status = BatteryStatus.fromPayload(frame.payload());
                         Log.i(TAG, "battery: " + status);
-                        Listener l = listener();
-                        if (l != null) {
-                            l.onBatteryStatus(status.percent(), status.isCriticallyLow());
+                        // Every 1%-change push is logged above for diagnostics, but only the
+                        // first reading of the connection and a fresh transition into
+                        // isCriticallyLow() reach the UI - see batteryReportPending's javadoc.
+                        boolean newlyCritical = status.isCriticallyLow() && !lastBatteryCritical;
+                        boolean shouldNotify = batteryReportPending || newlyCritical;
+                        batteryReportPending = false;
+                        lastBatteryCritical = status.isCriticallyLow();
+                        if (shouldNotify) {
+                            Listener l = listener();
+                            if (l != null) {
+                                l.onBatteryStatus(status.percent(), status.isCriticallyLow());
+                            }
                         }
                     }
                     break;
