@@ -2,6 +2,7 @@
 <resources>
     <string name="menu_new_game">Neues Spiel</string>
     <string name="menu_undo">Zug zurücknehmen</string>
+    <string name="menu_redo">Zug wiederholen</string>
     <string name="menu_flip_board">Brett drehen</string>
     <string name="menu_opening_library">Eröffnungsbibliothek</string>
     <string name="menu_hint">Tipp</string>

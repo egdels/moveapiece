@@ -120,6 +120,10 @@ final class GameController
     private static final String UNDO_ICON_PATH =
             "M12.5,8c-2.65,0 -5.05,0.99 -6.9,2.6L2,7v9h9l-3.62,-3.62c1.39,-1.16 3.16,-1.88 5.12,-1.88 "
                     + "3.54,0 6.55,2.31 7.6,5.5l2.37,-0.78C21.08,11.03 17.15,8 12.5,8z";
+    // Same Material "redo" glyph as the Android app's ic_redo.xml (mirror of UNDO_ICON_PATH).
+    private static final String REDO_ICON_PATH =
+            "M18.4,10.6C16.55,8.99 14.15,8 11.5,8c-4.65,0 -8.58,3.03 -9.96,7.22L3.9,16c1.05,-3.19 "
+                    + "4.05,-5.5 7.6,-5.5 1.95,0 3.73,0.72 5.12,1.88L13,16h9v-9L18.4,10.6z";
     private static final String FLIP_BOARD_ICON_PATH =
             "M16,17.01V10h-2v7.01h-3L15,21l4,-3.99h-3zM9,3L5,6.99h3V14h2V6.99h3L9,3z";
     private static final String OPENING_LIBRARY_ICON_PATH =
@@ -144,6 +148,7 @@ final class GameController
                     + "L14.88,16.29z";
 
     private final Button undoButton = iconButton(UNDO_ICON_PATH, Messages.get("menu_undo"));
+    private final Button redoButton = iconButton(REDO_ICON_PATH, Messages.get("menu_redo"));
     private final Button newGameButton =
             iconButton(NEW_GAME_ICON_PATH, Messages.get("menu_new_game"));
     private final Button importButton =
@@ -381,6 +386,7 @@ final class GameController
 
         newGameButton.setOnAction(e -> openGameSetupDialog());
         undoButton.setOnAction(e -> undo());
+        redoButton.setOnAction(e -> redo());
         importButton.setOnAction(e -> importPgn());
         exportButton.setOnAction(e -> exportPgn());
         analyzeGameButton.setOnAction(e -> startPostGameAnalysis());
@@ -407,6 +413,7 @@ final class GameController
                         8,
                         newGameButton,
                         undoButton,
+                        redoButton,
                         flipBoardButton,
                         openingLibraryButton,
                         hintButton,
@@ -1289,6 +1296,29 @@ final class GameController
         syncPegasusPosition();
     }
 
+    /**
+     * Mirrors {@link #undo()}: reapplies the move(s) undo most recently moved to the redo stack,
+     * landing back on the human's own turn in HUMAN_VS_STOCKFISH mode the same way undo does (redo
+     * the human's move, then immediately redo the engine's reply too). No-op if there is nothing to
+     * redo.
+     */
+    private void redo() {
+        if (mode == Mode.TRAINING) {
+            redoTrainingMove();
+            return;
+        }
+        abandonPendingSearches();
+        if (!game.redoMove()) {
+            return;
+        }
+        if (mode == Mode.HUMAN_VS_STOCKFISH && game.canRedo() && game.sideToMove() != humanSide) {
+            game.redoMove();
+        }
+        boardCanvas.setLastMove(null, null);
+        refresh();
+        syncPegasusPosition();
+    }
+
     private void refresh() {
         Piece[] pieces = new Piece[64];
         for (int i = 0; i < 64; i++) {
@@ -1514,6 +1544,35 @@ final class GameController
             if (trainingSession.plyIndex() > 0 && !trainingSession.isHumanTurnNow()) {
                 game.undoLastMove();
                 trainingSession.retreat();
+            }
+        }
+        boardCanvas.setLastMove(null, null);
+        refresh();
+        syncPegasusPosition();
+    }
+
+    /**
+     * Mirrors {@link #undoTrainingMove()}: replays the trainee's next expected move (exactly the
+     * move undo last retreated past, since {@link TrainingSession} tracks a fixed, known opening
+     * line rather than free-form history - no separate redo stack is needed here), then immediately
+     * replays the book/engine's reply too if that lands off the human's turn, mirroring undo's own
+     * pairing. No-op if there is nothing to redo.
+     */
+    private void redoTrainingMove() {
+        if (trainingSession == null || trainingBookMovePending || trainingSession.isComplete()) {
+            return;
+        }
+        stopPendingBookMove();
+        guidingTrainingHumanMove = false;
+        String humanUci = trainingSession.currentExpectedUci();
+        if (humanUci == null || !game.applyUciMove(humanUci)) {
+            return;
+        }
+        trainingSession.advance();
+        if (!trainingSession.isComplete() && !trainingSession.isHumanTurnNow()) {
+            String replyUci = trainingSession.currentExpectedUci();
+            if (replyUci != null && game.applyUciMove(replyUci)) {
+                trainingSession.advance();
             }
         }
         boardCanvas.setLastMove(null, null);

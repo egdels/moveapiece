@@ -2,6 +2,7 @@
 <resources>
     <string name="menu_new_game">Nouvelle partie</string>
     <string name="menu_undo">Annuler le coup</string>
+    <string name="menu_redo">Rétablir le coup</string>
     <string name="menu_flip_board">Retourner l\'échiquier</string>
     <string name="menu_opening_library">Bibliothèque d\'ouvertures</string>
     <string name="menu_hint">Indice</string>

@@ -2,6 +2,7 @@
 <resources>
     <string name="menu_new_game">Nieuw spel</string>
     <string name="menu_undo">Zet terugnemen</string>
+    <string name="menu_redo">Zet opnieuw uitvoeren</string>
     <string name="menu_flip_board">Bord draaien</string>
     <string name="menu_opening_library">Openingsbibliotheek</string>
     <string name="menu_hint">Hint</string>

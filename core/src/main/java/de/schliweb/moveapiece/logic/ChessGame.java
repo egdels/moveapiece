@@ -26,7 +26,12 @@ import java.util.Locale;
 /**
  * Wraps a chesslib {@link Board} with the subset of operations the UI and the engine bridge need:
  * applying moves by square (with promotion choice), applying engine moves given as raw UCI strings,
- * undo, and game-end state.
+ * undo/redo, and game-end state.
+ *
+ * <p>Undo/redo is a plain two-stack model: {@link #undoLastMove()} moves the last played move onto
+ * a redo stack, {@link #redoMove()} moves it back. Playing any new move (by either {@link
+ * #applyMove} or {@link #applyUciMove}) discards the redo stack, same as in any editor - once a
+ * different move branches off from an earlier point, the old "future" is no longer reachable.
  */
 public class ChessGame {
 
@@ -35,6 +40,7 @@ public class ChessGame {
 
     private final Board board = new Board();
     private final List<Move> moveHistory = new ArrayList<>();
+    private final List<Move> redoHistory = new ArrayList<>();
     private String startFen = START_FEN;
 
     public Piece pieceAt(Square square) {
@@ -76,6 +82,7 @@ public class ChessGame {
             if (m.getFrom() == from && m.getTo() == to && m.getPromotion() == wantedPromotion) {
                 if (board.doMove(m)) {
                     moveHistory.add(m);
+                    redoHistory.clear();
                     return true;
                 }
                 return false;
@@ -97,18 +104,36 @@ public class ChessGame {
         // NPEs instead of returning false.
         if (board.doMove(move, true)) {
             moveHistory.add(move);
+            redoHistory.clear();
             return true;
         }
         return false;
     }
 
+    /** Undoes the last move, e.g. moving it to the redo stack; false if there is nothing to undo. */
     public boolean undoLastMove() {
         if (moveHistory.isEmpty()) {
             return false;
         }
         board.undoMove();
-        moveHistory.remove(moveHistory.size() - 1);
+        redoHistory.add(moveHistory.remove(moveHistory.size() - 1));
         return true;
+    }
+
+    /** Reapplies the most recently undone move; false if there is nothing to redo. */
+    public boolean redoMove() {
+        if (redoHistory.isEmpty()) {
+            return false;
+        }
+        Move move = redoHistory.remove(redoHistory.size() - 1);
+        board.doMove(move);
+        moveHistory.add(move);
+        return true;
+    }
+
+    /** Whether {@link #redoMove()} has a move to reapply. */
+    public boolean canRedo() {
+        return !redoHistory.isEmpty();
     }
 
     public boolean isCheckmate() {
@@ -152,6 +177,7 @@ public class ChessGame {
         board.loadFromFen(fen);
         startFen = fen;
         moveHistory.clear();
+        redoHistory.clear();
     }
 
     public int moveCount() {

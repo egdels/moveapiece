@@ -4,6 +4,7 @@
 
     <string name="menu_new_game">New Game</string>
     <string name="menu_undo">Undo Move</string>
+    <string name="menu_redo">Redo Move</string>
     <string name="menu_flip_board">Flip Board</string>
     <string name="menu_opening_library">Opening Library</string>
     <string name="menu_hint">Hint</string>

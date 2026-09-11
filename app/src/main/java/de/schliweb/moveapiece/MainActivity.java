@@ -306,6 +306,7 @@ public class MainActivity extends AppCompatActivity
 
         binding.newGameButton.setOnClickListener(v -> showNewGameDialog());
         binding.undoButton.setOnClickListener(v -> undo());
+        binding.redoButton.setOnClickListener(v -> redo());
         binding.flipBoardButton.setOnClickListener(v -> setBoardFlipped(!boardFlipped));
         binding.openingLibraryButton.setOnClickListener(
                 v -> startActivity(new Intent(this, OpeningLibraryActivity.class)));
@@ -933,6 +934,32 @@ public class MainActivity extends AppCompatActivity
     }
 
     /**
+     * Mirrors {@link #undo()}: reapplies the move(s) undo most recently moved to the redo stack,
+     * landing back on the human's own turn in ENGINE mode the same way undo does (redo the human's
+     * move, then immediately redo the engine's reply too, rather than leaving the engine to move on
+     * its own). No-op if there is nothing to redo.
+     */
+    private void redo() {
+        if (waitingForEngineMove) {
+            return;
+        }
+        if (mode == GameMode.TRAINING) {
+            redoTrainingMove();
+            return;
+        }
+        abandonPendingSearches();
+        if (!game.redoMove()) {
+            return;
+        }
+        if (mode == GameMode.ENGINE && game.canRedo() && game.sideToMove() == engineSide) {
+            game.redoMove();
+        }
+        setLastMove(null, null);
+        refreshBoard();
+        syncPegasusPosition();
+    }
+
+    /**
      * Steps the training line back to the trainee's own previous move so they can retry it -
      * mirroring ENGINE-mode undo, which likewise always lands back on the human's turn rather than
      * the opponent's. Rolls back an unconfirmed optimistic book-move apply first (see {@link
@@ -959,6 +986,38 @@ public class MainActivity extends AppCompatActivity
             if (trainingSession.plyIndex() > 0 && !trainingSession.isHumanTurnNow()) {
                 game.undoLastMove();
                 trainingSession.retreat();
+            }
+        }
+        setLastMove(null, null);
+        refreshBoard();
+        syncPegasusPosition();
+    }
+
+    /**
+     * Mirrors {@link #undoTrainingMove()}: replays the trainee's next expected move (which is
+     * exactly the move undo last retreated past, since {@link TrainingSession} tracks a fixed,
+     * known {@link OpeningLine} rather than free-form history - no separate redo stack is needed
+     * here), then immediately replays the book/engine's reply too if
+     * that's what {@code undoTrainingMove} would have retreated past as a pair, landing back on the
+     * human's turn the same way undo does. No-op if there is nothing to redo (training not started,
+     * an optimistic book move is still pending, or the line is already complete).
+     */
+    private void redoTrainingMove() {
+        if (trainingSession == null || trainingBookMovePending || trainingSession.isComplete()) {
+            return;
+        }
+        trainingHandler.removeCallbacksAndMessages(null);
+        waitingForTrainingAutoMove = false;
+        guidingTrainingHumanMove = false;
+        String humanUci = trainingSession.currentExpectedUci();
+        if (humanUci == null || !game.applyUciMove(humanUci)) {
+            return;
+        }
+        trainingSession.advance();
+        if (!trainingSession.isComplete() && !trainingSession.isHumanTurnNow()) {
+            String replyUci = trainingSession.currentExpectedUci();
+            if (replyUci != null && game.applyUciMove(replyUci)) {
+                trainingSession.advance();
             }
         }
         setLastMove(null, null);

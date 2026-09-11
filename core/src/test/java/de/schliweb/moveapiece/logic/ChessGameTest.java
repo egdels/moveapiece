@@ -75,6 +75,64 @@ public class ChessGameTest {
     }
 
     @Test
+    public void redoMove_reappliesTheUndoneMove() {
+        ChessGame game = new ChessGame();
+        game.applyMove(Square.E2, Square.E4, null);
+        game.undoLastMove();
+
+        assertTrue(game.canRedo());
+        assertTrue(game.redoMove());
+        assertEquals(Side.BLACK, game.sideToMove());
+        assertEquals(Piece.WHITE_PAWN, game.pieceAt(Square.E4));
+        assertEquals(Piece.NONE, game.pieceAt(Square.E2));
+        assertEquals(1, game.moveCount());
+        assertFalse(game.canRedo());
+    }
+
+    @Test
+    public void redoMove_onEmptyRedoStackReturnsFalse() {
+        ChessGame game = new ChessGame();
+        assertFalse(game.canRedo());
+        assertFalse(game.redoMove());
+    }
+
+    @Test
+    public void applyingANewMoveAfterUndoDiscardsTheRedoStack() {
+        ChessGame game = new ChessGame();
+        game.applyMove(Square.E2, Square.E4, null);
+        game.undoLastMove();
+        assertTrue(game.canRedo());
+
+        // A different move than the undone one branches off - the old "future" is gone.
+        assertTrue(game.applyMove(Square.D2, Square.D4, null));
+
+        assertFalse(game.canRedo());
+        assertFalse(game.redoMove());
+        assertEquals(Piece.WHITE_PAWN, game.pieceAt(Square.D4));
+    }
+
+    @Test
+    public void multipleUndoRedoRoundTripRestoresTheFullLine() {
+        ChessGame game = new ChessGame();
+        game.applyUciMove("e2e4");
+        game.applyUciMove("e7e5");
+        game.applyUciMove("g1f3");
+
+        assertTrue(game.undoLastMove());
+        assertTrue(game.undoLastMove());
+        assertTrue(game.undoLastMove());
+        assertEquals(0, game.moveCount());
+
+        assertTrue(game.redoMove());
+        assertTrue(game.redoMove());
+        assertTrue(game.redoMove());
+        assertFalse(game.canRedo());
+        assertEquals(3, game.moveCount());
+        assertEquals(Piece.WHITE_KNIGHT, game.pieceAt(Square.F3));
+        assertEquals(Piece.NONE, game.pieceAt(Square.G1));
+    }
+
+    @Test
     public void applyUciMove_matchesApplyMoveBySquare() {
         ChessGame game = new ChessGame();
         assertTrue(game.applyUciMove("e2e4"));

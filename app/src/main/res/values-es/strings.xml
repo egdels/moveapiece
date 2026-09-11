@@ -2,6 +2,7 @@
 <resources>
     <string name="menu_new_game">Partida nueva</string>
     <string name="menu_undo">Deshacer jugada</string>
+    <string name="menu_redo">Rehacer jugada</string>
     <string name="menu_flip_board">Girar tablero</string>
     <string name="menu_opening_library">Biblioteca de aperturas</string>
     <string name="menu_hint">Pista</string>

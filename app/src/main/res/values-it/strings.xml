@@ -2,6 +2,7 @@
 <resources>
     <string name="menu_new_game">Nuova partita</string>
     <string name="menu_undo">Annulla mossa</string>
+    <string name="menu_redo">Ripeti mossa</string>
     <string name="menu_flip_board">Ruota scacchiera</string>
     <string name="menu_opening_library">Libreria delle aperture</string>
     <string name="menu_hint">Suggerimento</string>
