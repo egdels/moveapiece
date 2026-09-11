@@ -1,0 +1,7 @@
+Feature update.
+
+* Added a Redo button next to Undo
+* The move list is now clickable - jump straight to any position in the game
+* The board can now show file and rank coordinates (a-h, 1-8)
+* The Pegasus board now warns when its battery is critically low
+* Fixed an occasional incorrect evaluation shown after fast undo/redo navigation
