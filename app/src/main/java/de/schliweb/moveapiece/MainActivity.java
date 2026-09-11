@@ -820,7 +820,16 @@ public class MainActivity extends AppCompatActivity
     }
 
     private boolean isBoardInteractiveNow() {
-        if (game.isGameOver() || waitingForEngineMove || waitingForTrainingAutoMove) {
+        if (game.isGameOver()
+                || waitingForEngineMove
+                || waitingForTrainingAutoMove
+                // A move played here while game analysis is running would corrupt it: the analysis
+                // replays past positions through the same shared engine instance without going
+                // through abandonPendingSearches() per position (that would restart the whole
+                // analysis on every single ply), so it has no way to notice its captured
+                // postGameUciMoves has gone stale, and its own in-flight search would race the
+                // freshly triggered one for the new move on that one shared engine.
+                || postGameUciMoves != null) {
             return false;
         }
         switch (mode) {
@@ -1539,20 +1548,26 @@ public class MainActivity extends AppCompatActivity
     }
 
     /**
-     * Replays the finished game from the start, one ply at a time, grading every move the same way
-     * live blunder-check does ({@link #moveQualityLabelRes}) and showing a summary dialog once
-     * done. Always searches at full strength, restored afterwards in {@link
-     * #advancePostGameAnalysis}. Requires {@link ChessGame#isGameOver()} rather than just some
-     * moves played - unlike every other search this method starts, it doesn't call {@link
-     * StockfishEngine#newGame()} (which would send "isready" and re-enter {@link #onReadyOk},
-     * undoing the full-strength setting and, if it were still someone's turn in the live game,
-     * firing off an unwanted real move), so nothing may still be live for it to accidentally
-     * interfere with.
+     * Replays the game played so far from the start, one ply at a time, grading every move the
+     * same way live blunder-check does ({@link #moveQualityLabelRes}) and showing a summary dialog
+     * once done. Works whether the game has actually ended or is still in progress - only {@link
+     * ChessGame#moveCount()} needs to be positive, there has to be something to replay. Always
+     * searches at full strength, restored afterwards in {@link #advancePostGameAnalysis}.
+     *
+     * <p>Unlike every other search this method starts, it doesn't call {@link
+     * StockfishEngine#newGame()} before replaying (which would send "isready" and re-enter {@link
+     * #onReadyOk}, undoing the full-strength setting and, if it were still someone's turn in a
+     * still-live game, firing off an unwanted real move) - so instead, if the game isn't actually
+     * over once the replay finishes, the live engine turn (if any) and live eval search that {@link
+     * #abandonPendingSearches} cancelled below are explicitly restarted at the end of {@link
+     * #recordPostGameEval}. {@link #isBoardInteractiveNow} blocks board taps for the whole replay,
+     * since a move played on the actual, live game mid-replay would go through the same shared
+     * engine instance without this method noticing.
      */
     private void startPostGameAnalysis() {
         if (!engineReady
                 || mode == GameMode.TRAINING
-                || !game.isGameOver()
+                || game.moveCount() == 0
                 || postGameUciMoves != null) {
             return;
         }
@@ -1606,6 +1621,15 @@ public class MainActivity extends AppCompatActivity
         updateHintButtonState();
         updateAnalyzeGameButtonState();
         showPostGameReport(uciMoves, evals);
+        if (!game.isGameOver()) {
+            // The game was still live when analysis started (see startPostGameAnalysis) -
+            // abandonPendingSearches() there cancelled whatever live engine-move/eval search was
+            // in flight, so resume it now the same way startNewGame() kicks the engine off: a
+            // plain refresh (board interactivity, live eval) plus an explicit engine-move trigger,
+            // since refreshBoard() itself never starts one.
+            refreshBoard();
+            maybeTriggerEngineMove();
+        }
     }
 
     /**
@@ -1616,7 +1640,7 @@ public class MainActivity extends AppCompatActivity
     private void updateAnalyzeGameButtonState() {
         boolean running = postGameUciMoves != null;
         binding.analyzeGameButton.setEnabled(
-                !running && engineReady && mode != GameMode.TRAINING && game.isGameOver());
+                !running && engineReady && mode != GameMode.TRAINING && game.moveCount() > 0);
         if (running) {
             binding.analysisProgressText.setText(
                     getString(
