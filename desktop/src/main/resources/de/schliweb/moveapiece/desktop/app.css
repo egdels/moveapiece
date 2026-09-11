@@ -151,6 +151,18 @@
     -fx-font-size: 12px;
 }
 
+.move-history-link {
+    -fx-fill: -primary;
+    -fx-underline: true;
+}
+
+/* The move at ChessGame#moveCount() - the position currently on the board, however it was
+   reached (a played move, undo/redo, or a history click). */
+.move-history-current {
+    -fx-fill: -primary-dark;
+    -fx-font-weight: bold;
+}
+
 .list-cell:filled:selected {
     -fx-background-color: -primary-light;
     -fx-text-fill: -primary-dark;

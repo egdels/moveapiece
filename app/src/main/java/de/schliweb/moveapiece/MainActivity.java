@@ -11,6 +11,11 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.Spannable;
+import android.text.SpannableStringBuilder;
+import android.text.TextPaint;
+import android.text.method.LinkMovementMethod;
+import android.text.style.ClickableSpan;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.ArrayAdapter;
@@ -303,6 +308,8 @@ public class MainActivity extends AppCompatActivity
         binding.boardView.setOnMoveListener(this);
         binding.boardView.setFlipped(boardFlipped);
         binding.boardView.setLastMove(lastMoveFrom, lastMoveTo);
+        // Required for the ClickableSpans set on it by clickableMoveHistory() to respond to taps.
+        binding.moveListText.setMovementMethod(LinkMovementMethod.getInstance());
 
         binding.newGameButton.setOnClickListener(v -> showNewGameDialog());
         binding.undoButton.setOnClickListener(v -> undo());
@@ -874,7 +881,124 @@ public class MainActivity extends AppCompatActivity
     }
 
     private void updateMoveHistory() {
-        binding.moveListText.setText(game.toSan());
+        if (mode == GameMode.TRAINING) {
+            // The training line has its own guided navigation (retreat()/advance() paired with
+            // undo/redo) - letting the trainee freely jump around the line would cut across the
+            // "prove you know the move" hinting, so its history stays plain, unclickable text
+            // (and only ever shows what's actually been played, not a redoable future).
+            binding.moveListText.setText(game.toSan());
+            return;
+        }
+        // toFullSan(), not toSan(): after stepping back via undo/jumpToPly, the moves ahead are
+        // still redoable and must stay visible and clickable, or the user could never navigate
+        // back and forth in the history - only playing a genuinely new move should drop them.
+        binding.moveListText.setText(clickableMoveHistory(game.toFullSan()));
+    }
+
+    /**
+     * Turns {@link ChessGame#toFullSan()}'s numbered movetext (e.g. "1. e4 e5 2. Nf3") into a
+     * version where every move (not the move-number tokens) is a {@link ClickableSpan} that jumps
+     * the game to the position right after it via {@link #jumpToPly}. The move(s) that make up the
+     * position currently on the board - however reached (a played move, {@link #undo()}/{@link
+     * #redo()}, or a previous history click) - are additionally bolded and drawn in a darker shade,
+     * so the list always shows where you currently are.
+     *
+     * <p>In ENGINE mode that's always the human's move plus the engine's paired reply (see {@link
+     * #jumpToPly}'s own pairing - navigation there can never land between the two), so both get
+     * highlighted, not just {@link ChessGame#moveCount()} alone: highlighting only the second half
+     * would look contradictory after clicking the human's own move - the reply next to it would
+     * light up instead of the one actually clicked. Outside ENGINE mode there is no such pairing,
+     * so only the exact current move is highlighted.
+     */
+    private CharSequence clickableMoveHistory(String toSan) {
+        SpannableStringBuilder text = new SpannableStringBuilder();
+        int ply = 0;
+        int currentPly = game.moveCount();
+        int currentRoundStart =
+                mode == GameMode.ENGINE && currentPly > 1 ? currentPly - 1 : currentPly;
+        for (String token : toSan.split("\\s+")) {
+            if (token.isEmpty()) {
+                continue;
+            }
+            if (text.length() > 0) {
+                text.append(' ');
+            }
+            int start = text.length();
+            text.append(token);
+            if (!token.matches("\\d+\\.")) {
+                ply++;
+                int targetPly = ply;
+                boolean isCurrent = ply >= currentRoundStart && ply <= currentPly;
+                text.setSpan(
+                        new ClickableSpan() {
+                            @Override
+                            public void onClick(View widget) {
+                                jumpToPly(targetPly);
+                            }
+
+                            @Override
+                            public void updateDrawState(TextPaint ds) {
+                                ds.setColor(
+                                        getColor(
+                                                isCurrent
+                                                        ? R.color.brand_primary_dark
+                                                        : R.color.brand_primary));
+                                ds.setUnderlineText(false);
+                                ds.setFakeBoldText(isCurrent);
+                            }
+                        },
+                        start,
+                        text.length(),
+                        Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+            }
+        }
+        return text;
+    }
+
+    /**
+     * Jumps the game to the position right after ply {@code targetPly} (1-based, matching a move's
+     * position in {@link ChessGame#toUciMoveList()}) - like clicking a move in the history. Reuses
+     * {@link ChessGame#jumpToPly}'s own undo/redo stacks for a single refresh/Pegasus-resync
+     * instead of the several an equivalent run of {@link #undo()}/{@link #redo()} clicks would
+     * trigger, and highlights the landed-on move like any other applied move. Only reachable
+     * outside TRAINING mode - see {@link #updateMoveHistory()}.
+     *
+     * <p>In ENGINE mode, never leaves the browsed position frozen on the engine's own turn - always
+     * advances one further ply forward instead, redoing the engine's already-recorded reply
+     * (mirroring {@link #undo()}/{@link #redo()}'s own pairing, never triggering a fresh engine
+     * decision - like other chess GUIs' history navigation, only already-recorded moves are ever
+     * skipped past). Always forward, regardless of which direction {@code targetPly} was reached
+     * from: pairing backward would instead undo the very move that was clicked on, and would make
+     * clicking the same history entry repeatedly land on a different position each time (the first
+     * click's pairing changes where the next click's "direction" is computed from) - this way
+     * {@code jumpToPly} is a pure function of {@code targetPly} alone, idempotent under repeated
+     * clicks on the same entry.
+     */
+    private void jumpToPly(int targetPly) {
+        if (waitingForEngineMove) {
+            return;
+        }
+        abandonPendingSearches();
+        int before = game.moveCount();
+        int reached = game.jumpToPly(targetPly);
+        if (reached != targetPly) {
+            return; // out of range; nothing changed
+        }
+        if (reached != before && mode == GameMode.ENGINE && game.sideToMove() == engineSide) {
+            game.redoMove();
+            reached = game.moveCount();
+        }
+        if (reached > 0) {
+            String[] uciMoves = game.toUciMoveList().split(" ");
+            String uci = uciMoves[reached - 1];
+            Square from = Square.valueOf(uci.substring(0, 2).toUpperCase(Locale.ROOT));
+            Square to = Square.valueOf(uci.substring(2, 4).toUpperCase(Locale.ROOT));
+            setLastMove(from, to);
+        } else {
+            setLastMove(null, null);
+        }
+        refreshBoard();
+        syncPegasusPosition();
     }
 
     private Square findCheckedKingSquare() {

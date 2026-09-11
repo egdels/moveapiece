@@ -133,6 +133,77 @@ public class ChessGameTest {
     }
 
     @Test
+    public void jumpToPly_backwardsFromTheCurrentPosition() {
+        ChessGame game = new ChessGame();
+        game.applyUciMove("e2e4");
+        game.applyUciMove("e7e5");
+        game.applyUciMove("g1f3");
+
+        assertEquals(1, game.jumpToPly(1));
+        assertEquals(1, game.moveCount());
+        assertEquals(Piece.WHITE_PAWN, game.pieceAt(Square.E4));
+        assertEquals(Piece.NONE, game.pieceAt(Square.F3));
+        assertTrue(game.canRedo());
+    }
+
+    @Test
+    public void jumpToPly_forwardsUsesTheRedoStack() {
+        ChessGame game = new ChessGame();
+        game.applyUciMove("e2e4");
+        game.applyUciMove("e7e5");
+        game.applyUciMove("g1f3");
+        game.jumpToPly(0);
+
+        assertEquals(3, game.jumpToPly(3));
+        assertEquals(3, game.moveCount());
+        assertEquals(Piece.WHITE_KNIGHT, game.pieceAt(Square.F3));
+        assertFalse(game.canRedo());
+    }
+
+    @Test
+    public void jumpToPly_clampsToWhatIsReachable() {
+        ChessGame game = new ChessGame();
+        game.applyUciMove("e2e4");
+
+        assertEquals(0, game.jumpToPly(-5));
+        assertEquals(1, game.jumpToPly(50));
+        assertEquals(1, game.moveCount());
+    }
+
+    @Test
+    public void toFullSan_keepsShowingRedoableMovesAfterUndo() {
+        ChessGame game = new ChessGame();
+        game.applyUciMove("e2e4");
+        game.applyUciMove("e7e5");
+        game.applyUciMove("g1f3");
+
+        String beforeUndo = game.toFullSan();
+        game.undoLastMove();
+        game.undoLastMove();
+
+        assertEquals(1, game.moveCount());
+        assertEquals(3, game.totalPlyCount());
+        // toSan() only reflects what's currently applied - shrinks on undo.
+        assertEquals("1. e4", game.toSan());
+        // toFullSan() keeps showing the still-redoable future moves too.
+        assertEquals(beforeUndo, game.toFullSan());
+    }
+
+    @Test
+    public void toFullSan_dropsRedoableMovesOnceANewMoveBranchesOff() {
+        ChessGame game = new ChessGame();
+        game.applyUciMove("e2e4");
+        game.applyUciMove("e7e5");
+        game.undoLastMove();
+
+        // Black's turn again - a different reply than the undone e7e5 branches off.
+        assertTrue(game.applyUciMove("g8f6"));
+
+        assertEquals("1. e4 Nf6", game.toFullSan());
+        assertEquals(2, game.totalPlyCount());
+    }
+
+    @Test
     public void applyUciMove_matchesApplyMoveBySquare() {
         ChessGame game = new ChessGame();
         assertTrue(game.applyUciMove("e2e4"));

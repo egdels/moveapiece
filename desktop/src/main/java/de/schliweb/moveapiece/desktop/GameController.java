@@ -44,6 +44,7 @@ import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Cursor;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
@@ -51,6 +52,7 @@ import javafx.scene.control.ButtonType;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ChoiceDialog;
 import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Slider;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.Tooltip;
@@ -62,6 +64,8 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.shape.SVGPath;
+import javafx.scene.text.Text;
+import javafx.scene.text.TextFlow;
 import javafx.stage.FileChooser;
 import javafx.stage.Modality;
 import javafx.stage.Popup;
@@ -111,7 +115,8 @@ final class GameController
     private final ChessGame game = new ChessGame();
     private final BoardCanvas boardCanvas = new BoardCanvas();
     private final Label statusLabel = new Label();
-    private final TextArea moveListArea = new TextArea();
+    private final TextFlow moveListFlow = new TextFlow();
+    private final ScrollPane moveListScroll = new ScrollPane(moveListFlow);
     private final Slider strengthSlider = new Slider(1320, 3190, Settings.getEngineElo());
     private final Label strengthLabel = new Label();
     // Same Material icon glyphs as the Android app's ic_undo.xml/ic_flip_board.xml
@@ -375,11 +380,10 @@ final class GameController
         strengthLabel.setText(
                 Messages.get("dialog_strength_format", (int) strengthSlider.getValue()));
 
-        moveListArea.setEditable(false);
-        moveListArea.setWrapText(true);
-        moveListArea.setPrefRowCount(10);
-        moveListArea.getStyleClass().add("move-list");
-        VBox.setVgrow(moveListArea, Priority.ALWAYS);
+        moveListFlow.getStyleClass().add("move-list");
+        moveListScroll.setFitToWidth(true);
+        moveListScroll.setPrefHeight(180);
+        VBox.setVgrow(moveListScroll, Priority.ALWAYS);
 
         statusLabel.getStyleClass().add("status-label");
         trainingProgressLabel.getStyleClass().add("training-progress-label");
@@ -440,7 +444,7 @@ final class GameController
                         statusLabel,
                         trainingProgressLabel,
                         movesHeading,
-                        moveListArea,
+                        moveListScroll,
                         pgnBox,
                         analysisProgressLabel);
         sidebar.getStyleClass().addAll("card", "sidebar");
@@ -1327,7 +1331,7 @@ final class GameController
         boardCanvas.setBoard(pieces);
         boardCanvas.setCheckedKingSquare(findCheckedKingSquare());
         boardCanvas.setInteractive(isBoardInteractiveNow());
-        moveListArea.setText(game.toSan());
+        updateMoveHistory();
         statusLabel.setText(statusText());
         statusLabel.getStyleClass().removeAll("check", "gameover");
         if (game.isGameOver()) {
@@ -1344,6 +1348,110 @@ final class GameController
         if (game.isGameOver()) {
             showGameOverAlert();
         }
+    }
+
+    /**
+     * Turns {@link ChessGame#toSan()}'s numbered movetext (e.g. "1. e4 e5 2. Nf3") into individual
+     * {@link Text} nodes in {@link #moveListFlow}: move-number tokens stay plain, every actual move
+     * is clickable and jumps the game to the position right after it via {@link #jumpToPly}. The
+     * training line has its own guided navigation (retreat()/advance() paired with undo/redo), so
+     * its history stays plain, unclickable text - letting the trainee freely jump around it would
+     * cut across the "prove you know the move" hinting.
+     *
+     * <p>Uses {@link ChessGame#toFullSan()}, not {@link ChessGame#toSan()}, outside TRAINING mode:
+     * after stepping back via undo/{@link #jumpToPly}, the moves ahead are still redoable and must
+     * stay visible and clickable, or the user could never navigate back and forth in the history -
+     * only playing a genuinely new move should drop them. The move(s) that make up the position
+     * currently on the board - however reached (a played move, {@link #undo()}/{@link #redo()}, or
+     * a previous history click) - additionally get the {@code move-history-current} style, so the
+     * list always shows where you currently are.
+     *
+     * <p>In HUMAN_VS_STOCKFISH mode that's always the human's move plus the engine's paired reply
+     * (see {@link #jumpToPly}'s own pairing - navigation there can never land between the two), so
+     * both get the style, not just {@link ChessGame#moveCount()} alone: highlighting only the
+     * second half would look contradictory after clicking the human's own move - the reply next to
+     * it would light up instead of the one actually clicked. Outside that mode there is no such
+     * pairing, so only the exact current move gets it.
+     */
+    private void updateMoveHistory() {
+        moveListFlow.getChildren().clear();
+        if (mode == Mode.TRAINING) {
+            moveListFlow.getChildren().add(new Text(game.toSan()));
+            return;
+        }
+        int ply = 0;
+        int currentPly = game.moveCount();
+        int currentRoundStart =
+                mode == Mode.HUMAN_VS_STOCKFISH && currentPly > 1 ? currentPly - 1 : currentPly;
+        boolean first = true;
+        for (String token : game.toFullSan().split("\\s+")) {
+            if (token.isEmpty()) {
+                continue;
+            }
+            if (!first) {
+                moveListFlow.getChildren().add(new Text(" "));
+            }
+            first = false;
+            if (token.matches("\\d+\\.")) {
+                moveListFlow.getChildren().add(new Text(token));
+            } else {
+                ply++;
+                int targetPly = ply;
+                Text moveText = new Text(token);
+                moveText.getStyleClass().add("move-history-link");
+                if (ply >= currentRoundStart && ply <= currentPly) {
+                    moveText.getStyleClass().add("move-history-current");
+                }
+                moveText.setCursor(Cursor.HAND);
+                moveText.setOnMouseClicked(e -> jumpToPly(targetPly));
+                moveListFlow.getChildren().add(moveText);
+            }
+        }
+    }
+
+    /**
+     * Jumps the game to the position right after ply {@code targetPly} (1-based, matching a move's
+     * position in {@link ChessGame#toUciMoveList()}) - like clicking a move in the history. Reuses
+     * {@link ChessGame#jumpToPly}'s own undo/redo stacks for a single refresh/Pegasus-resync
+     * instead of the several an equivalent run of {@link #undo()}/{@link #redo()} clicks would
+     * trigger, and highlights the landed-on move like any other applied move. Only reachable
+     * outside TRAINING mode - see {@link #updateMoveHistory()}.
+     *
+     * <p>In HUMAN_VS_STOCKFISH mode, never leaves the browsed position frozen on the engine's own
+     * turn - always advances one further ply forward instead, redoing the engine's already-recorded
+     * reply (mirroring {@link #undo()}/{@link #redo()}'s own pairing, never triggering a fresh
+     * engine decision - like other chess GUIs' history navigation, only already-recorded moves are
+     * ever skipped past). Always forward, regardless of which direction {@code targetPly} was
+     * reached from: pairing backward would instead undo the very move that was clicked on, and
+     * would make clicking the same history entry repeatedly land on a different position each time
+     * (the first click's pairing changes where the next click's "direction" is computed from) -
+     * this way {@code jumpToPly} is a pure function of {@code targetPly} alone, idempotent under
+     * repeated clicks on the same entry.
+     */
+    private void jumpToPly(int targetPly) {
+        abandonPendingSearches();
+        int before = game.moveCount();
+        int reached = game.jumpToPly(targetPly);
+        if (reached != targetPly) {
+            return; // out of range; nothing changed
+        }
+        if (reached != before
+                && mode == Mode.HUMAN_VS_STOCKFISH
+                && game.sideToMove() != humanSide) {
+            game.redoMove();
+            reached = game.moveCount();
+        }
+        if (reached > 0) {
+            String[] uciMoves = game.toUciMoveList().split(" ");
+            String uci = uciMoves[reached - 1];
+            Square from = Square.valueOf(uci.substring(0, 2).toUpperCase(Locale.ROOT));
+            Square to = Square.valueOf(uci.substring(2, 4).toUpperCase(Locale.ROOT));
+            boardCanvas.setLastMove(from, to);
+        } else {
+            boardCanvas.setLastMove(null, null);
+        }
+        refresh();
+        syncPegasusPosition();
     }
 
     private boolean isBoardInteractiveNow() {

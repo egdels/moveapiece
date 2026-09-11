@@ -136,6 +136,25 @@ public class ChessGame {
         return !redoHistory.isEmpty();
     }
 
+    /**
+     * Jumps to the position right after {@code targetPly} moves from the start (0 = starting
+     * position), via repeated {@link #undoLastMove()}/{@link #redoMove()} - same two stacks, no
+     * rebuild from scratch, so this is exactly what clicking a move in the history and landing on
+     * it does. Clamped to what undo/redo can actually reach (negative or beyond the redo stack);
+     * callers compare the returned ply against {@code targetPly} to detect that.
+     *
+     * @return the ply actually reached, i.e. the new {@link #moveCount()}
+     */
+    public int jumpToPly(int targetPly) {
+        while (moveCount() > targetPly && undoLastMove()) {
+            // continue
+        }
+        while (moveCount() < targetPly && redoMove()) {
+            // continue
+        }
+        return moveCount();
+    }
+
     public boolean isCheckmate() {
         return board.isMated();
     }
@@ -158,8 +177,20 @@ public class ChessGame {
 
     /** Space-separated UCI moves from the start position, for "position startpos moves ...". */
     public String toUciMoveList() {
+        return uciOf(moveHistory);
+    }
+
+    /**
+     * Like {@link #toUciMoveList()}, but includes still-redoable future moves too - see {@link
+     * #toFullSan()}.
+     */
+    public String toFullUciMoveList() {
+        return uciOf(fullMoveList());
+    }
+
+    private String uciOf(List<Move> moves) {
         StringBuilder sb = new StringBuilder();
-        for (Move m : moveHistory) {
+        for (Move m : moves) {
             if (sb.length() > 0) {
                 sb.append(' ');
             }
@@ -184,6 +215,28 @@ public class ChessGame {
         return moveHistory.size();
     }
 
+    /**
+     * Total plies in the currently known line: played ({@link #moveCount()}) plus still-redoable.
+     * Unlike {@link #moveCount()}, this doesn't shrink when {@link #undoLastMove()} is called - see
+     * {@link #toFullSan()}.
+     */
+    public int totalPlyCount() {
+        return moveHistory.size() + redoHistory.size();
+    }
+
+    /**
+     * Every move in the currently known line, played plus still-redoable, in chronological order -
+     * independent of the undo/redo cursor position. {@code redoHistory} itself is LIFO (most
+     * recently undone move last), so it's walked back-to-front to restore chronological order.
+     */
+    private List<Move> fullMoveList() {
+        List<Move> all = new ArrayList<>(moveHistory);
+        for (int i = redoHistory.size() - 1; i >= 0; i--) {
+            all.add(redoHistory.get(i));
+        }
+        return all;
+    }
+
     /** Current position as a FEN string (full 6-field form). */
     public String toFen() {
         return board.getFen();
@@ -191,11 +244,25 @@ public class ChessGame {
 
     /** Move history in Short Algebraic Notation with move numbers, e.g. "1. e4 e5 2. Nf3". */
     public String toSan() {
-        if (moveHistory.isEmpty()) {
+        return sanOf(moveHistory);
+    }
+
+    /**
+     * Like {@link #toSan()}, but includes still-redoable future moves too (see {@link
+     * #fullMoveList()}) - for a move-list UI that lets the user navigate the whole known line
+     * (including plies that {@link #undoLastMove()} stepped back past) without moves disappearing
+     * as soon as they step back once.
+     */
+    public String toFullSan() {
+        return sanOf(fullMoveList());
+    }
+
+    private String sanOf(List<Move> moves) {
+        if (moves.isEmpty()) {
             return "";
         }
         MoveList moveList = new MoveList(startFen);
-        moveList.addAll(moveHistory);
+        moveList.addAll(moves);
         try {
             return moveList.toSanWithMoveNumbers().trim();
         } catch (MoveConversionException e) {
