@@ -110,7 +110,9 @@ public class ChessGame {
         return false;
     }
 
-    /** Undoes the last move, e.g. moving it to the redo stack; false if there is nothing to undo. */
+    /**
+     * Undoes the last move, e.g. moving it to the redo stack; false if there is nothing to undo.
+     */
     public boolean undoLastMove() {
         if (moveHistory.isEmpty()) {
             return false;

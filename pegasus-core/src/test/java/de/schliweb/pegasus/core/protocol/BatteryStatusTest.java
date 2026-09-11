@@ -13,8 +13,7 @@ import org.junit.Test;
 public class BatteryStatusTest {
 
     private static BatteryStatus withStatusBits(int statusBits) {
-        return BatteryStatus.fromPayload(
-                new byte[] {0x58, 0, 0, 0, 0, 0, 0, 0, (byte) statusBits});
+        return BatteryStatus.fromPayload(new byte[] {0x58, 0, 0, 0, 0, 0, 0, 0, (byte) statusBits});
     }
 
     @Test

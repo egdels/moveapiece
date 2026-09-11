@@ -12,9 +12,9 @@ import de.schliweb.pegasus.core.util.HexUtil;
  *
  * <p>Byte 0 (percentage) and byte 8 (status bits) are CONFIRMED_BY_MANUFACTURER_SPEC (DGT
  * Chessboard Communication Protocol v1.2.1): byte 0 is the charge percentage, byte 8 has bit 2 =
- * "battery low" (yellow) and bit 3 = "battery empty" (red). Per that document, if both bits are
- * set the board shuts itself down within about 3 minutes. The remaining bytes (running/on/standby
- * time fields) are documented as "currently not used" and kept only in the raw payload.
+ * "battery low" (yellow) and bit 3 = "battery empty" (red). Per that document, if both bits are set
+ * the board shuts itself down within about 3 minutes. The remaining bytes (running/on/standby time
+ * fields) are documented as "currently not used" and kept only in the raw payload.
  */
 public final class BatteryStatus {
 

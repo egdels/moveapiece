@@ -1121,10 +1121,10 @@ public class MainActivity extends AppCompatActivity
      * Mirrors {@link #undoTrainingMove()}: replays the trainee's next expected move (which is
      * exactly the move undo last retreated past, since {@link TrainingSession} tracks a fixed,
      * known {@link OpeningLine} rather than free-form history - no separate redo stack is needed
-     * here), then immediately replays the book/engine's reply too if
-     * that's what {@code undoTrainingMove} would have retreated past as a pair, landing back on the
-     * human's turn the same way undo does. No-op if there is nothing to redo (training not started,
-     * an optimistic book move is still pending, or the line is already complete).
+     * here), then immediately replays the book/engine's reply too if that's what {@code
+     * undoTrainingMove} would have retreated past as a pair, landing back on the human's turn the
+     * same way undo does. No-op if there is nothing to redo (training not started, an optimistic
+     * book move is still pending, or the line is already complete).
      */
     private void redoTrainingMove() {
         if (trainingSession == null || trainingBookMovePending || trainingSession.isComplete()) {

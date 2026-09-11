@@ -86,8 +86,8 @@ public class PegasusGameBridge {
 
         /**
          * Reported once per connect (from the init sequence's battery request), and again on any
-         * later transition into a critically low battery. Real Pegasus hardware also pushes a
-         * fresh reading spontaneously whenever the percentage changes by 1% (CONFIRMED_ON_HARDWARE
+         * later transition into a critically low battery. Real Pegasus hardware also pushes a fresh
+         * reading spontaneously whenever the percentage changes by 1% (CONFIRMED_ON_HARDWARE
          * 2026-09-11) - those routine drift updates are intentionally not forwarded here (would
          * mean a UI notification every few minutes for the whole session); see {@code
          * batteryReportPending} in the implementation for the exact gating. {@code criticallyLow}
@@ -150,15 +150,18 @@ public class PegasusGameBridge {
     /**
      * Whether the first battery reading of the current connection is still unreported to {@link
      * Listener#onBatteryStatus} - true right after (re)connect. Real Pegasus hardware pushes a
-     * fresh battery status spontaneously every time the percentage changes by 1% (CONFIRMED_ON_HARDWARE
-     * 2026-09-11, minutes apart, no re-request needed), not just once per connect as originally
-     * assumed; reporting every one of those to the UI would mean a toast every few minutes for the
-     * whole session, so only the first reading and later transitions into {@link
-     * BatteryStatus#isCriticallyLow()} are forwarded - see {@link #lastBatteryCritical}.
+     * fresh battery status spontaneously every time the percentage changes by 1%
+     * (CONFIRMED_ON_HARDWARE 2026-09-11, minutes apart, no re-request needed), not just once per
+     * connect as originally assumed; reporting every one of those to the UI would mean a toast
+     * every few minutes for the whole session, so only the first reading and later transitions into
+     * {@link BatteryStatus#isCriticallyLow()} are forwarded - see {@link #lastBatteryCritical}.
      */
     private boolean batteryReportPending;
 
-    /** Last {@link BatteryStatus#isCriticallyLow()} seen this connection; see {@link #batteryReportPending}. */
+    /**
+     * Last {@link BatteryStatus#isCriticallyLow()} seen this connection; see {@link
+     * #batteryReportPending}.
+     */
     private boolean lastBatteryCritical;
 
     /**
@@ -344,10 +347,10 @@ public class PegasusGameBridge {
      * board-state request, and update mode — spaced 1.5s apart. Denser spacing made the board stop
      * responding to the whole burst on real hardware.
      *
-     * <p>The dev-key-state query (0x5A, added after the manufacturer shared their protocol
-     * document — DGT Chessboard Communication Protocol v1.2.1) is not part of that captured
-     * burst; it is a read-only status request, so inserting it does not change what the official
-     * app itself writes to the board. Its response is handled in {@link #onProtocolData}.
+     * <p>The dev-key-state query (0x5A, added after the manufacturer shared their protocol document
+     * — DGT Chessboard Communication Protocol v1.2.1) is not part of that captured burst; it is a
+     * read-only status request, so inserting it does not change what the official app itself writes
+     * to the board. Its response is handled in {@link #onProtocolData}.
      */
     private void sendOfficialInitSequence() {
         byte[][] seq = {

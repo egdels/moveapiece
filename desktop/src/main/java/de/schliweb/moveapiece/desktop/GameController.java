@@ -766,10 +766,15 @@ final class GameController
 
     @Override
     public void onBatteryStatus(int percent, boolean criticallyLow) {
-        LOG.log(Level.INFO, "Pegasus battery: {0}% (criticallyLow={1})", new Object[] {percent, criticallyLow});
+        LOG.log(
+                Level.INFO,
+                "Pegasus battery: {0}% (criticallyLow={1})",
+                new Object[] {percent, criticallyLow});
         showToast(
                 Messages.get(
-                        criticallyLow ? "pegasus_battery_critical_format" : "pegasus_battery_format",
+                        criticallyLow
+                                ? "pegasus_battery_critical_format"
+                                : "pegasus_battery_format",
                         percent));
     }
 
