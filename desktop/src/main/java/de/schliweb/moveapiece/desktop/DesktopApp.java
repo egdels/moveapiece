@@ -107,8 +107,8 @@ public class DesktopApp extends Application {
     /**
      * Apple's documented Big Sur+ icon template: a 1024x1024 canvas, an 824x824 icon tile (100px
      * margin per side - ~9.77%), 185.4 corner radius. The same fractions drive {@code
-     * packaging.gradle}'s {@code generateIcons} task, which bakes this shape into the bundled
-     * .icns - see {@link #maskToMacSquircle} for why both places need it independently.
+     * packaging.gradle}'s {@code generateIcons} task, which bakes this shape into the bundled .icns
+     * - see {@link #maskToMacSquircle} for why both places need it independently.
      */
     private static final double ICON_PADDING_FRACTION = 100.0 / 1024.0;
 
@@ -119,9 +119,9 @@ public class DesktopApp extends Application {
 
     /**
      * Pads and clips a plain square icon to approximate macOS's Big Sur+ "continuous corner"
-     * app-icon shape (a superellipse-cornered rounded square - flat edges, smoothly curved
-     * corners; not a plain circular-arc round-rect, which looks noticeably more geometric/angular
-     * by comparison). {@code java.awt.Taskbar}'s runtime Dock tile (see {@link #setDockIcon}) shows
+     * app-icon shape (a superellipse-cornered rounded square - flat edges, smoothly curved corners;
+     * not a plain circular-arc round-rect, which looks noticeably more geometric/angular by
+     * comparison). {@code java.awt.Taskbar}'s runtime Dock tile (see {@link #setDockIcon}) shows
      * exactly the pixels it's given, unmasked - unlike a small handful of macOS surfaces that apply
      * their own cosmetic framing to a *pinned, not-running* app tile, nothing softens a *running*
      * app's Dock icon at all. Without this, it would look like a plain square next to the properly
@@ -152,8 +152,8 @@ public class DesktopApp extends Application {
     /**
      * Traces Apple's icon-tile outline (see {@link #maskToMacSquircle}) at the given canvas size:
      * the 100px-margin content box, superellipse-cornered rather than circular-arc-cornered. Each
-     * corner is a quarter of the superellipse {@code |x/r|^n + |y/r|^n = 1}, parametrized as
-     * {@code (r*cos(t)^(2/n), r*sin(t)^(2/n))} for {@code t} in {@code [0, pi/2]} - flatter/more
+     * corner is a quarter of the superellipse {@code |x/r|^n + |y/r|^n = 1}, parametrized as {@code
+     * (r*cos(t)^(2/n), r*sin(t)^(2/n))} for {@code t} in {@code [0, pi/2]} - flatter/more
      * "continuous" than a quarter-circle (which this formula reduces to at n=2) - swept per corner
      * in clockwise path order and connected by the tile's straight edges.
      */

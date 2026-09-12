@@ -997,9 +997,9 @@ final class GameController
     }
 
     /**
-     * Replays the game played so far from the start, one ply at a time, grading every move the
-     * same way live blunder-check does ({@link #moveQualityLabelKey}) and showing a summary dialog
-     * once done. Works whether the game has actually ended or is still in progress - only {@link
+     * Replays the game played so far from the start, one ply at a time, grading every move the same
+     * way live blunder-check does ({@link #moveQualityLabelKey}) and showing a summary dialog once
+     * done. Works whether the game has actually ended or is still in progress - only {@link
      * ChessGame#moveCount()} needs to be positive, there has to be something to replay. Always
      * searches at full strength, restored afterwards in {@link #advancePostGameAnalysis}.
      *
