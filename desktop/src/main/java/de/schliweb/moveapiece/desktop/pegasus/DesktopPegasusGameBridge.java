@@ -339,14 +339,14 @@ public class DesktopPegasusGameBridge {
      */
     private void sendOfficialInitSequence() {
         byte[][] seq = {
-                PegasusCommands.encodeReset(),
-                PegasusCommands.encodeDevKey(),
-                PegasusCommands.encodeDevKeyStateRequest(),
-                {0x55},
-                {0x47},
-                PegasusCommands.encodeBoardStateRequest(),
-                {0x4C},
-                PegasusCommands.encodeUpdateMode(),
+            PegasusCommands.encodeReset(),
+            PegasusCommands.encodeDevKey(),
+            PegasusCommands.encodeDevKeyStateRequest(),
+            {0x55},
+            {0x47},
+            PegasusCommands.encodeBoardStateRequest(),
+            {0x4C},
+            PegasusCommands.encodeUpdateMode(),
         };
         for (int i = 0; i < seq.length; i++) {
             byte[] cmd = seq[i];
@@ -494,7 +494,7 @@ public class DesktopPegasusGameBridge {
                 && !squaresSeenEmpty.contains(guideCaptureSquare)
                 && physicalBoard != null
                 && OccupancyProjection.normalize(physicalBoard)
-                .equals(OccupancyProjection.occupancyOf(guideTargetPosition));
+                        .equals(OccupancyProjection.occupancyOf(guideTargetPosition));
     }
 
     private void dispatchDetectionResult(MoveDetectionResult result) {
@@ -628,7 +628,7 @@ public class DesktopPegasusGameBridge {
             }
             if (physicalBoard == null
                     || !OccupancyProjection.normalize(physicalBoard)
-                    .equals(OccupancyProjection.occupancyOf(current))) {
+                            .equals(OccupancyProjection.occupancyOf(current))) {
                 return;
             }
             cancel(checkIndicatorFuture);
@@ -708,10 +708,10 @@ public class DesktopPegasusGameBridge {
                     Level.INFO,
                     "syncBoardToPosition: fen={0} physicalBoard={1}",
                     new Object[] {
-                            fen,
-                            physicalBoard == null
-                                    ? "null (not yet received)"
-                                    : ("\n" + OccupancyProjection.normalize(physicalBoard))
+                        fen,
+                        physicalBoard == null
+                                ? "null (not yet received)"
+                                : ("\n" + OccupancyProjection.normalize(physicalBoard))
                     });
             MoveDetectionResult result = moveDetector.reset(target, physicalBoard);
             updateMismatchLeds(result);
