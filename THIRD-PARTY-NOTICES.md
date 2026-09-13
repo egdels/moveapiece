@@ -13,6 +13,7 @@ This project (MoveAPiece) is licensed under the GNU General Public License v3.0
 | Material Components for Android | Apache 2.0 | https://github.com/material-components/material-components-android |
 | bluez-dbus 0.3.5 (`desktop`, Linux Pegasus BLE transport) | MIT | https://github.com/hypfvieh/bluez-dbus |
 | dbus-java-core / dbus-java-transport-native-unixsocket 5.2.0 (`desktop`, transitive/direct deps of bluez-dbus above) | MIT | https://github.com/hypfvieh/dbus-java |
+| ONNX Runtime 1.29.0 (`core`, runs the Maia neural network - see below) | MIT | https://github.com/microsoft/onnxruntime |
 
 ## NNUE evaluation networks
 
@@ -35,6 +36,35 @@ assets (`app/build/generated/nnueAssets`, populated by the `installNnueAssets`
 Gradle task) and are extracted to app-private storage at first launch by
 `NnueAssets.java`, then pointed to via the standard UCI `EvalFile` /
 `EvalFileSmall` options.
+
+## Maia neural network (human-like opponent, desktop only)
+
+`desktop/src/main/resources/de/schliweb/moveapiece/desktop/maia/maia-<rating>.onnx`
+(nine files, ratings 1100–1900 in steps of 100), run via ONNX Runtime (see
+above) as an alternative, human-like opponent to Stockfish - see
+`GameController#startMaiaGame`.
+
+- Source: original Maia weights from
+  https://github.com/CSSLab/maia-chess (**not** the newer, AGPL-3.0-licensed
+  Maia-3), converted to ONNX with lc0's own official `leela2onnx` converter
+  (https://github.com/LeelaChessZero/lc0), no third-party conversion tool
+  involved
+- License: GPLv3 (same as MoveAPiece itself, no additional obligations)
+- Full provenance (exact upstream commit, per-file SHA-256 of both the
+  original `.pb.gz` weights and the converted `.onnx` files, declared
+  network-format fields, and how the conversion was verified against lc0's
+  own native output): see `MAIA_PROVENANCE_TEMPLATE.md`
+
+`core/src/main/resources/de/schliweb/moveapiece/engine/maia/policy_index_1858.txt`
+is a separate, small artifact: the fixed lookup table mapping the network's
+1858-slot policy output to actual chess moves, used unmodified.
+
+- Source: `policy_index.py` from
+  https://github.com/Rocketknight1/minimal_lczero, commit
+  `dfccc33d4968d15922437a64608bcc7584a5ead6`
+- License: GPLv3
+- Independently cross-checked against lc0's own live `VerboseMoveStats`
+  debug output (see `MAIA_PROVENANCE_TEMPLATE.md`) rather than trusted as-is
 
 ## Chess piece artwork (and app icon)
 

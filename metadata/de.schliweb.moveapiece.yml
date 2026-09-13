@@ -11,7 +11,7 @@ AutoName: MoveAPiece
 
 RepoType: git
 Repo: https://github.com/egdels/moveapiece
-Binaries: 
+Binaries:
   https://github.com/egdels/moveapiece/releases/download/v%v/app-universal-release.apk
 
 Builds:
@@ -25,7 +25,7 @@ Builds:
     gradle:
       - yes
     output: app/build/outputs/apk/release/app-universal-release-unsigned.apk
-    binary: 
+    binary:
       https://github.com/egdels/moveapiece/releases/download/v%v/app-universal-release.apk
     ndk: 28.0.13004108
 

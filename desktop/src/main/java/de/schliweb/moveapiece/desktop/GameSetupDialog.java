@@ -30,19 +30,23 @@ import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
 /**
- * Modal "New Game" picker: opponent (human, Stockfish, or the opening trainer), which color the
- * human plays, and - for the opening trainer - which line to drill and whether the trainee's own
- * next move gets a highlighted hint. Mirrors the Android app's single {@code showNewGameDialog}
- * (one dialog for all three modes) - the one deliberate difference is the engine's playing
- * strength, which stays a live, always-visible sidebar slider on desktop (see {@link
- * GameController}) rather than a dialog-only setting, since unlike the Android dialog's SeekBar it
- * can be adjusted mid-game.
+ * Modal "New Game" picker: opponent (human, Stockfish, Maia, or the opening trainer), which color
+ * the human plays, and - for the opening trainer - which line to drill and whether the trainee's
+ * own next move gets a highlighted hint. Mirrors the Android app's single {@code
+ * showNewGameDialog} - the one deliberate difference is that neither engine's playing strength is
+ * chosen here: both Stockfish's Elo and Maia's rating stay live, always-visible sidebar controls
+ * on desktop (see {@link GameController}) rather than a dialog-only, one-time setting, since
+ * unlike the Android dialog's SeekBar both can be adjusted mid-game - Maia's by swapping in a
+ * different bundled model file (see {@link GameController#startMaiaGame}), not a UCI option on a
+ * running instance, but adjustable all the same. A fresh Maia game simply starts at whichever
+ * rating was last used (see {@link Settings#getMaiaRating}).
  */
 final class GameSetupDialog {
 
     enum Opponent {
         HUMAN,
         STOCKFISH,
+        MAIA,
         TRAINER
     }
 
@@ -60,9 +64,11 @@ final class GameSetupDialog {
         ToggleGroup opponentGroup = new ToggleGroup();
         RadioButton humanRadio = new RadioButton(Messages.get("mode_human_vs_human"));
         RadioButton stockfishRadio = new RadioButton(Messages.get("mode_human_vs_stockfish"));
+        RadioButton maiaRadio = new RadioButton(Messages.get("mode_human_vs_maia"));
         RadioButton trainerRadio = new RadioButton(Messages.get("mode_opening_trainer"));
         humanRadio.setToggleGroup(opponentGroup);
         stockfishRadio.setToggleGroup(opponentGroup);
+        maiaRadio.setToggleGroup(opponentGroup);
         trainerRadio.setToggleGroup(opponentGroup);
         stockfishRadio.setSelected(true);
 
@@ -115,6 +121,7 @@ final class GameSetupDialog {
                         8,
                         humanRadio,
                         stockfishRadio,
+                        maiaRadio,
                         trainerRadio,
                         colorBox,
                         openingBox,
@@ -180,7 +187,9 @@ final class GameSetupDialog {
                                     ? Opponent.HUMAN
                                     : stockfishRadio.isSelected()
                                             ? Opponent.STOCKFISH
-                                            : Opponent.TRAINER;
+                                            : maiaRadio.isSelected()
+                                                    ? Opponent.MAIA
+                                                    : Opponent.TRAINER;
                     Side side = whiteRadio.isSelected() ? Side.WHITE : Side.BLACK;
                     OpeningLine opening =
                             opponent == Opponent.TRAINER

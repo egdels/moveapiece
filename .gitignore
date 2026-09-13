@@ -29,3 +29,9 @@ local.properties
 # our heads-up email (see 2026-09-10 reply) - confidential, not ours to
 # redistribute, must never be committed.
 /MAN_72002_DGT Chessboard CommunicationProtocol_v1.2.1.pdf
+
+# ONNX Runtime's telemetry-device-ID fallback file (see the "Failed to
+# persist telemetry device ID" warning it logs) - written next to the
+# working directory on every run/test that loads a Maia model, wherever the
+# JVM's working directory happens to be. Not source, not configuration.
+:memory:.ses

@@ -9,6 +9,11 @@ java {
 
 dependencies {
     implementation 'com.github.bhlangonijr:chesslib:1.3.7'
+    // MaiaEngine's ONNX Runtime dependency (MIT-licensed, official Microsoft
+    // package) - runs identically on desktop JVM and Android, unlike
+    // Stockfish's per-platform native process, so it lives here in :core
+    // rather than being split across :app/:desktop like stockfish.gradle.
+    implementation 'com.microsoft.onnxruntime:onnxruntime:1.29.0'
 
     testImplementation 'junit:junit:4.13.2'
     // Cross-checks ChessGame's FEN output against pegasus-core's own FEN

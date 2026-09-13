@@ -13,6 +13,8 @@ import de.schliweb.moveapiece.desktop.pegasus.LinuxPegasusBleTransport;
 import de.schliweb.moveapiece.desktop.pegasus.MacosPegasusBleTransport;
 import de.schliweb.moveapiece.desktop.pegasus.WindowsPegasusBleTransport;
 import de.schliweb.moveapiece.engine.EngineListener;
+import de.schliweb.moveapiece.engine.MaiaEngine;
+import de.schliweb.moveapiece.engine.MaiaEngineListener;
 import de.schliweb.moveapiece.engine.NnueAssets;
 import de.schliweb.moveapiece.engine.StockfishEngine;
 import de.schliweb.moveapiece.engine.UciInfoParser;
@@ -73,11 +75,20 @@ import javafx.stage.Stage;
 import javafx.util.Duration;
 
 /**
- * Wires a {@link ChessGame}, a {@link StockfishEngine} and a {@link BoardCanvas} together into a
- * playable window: human-vs-human, human-vs-Stockfish, an in-game opening trainer that drills a
- * fixed line from {@code core}'s opening library, adjustable engine strength, undo, and PGN
- * import/export. Mirrors the Android app's {@code MainActivity} orchestration at a much smaller
- * scope.
+ * Wires a {@link ChessGame}, a {@link StockfishEngine}, a {@link MaiaEngine} and a {@link
+ * BoardCanvas} together into a playable window: human-vs-human, human-vs-Stockfish (adjustable
+ * playing strength), human-vs-Maia (a human-like opponent at a fixed rating - see {@link
+ * #startMaiaGame}), an in-game opening trainer that drills a fixed line from {@code core}'s opening
+ * library, undo, and PGN import/export. Mirrors the Android app's {@code MainActivity}
+ * orchestration at a much smaller scope (Maia is desktop-only for now).
+ *
+ * <p>Stockfish and Maia coexist rather than one replacing the other during a Maia game: only
+ * generating the opponent's own reply move goes through {@link #maiaEngine} - the live evaluation
+ * display, hints, and post-game analysis all still go through the same always-running {@link
+ * #engine} (Stockfish) regardless of {@link #mode}, since none of them care who played the last
+ * move (see {@link #isPairedEngineMode}). The one feature that silently sits out a HUMAN_VS_MAIA
+ * game is live move-quality/blunder-check right after the human's own move, a deliberate tradeoff
+ * documented on {@link #maybeTriggerAnalysis}.
  */
 final class GameController
         implements BoardCanvas.MoveSource, EngineListener, DesktopPegasusGameBridge.Listener {
@@ -87,6 +98,7 @@ final class GameController
     private enum Mode {
         HUMAN_VS_HUMAN,
         HUMAN_VS_STOCKFISH,
+        HUMAN_VS_MAIA,
         TRAINING
     }
 
@@ -119,6 +131,15 @@ final class GameController
     private final ScrollPane moveListScroll = new ScrollPane(moveListFlow);
     private final Slider strengthSlider = new Slider(1320, 3190, Settings.getEngineElo());
     private final Label strengthLabel = new Label();
+    // Live-adjustable counterpart to strengthSlider/strengthLabel for HUMAN_VS_MAIA: unlike
+    // Stockfish's Elo, Maia's rating isn't a UCI option on a running engine, it's a choice of which
+    // bundled model to load, so picking a new value here swaps in a whole new MaiaEngine mid-game
+    // (see #switchMaiaRating) instead of tweaking a parameter - the two pairs are shown one at a
+    // time, never together (see #updateStrengthControlsVisibility). Bounds match MaiaRatings.ALL
+    // (1100-1900 in steps of 100); snapToTicks/majorTickUnit/blockIncrement below keep the slider on
+    // those 9 values, since there's no bundled model for anything in between.
+    private final Label maiaRatingLabel = new Label();
+    private final Slider maiaRatingSlider = new Slider(1100, 1900, Settings.getMaiaRating());
     // Same Material icon glyphs as the Android app's ic_undo.xml/ic_flip_board.xml
     // (SVG path data reused verbatim - both use the same path-string syntax).
     private static final String NEW_GAME_ICON_PATH = "M19,13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z";
@@ -181,6 +202,13 @@ final class GameController
     private StockfishEngine engine;
     private StockfishLocator.Location engineLocation;
     private boolean engineReady = false;
+    // Loaded fresh per Maia game (see #startMaiaGame) and again on every mid-game rating change
+    // (see #switchMaiaRating), unlike engine/engineLocation above which are started once in the
+    // constructor and live for the app's whole lifetime - a different rating is a different
+    // bundled model file, not a UCI option to change on a running instance.
+    private MaiaEngine maiaEngine;
+    private boolean maiaReady = false;
+    private int currentMaiaRating;
     private boolean waitingForEngineMove = false;
     private boolean waitingForHint = false;
     private boolean boardFlipped = false;
@@ -379,6 +407,44 @@ final class GameController
                         });
         strengthLabel.setText(
                 Messages.get("dialog_strength_format", (int) strengthSlider.getValue()));
+        strengthLabel.managedProperty().bind(strengthLabel.visibleProperty());
+        strengthSlider.managedProperty().bind(strengthSlider.visibleProperty());
+        maiaRatingLabel.managedProperty().bind(maiaRatingLabel.visibleProperty());
+        maiaRatingLabel.setVisible(false);
+
+        maiaRatingSlider.setShowTickLabels(false);
+        maiaRatingSlider.setSnapToTicks(true);
+        maiaRatingSlider.setMajorTickUnit(100);
+        maiaRatingSlider.setMinorTickCount(0);
+        maiaRatingSlider.setBlockIncrement(100);
+        // Label text tracks every tick while dragging for live feedback, but the actual (expensive -
+        // a full model reload) engine swap only fires once the drag ends, via the valueChanging
+        // listener below - not on every intermediate tick a fast drag passes through.
+        //
+        // Both listeners snap the reported value themselves via MaiaRatings.nearest rather than
+        // trusting the Slider's own snapToTicks to have already landed on an exact multiple of 100 -
+        // see that method's Javadoc for why relying on it directly once failed to load a rating the
+        // user had, visually, already dragged onto.
+        maiaRatingSlider
+                .valueProperty()
+                .addListener(
+                        (obs, old, val) -> {
+                            int rating = MaiaRatings.nearest(val.doubleValue());
+                            maiaRatingLabel.setText(Messages.get("dialog_maia_rating_format", rating));
+                            if (!maiaRatingSlider.isValueChanging()) {
+                                switchMaiaRating(rating);
+                            }
+                        });
+        maiaRatingSlider
+                .valueChangingProperty()
+                .addListener(
+                        (obs, wasChanging, isChanging) -> {
+                            if (!isChanging) {
+                                switchMaiaRating(MaiaRatings.nearest(maiaRatingSlider.getValue()));
+                            }
+                        });
+        maiaRatingSlider.managedProperty().bind(maiaRatingSlider.visibleProperty());
+        maiaRatingSlider.setVisible(false);
 
         moveListFlow.getStyleClass().add("move-list");
         moveListScroll.setFitToWidth(true);
@@ -437,6 +503,8 @@ final class GameController
                         10,
                         strengthLabel,
                         strengthSlider,
+                        maiaRatingLabel,
+                        maiaRatingSlider,
                         actionBox,
                         hintAlternativesLabel,
                         evalBox,
@@ -588,10 +656,21 @@ final class GameController
     }
 
     private void maybeStartEngineMove() {
-        if (mode != Mode.HUMAN_VS_STOCKFISH || game.isGameOver()) {
+        if (!isPairedEngineMode() || game.isGameOver()) {
             return;
         }
         if (game.sideToMove() == humanSide) {
+            return;
+        }
+        if (mode == Mode.HUMAN_VS_MAIA) {
+            if (!maiaReady) {
+                return;
+            }
+            waitingForEngineMove = true;
+            boardCanvas.setInteractive(false);
+            maiaRatingSlider.setDisable(true);
+            maiaEngine.setPosition(game.toUciMoveList());
+            maiaEngine.go();
             return;
         }
         if (!engineReady) {
@@ -1241,8 +1320,15 @@ final class GameController
         if (!engineReady) {
             return;
         }
-        boolean engineAboutToSearchAnyway =
-                mode == Mode.HUMAN_VS_STOCKFISH && game.sideToMove() != humanSide;
+        // Also skipped for HUMAN_VS_MAIA, even though Maia's own move-generation never touches
+        // this Stockfish instance at all (no actual search conflict) - Maia replies near-instantly
+        // (a single forward pass), so starting a ~1.5s Stockfish analysis here would almost always
+        // just get thrown away a moment later when Maia's reply lands and the position moves on.
+        // One real cost: live move-quality/blunder-check (see #maybeFinalizeMoveQuality) then never
+        // gets a fresh eval for the position right after the human's own move before Maia replies,
+        // so blunder detection silently doesn't fire for that ply in HUMAN_VS_MAIA games - the eval
+        // display itself, hints, and post-game analysis are unaffected (see #isPairedEngineMode).
+        boolean engineAboutToSearchAnyway = isPairedEngineMode() && game.sideToMove() != humanSide;
         if (engineAboutToSearchAnyway) {
             return;
         }
@@ -1273,6 +1359,7 @@ final class GameController
         switch (choice.opponent()) {
             case HUMAN -> startHumanVsHuman();
             case STOCKFISH -> startStockfishGame(choice.side());
+            case MAIA -> startMaiaGame(choice.side(), Settings.getMaiaRating());
             case TRAINER -> startTraining(choice.opening(), choice.side(), choice.hintsEnabled());
         }
     }
@@ -1286,6 +1373,7 @@ final class GameController
         boardCanvas.setFlipped(false);
         boardCanvas.setTrainingHint(null, null);
         strengthSlider.setDisable(true);
+        updateStrengthControlsVisibility();
         newGame();
     }
 
@@ -1299,8 +1387,143 @@ final class GameController
         boardCanvas.setFlipped(boardFlipped);
         boardCanvas.setTrainingHint(null, null);
         strengthSlider.setDisable(false);
+        updateStrengthControlsVisibility();
         newGame();
         maybeStartEngineMove();
+    }
+
+    /**
+     * Starts a fresh Human vs Maia game with the human playing the given side, loading the ONNX
+     * model for {@code rating} (one of {@link MaiaRatings#ALL}) fresh - unlike {@link #engine}
+     * (Stockfish), which is started once in the constructor and lives for the app's whole lifetime,
+     * a Maia network's "strength" is fixed at load time, not a UCI option on a running instance, so
+     * a new {@link MaiaEngine} is created here (shutting down any previous one first) and again on
+     * every later rating change via {@link #switchMaiaRating}.
+     */
+    void startMaiaGame(Side side, int rating) {
+        mode = Mode.HUMAN_VS_MAIA;
+        trainingSession = null;
+        stopPendingBookMove();
+        humanSide = side;
+        boardFlipped = side == Side.BLACK;
+        boardCanvas.setFlipped(boardFlipped);
+        boardCanvas.setTrainingHint(null, null);
+        strengthSlider.setDisable(true);
+        currentMaiaRating = rating;
+        updateStrengthControlsVisibility();
+        loadMaiaEngine(rating);
+        newGame();
+        maybeStartEngineMove();
+    }
+
+    /**
+     * Swaps in a different bundled Maia rating model without starting a new game - unlike {@link
+     * #startMaiaGame}, {@link #game} and the move history are left untouched, and the next Maia
+     * move (see {@link #maybeStartEngineMove}) simply replays the current position into the new
+     * engine before asking it to move.
+     *
+     * <p>Ignored while Maia is still computing its previous move ({@link #maiaRatingSlider} is kept
+     * disabled for the same reason - see {@link #refresh}): swapping the engine out from under an
+     * in-flight search would let the outgoing engine's reply and the incoming engine's own reply to
+     * the same pre-move position both land, racing to apply two different moves to one board.
+     */
+    private void switchMaiaRating(int rating) {
+        if (mode != Mode.HUMAN_VS_MAIA || rating == currentMaiaRating || waitingForEngineMove) {
+            return;
+        }
+        currentMaiaRating = rating;
+        Settings.setMaiaRating(rating);
+        maiaRatingLabel.setText(Messages.get("dialog_maia_rating_format", rating));
+        loadMaiaEngine(rating);
+    }
+
+    /**
+     * Shared by {@link #startMaiaGame} and {@link #switchMaiaRating}: (re)loads {@link #maiaEngine}.
+     *
+     * <p>Captures the freshly created engine in {@code loadedEngine} and has the listener check it's
+     * still the current {@link #maiaEngine} before touching {@link #maiaReady} - dragging {@link
+     * #maiaRatingSlider} across several ticks in one release can call this again before a slower,
+     * already-superseded model finishes loading, and that engine's belated {@code onReady} must not
+     * flip {@link #maiaReady} back on for an engine nobody is going to search with.
+     */
+    private void loadMaiaEngine(int rating) {
+        if (maiaEngine != null) {
+            maiaEngine.shutdown();
+        }
+        maiaReady = false;
+        MaiaEngine loadedEngine = new MaiaEngine(Platform::runLater);
+        maiaEngine = loadedEngine;
+        loadedEngine.setListener(
+                new MaiaEngineListener() {
+                    @Override
+                    public void onReady() {
+                        if (maiaEngine != loadedEngine) {
+                            return;
+                        }
+                        maiaReady = true;
+                        maybeStartEngineMove();
+                    }
+
+                    @Override
+                    public void onBestMove(
+                            String bestMoveUci, float winProbability, float drawProbability, float lossProbability) {
+                        waitingForEngineMove = false;
+                        if (bestMoveUci == null) {
+                            refresh();
+                            return;
+                        }
+                        applyUciToGame(bestMoveUci);
+                        if (pegasusBridge != null
+                                && pegasusBridge.getConnectionState() == ConnectionState.CONNECTED) {
+                            pegasusBridge.guideEngineMove(bestMoveUci);
+                        }
+                        refresh();
+                    }
+
+                    @Override
+                    public void onEngineError(Exception error) {
+                        waitingForEngineMove = false;
+                        maiaRatingSlider.setDisable(false);
+                        statusLabel.setText(Messages.get("error_engine_generic") + ": " + error.getMessage());
+                    }
+                });
+        try (java.io.InputStream model =
+                GameController.class.getResourceAsStream(MaiaRatings.resourcePath(rating))) {
+            if (model == null) {
+                throw new FileNotFoundException(MaiaRatings.resourcePath(rating));
+            }
+            loadedEngine.start(model);
+        } catch (IOException e) {
+            statusLabel.setText(Messages.get("status_maia_unavailable") + ": " + e.getMessage());
+        }
+    }
+
+    /**
+     * Whether the current {@link #mode} plays exactly one engine reply after each human move
+     * (Stockfish or Maia) - as opposed to {@code HUMAN_VS_HUMAN} (no engine turn at all) or {@code
+     * TRAINING} (its own book-move logic). Shared by every place that treats a human move and its
+     * paired engine reply as one unit: undo/redo, move-history highlighting, and history navigation
+     * ({@link #jumpToPly}) all skip past the reply together rather than landing between the two.
+     */
+    private boolean isPairedEngineMode() {
+        return mode == Mode.HUMAN_VS_STOCKFISH || mode == Mode.HUMAN_VS_MAIA;
+    }
+
+    /**
+     * Shows exactly one of {@link #strengthSlider}/{@link #strengthLabel} (Stockfish) or {@link
+     * #maiaRatingLabel}/{@link #maiaRatingSlider} (Maia) depending on {@link #mode} - both pairs are
+     * live-adjustable for their running game, called from every place that changes {@link #mode}.
+     */
+    private void updateStrengthControlsVisibility() {
+        boolean isMaia = mode == Mode.HUMAN_VS_MAIA;
+        strengthLabel.setVisible(!isMaia);
+        strengthSlider.setVisible(!isMaia);
+        maiaRatingLabel.setVisible(isMaia);
+        maiaRatingSlider.setVisible(isMaia);
+        if (isMaia) {
+            maiaRatingLabel.setText(Messages.get("dialog_maia_rating_format", currentMaiaRating));
+            maiaRatingSlider.setValue(currentMaiaRating);
+        }
     }
 
     private void undo() {
@@ -1312,9 +1535,7 @@ final class GameController
         if (!game.undoLastMove()) {
             return;
         }
-        if (mode == Mode.HUMAN_VS_STOCKFISH
-                && game.moveCount() > 0
-                && game.sideToMove() != humanSide) {
+        if (isPairedEngineMode() && game.moveCount() > 0 && game.sideToMove() != humanSide) {
             game.undoLastMove();
         }
         boardCanvas.setLastMove(null, null);
@@ -1324,9 +1545,9 @@ final class GameController
 
     /**
      * Mirrors {@link #undo()}: reapplies the move(s) undo most recently moved to the redo stack,
-     * landing back on the human's own turn in HUMAN_VS_STOCKFISH mode the same way undo does (redo
-     * the human's move, then immediately redo the engine's reply too). No-op if there is nothing to
-     * redo.
+     * landing back on the human's own turn in a paired-engine mode ({@link #isPairedEngineMode})
+     * the same way undo does (redo the human's move, then immediately redo the engine's reply too).
+     * No-op if there is nothing to redo.
      */
     private void redo() {
         if (mode == Mode.TRAINING) {
@@ -1337,7 +1558,7 @@ final class GameController
         if (!game.redoMove()) {
             return;
         }
-        if (mode == Mode.HUMAN_VS_STOCKFISH && game.canRedo() && game.sideToMove() != humanSide) {
+        if (isPairedEngineMode() && game.canRedo() && game.sideToMove() != humanSide) {
             game.redoMove();
         }
         boardCanvas.setLastMove(null, null);
@@ -1353,6 +1574,7 @@ final class GameController
         boardCanvas.setBoard(pieces);
         boardCanvas.setCheckedKingSquare(findCheckedKingSquare());
         boardCanvas.setInteractive(isBoardInteractiveNow());
+        maiaRatingSlider.setDisable(waitingForEngineMove);
         updateMoveHistory();
         statusLabel.setText(statusText());
         statusLabel.getStyleClass().removeAll("check", "gameover");
@@ -1388,12 +1610,13 @@ final class GameController
      * a previous history click) - additionally get the {@code move-history-current} style, so the
      * list always shows where you currently are.
      *
-     * <p>In HUMAN_VS_STOCKFISH mode that's always the human's move plus the engine's paired reply
-     * (see {@link #jumpToPly}'s own pairing - navigation there can never land between the two), so
-     * both get the style, not just {@link ChessGame#moveCount()} alone: highlighting only the
-     * second half would look contradictory after clicking the human's own move - the reply next to
-     * it would light up instead of the one actually clicked. Outside that mode there is no such
-     * pairing, so only the exact current move gets it.
+     * <p>In a paired-engine mode ({@link #isPairedEngineMode}, Stockfish or Maia) that's always the
+     * human's move plus the engine's paired reply (see {@link #jumpToPly}'s own pairing - navigation
+     * there can never land between the two), so both get the style, not just {@link
+     * ChessGame#moveCount()} alone: highlighting only the second half would look contradictory after
+     * clicking the human's own move - the reply next to it would light up instead of the one
+     * actually clicked. Outside those modes there is no such pairing, so only the exact current move
+     * gets it.
      */
     private void updateMoveHistory() {
         moveListFlow.getChildren().clear();
@@ -1403,7 +1626,7 @@ final class GameController
             int ply = 0;
             int currentPly = game.moveCount();
             int currentRoundStart =
-                    mode == Mode.HUMAN_VS_STOCKFISH && currentPly > 1 ? currentPly - 1 : currentPly;
+                    isPairedEngineMode() && currentPly > 1 ? currentPly - 1 : currentPly;
             boolean first = true;
             for (String token : game.toFullSan().split("\\s+")) {
                 if (token.isEmpty()) {
@@ -1456,8 +1679,9 @@ final class GameController
      * trigger, and highlights the landed-on move like any other applied move. Only reachable
      * outside TRAINING mode - see {@link #updateMoveHistory()}.
      *
-     * <p>In HUMAN_VS_STOCKFISH mode, never leaves the browsed position frozen on the engine's own
-     * turn - always advances one further ply forward instead, redoing the engine's already-recorded
+     * <p>In a paired-engine mode ({@link #isPairedEngineMode}), never leaves the browsed position
+     * frozen on the engine's own turn - always advances one further ply forward instead, redoing the
+     * engine's already-recorded
      * reply (mirroring {@link #undo()}/{@link #redo()}'s own pairing, never triggering a fresh
      * engine decision - like other chess GUIs' history navigation, only already-recorded moves are
      * ever skipped past). Always forward, regardless of which direction {@code targetPly} was
@@ -1474,9 +1698,7 @@ final class GameController
         if (reached != targetPly) {
             return; // out of range; nothing changed
         }
-        if (reached != before
-                && mode == Mode.HUMAN_VS_STOCKFISH
-                && game.sideToMove() != humanSide) {
+        if (reached != before && isPairedEngineMode() && game.sideToMove() != humanSide) {
             game.redoMove();
             reached = game.moveCount();
         }
@@ -1507,7 +1729,7 @@ final class GameController
         }
         return switch (mode) {
             case HUMAN_VS_HUMAN -> true;
-            case HUMAN_VS_STOCKFISH -> game.sideToMove() == humanSide;
+            case HUMAN_VS_STOCKFISH, HUMAN_VS_MAIA -> game.sideToMove() == humanSide;
             case TRAINING ->
                     trainingSession != null
                             && !trainingSession.isComplete()
@@ -1578,6 +1800,7 @@ final class GameController
         boardCanvas.setTrainingHint(null, null);
         boardCanvas.clearSelection();
         strengthSlider.setDisable(true);
+        updateStrengthControlsVisibility();
         if (pegasusBridge != null) {
             pegasusBridge.resetForNewGame();
         }
@@ -1831,6 +2054,7 @@ final class GameController
         mode = vsStockfish ? Mode.HUMAN_VS_STOCKFISH : Mode.HUMAN_VS_HUMAN;
         humanSide = trainedSide;
         strengthSlider.setDisable(!vsStockfish);
+        updateStrengthControlsVisibility();
         boardCanvas.setTrainingHint(null, null);
         refresh();
         if (vsStockfish && engineReady) {
@@ -1943,6 +2167,7 @@ final class GameController
         boardCanvas.setTrainingHint(null, null);
         boardCanvas.clearSelection();
         strengthSlider.setDisable(true);
+        updateStrengthControlsVisibility();
         if (engineReady) {
             engine.newGame();
         }
@@ -1971,6 +2196,11 @@ final class GameController
             String stockfish = Messages.get("choice_stockfish");
             white = humanSide == Side.WHITE ? you : stockfish;
             black = humanSide == Side.WHITE ? stockfish : you;
+        } else if (mode == Mode.HUMAN_VS_MAIA) {
+            String you = Messages.get("pgn_you");
+            String maia = "Maia " + currentMaiaRating; // a proper noun + a number, not localized
+            white = humanSide == Side.WHITE ? you : maia;
+            black = humanSide == Side.WHITE ? maia : you;
         } else {
             white = Messages.get("color_white");
             black = Messages.get("color_black");
@@ -2010,6 +2240,9 @@ final class GameController
     void shutdown() {
         if (engine != null) {
             engine.shutdown();
+        }
+        if (maiaEngine != null) {
+            maiaEngine.shutdown();
         }
         if (pegasusBridge != null) {
             pegasusBridge.shutdown();
