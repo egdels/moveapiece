@@ -15,7 +15,6 @@ import com.github.bhlangonijr.chesslib.CastleRight;
 import com.github.bhlangonijr.chesslib.Piece;
 import com.github.bhlangonijr.chesslib.Side;
 import com.github.bhlangonijr.chesslib.move.Move;
-
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -35,8 +34,8 @@ import java.util.function.Consumer;
 
 /**
  * Runs a Maia network (original CSSLab/maia-chess weights, converted to ONNX - see
- * MAIA_PROVENANCE_TEMPLATE.md) via ONNX Runtime for a single "what would a human of this
- * network's rating play here" forward pass, no search involved.
+ * MAIA_PROVENANCE_TEMPLATE.md) via ONNX Runtime for a single "what would a human of this network's
+ * rating play here" forward pass, no search involved.
  *
  * <p>Unlike {@link StockfishEngine}, there is no subprocess and no UCI protocol: inference runs
  * in-process on a dedicated background executor (a forward pass is cheap for this network's size -
@@ -47,8 +46,8 @@ import java.util.function.Consumer;
  * <p><b>Verified</b> (see {@code MaiaEngineSmokeTest} and {@code MaiaEngineGoldenTest}): the
  * starting position, three-ply history with Black to move, castling rights that have actually
  * changed through play, and a position reached the second time (repetition plane) all round-trip
- * end to end via ONNX Runtime and match lc0's own native output exactly - not just the winning move,
- * but (for the starting position) closely the logit gap to the runner-up too. See
+ * end to end via ONNX Runtime and match lc0's own native output exactly - not just the winning
+ * move, but (for the starting position) closely the logit gap to the runner-up too. See
  * MAIA_PROVENANCE_TEMPLATE.md for the exact reference numbers each test asserts against.
  *
  * <p>Two real bugs were caught by these tests during development, both fixed before the tests were
@@ -91,7 +90,10 @@ public class MaiaEngine {
         this(mainThreadDispatcher, new Random());
     }
 
-    /** @param random used only for temperature-based sampling in {@link #go(double)} - exposed for tests. */
+    /**
+     * @param random used only for temperature-based sampling in {@link #go(double)} - exposed for
+     *     tests.
+     */
     MaiaEngine(Consumer<Runnable> mainThreadDispatcher, Random random) {
         this.mainThreadDispatcher = mainThreadDispatcher;
         this.random = random;
@@ -117,7 +119,9 @@ public class MaiaEngine {
                 () -> {
                     try {
                         environment = OrtEnvironment.getEnvironment();
-                        session = environment.createSession(modelBytes, new OrtSession.SessionOptions());
+                        session =
+                                environment.createSession(
+                                        modelBytes, new OrtSession.SessionOptions());
                         resetReplayState();
                         post(MaiaEngineListener::onReady);
                     } catch (Exception e) {
@@ -126,7 +130,9 @@ public class MaiaEngine {
                 });
     }
 
-    /** @param movesUci space-separated UCI moves from the start position, may be empty or null */
+    /**
+     * @param movesUci space-separated UCI moves from the start position, may be empty or null
+     */
     public void setPosition(String movesUci) {
         ioExecutor.execute(
                 () -> {
@@ -137,7 +143,8 @@ public class MaiaEngine {
                     for (String uci : movesUci.trim().split("\\s+")) {
                         Move move = new Move(uci, board.getSideToMove());
                         if (!board.doMove(move, true)) {
-                            notifyError(new IllegalStateException("Illegal move in position: " + uci));
+                            notifyError(
+                                    new IllegalStateException("Illegal move in position: " + uci));
                             return;
                         }
                         recordSnapshot();
@@ -297,7 +304,8 @@ public class MaiaEngine {
         return candidates.get(candidates.size() - 1);
     }
 
-    private static float[] extractRow(OrtSession.Result result, String outputName) throws OrtException {
+    private static float[] extractRow(OrtSession.Result result, String outputName)
+            throws OrtException {
         Optional<OnnxValue> value = result.get(outputName);
         if (!value.isPresent()) {
             throw new IllegalStateException("Model has no output named " + outputName);

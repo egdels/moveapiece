@@ -18,9 +18,9 @@ import com.github.bhlangonijr.chesslib.move.Move;
  * by via {@link MaiaPolicyIndex} (always as if White is to move, castling written as "king captures
  * own rook") - see MAIA_PROVENANCE_TEMPLATE.md for why both quirks exist.
  *
- * <p>Translation only ever runs forward, from a real legal {@link Move} to its network string, never
- * the other way around: {@link MaiaEngine} keeps the original {@link Move} object alongside its
- * network string while scoring candidates, so the winning move is reported in real board
+ * <p>Translation only ever runs forward, from a real legal {@link Move} to its network string,
+ * never the other way around: {@link MaiaEngine} keeps the original {@link Move} object alongside
+ * its network string while scoring candidates, so the winning move is reported in real board
  * coordinates directly, with no need to invert this transform.
  */
 final class MaiaMoveIndexer {
@@ -63,8 +63,8 @@ final class MaiaMoveIndexer {
 
     /**
      * A king move is castling iff the moving piece is a king and it travels two files - no other
-     * king move (or any other piece's move) can do that in standard chess, so this needs no explicit
-     * castling-rights lookup.
+     * king move (or any other piece's move) can do that in standard chess, so this needs no
+     * explicit castling-rights lookup.
      */
     private static boolean isCastling(
             Board board, Move move, int fromFile, int fromRank, int toFile, int toRank) {

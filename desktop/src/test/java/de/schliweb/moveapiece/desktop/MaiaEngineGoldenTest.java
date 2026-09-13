@@ -23,8 +23,8 @@ import org.junit.Test;
  * targeting the parts of {@code MaiaPositionEncoder} its own Javadoc flagged as
  * "reasoned-but-not-yet-cross-checked": real multi-ply history, Black to move, castling rights that
  * have actually changed through play (not just the all-rights starting case), and the repetition
- * plane. See MAIA_PROVENANCE_TEMPLATE.md for how each expected move/ranking below was obtained
- * (lc0 itself, native {@code eigen} backend, {@code VerboseMoveStats}, same network) - none of it is
+ * plane. See MAIA_PROVENANCE_TEMPLATE.md for how each expected move/ranking below was obtained (lc0
+ * itself, native {@code eigen} backend, {@code VerboseMoveStats}, same network) - none of it is
  * guessed.
  *
  * <p>Not covered here: underpromotion in a live ONNX comparison (only unit-tested at the
@@ -50,9 +50,9 @@ public class MaiaEngineGoldenTest {
     /**
      * Same idea but with White having actually castled (1.e4 e5 2.Nf3 Nc6 3.Bc4 Bc5 4.O-O), so
      * White's castling planes must have flipped from "1" to "0" while Black's stayed "1" - the
-     * starting-position smoke test can't distinguish "castling plane always 1" from "castling
-     * plane correctly tracks rights", since every right is 1 there. lc0 native: g8f6 at 45.59%,
-     * d7d6 at 25.21%.
+     * starting-position smoke test can't distinguish "castling plane always 1" from "castling plane
+     * correctly tracks rights", since every right is 1 there. lc0 native: g8f6 at 45.59%, d7d6 at
+     * 25.21%.
      */
     @Test
     public void castlingRightsChanged_blackToMove() throws Exception {
@@ -80,11 +80,11 @@ public class MaiaEngineGoldenTest {
      * promotion-capture options (b7xa8, b7xc8, each with all four promotion pieces) - unlike {@code
      * MaiaMoveIndexerTest}'s promotion coverage (move-string level only, e.g. "e7e8q"), this runs
      * those moves' real policy indices (1798/1799/1804/1805 for the queen/rook variants, close to
-     * the end of the 1858-entry table, as expected for the "underpromotion" plane group) through the
-     * actual ONNX model. lc0 native does <i>not</i> pick a promotion here - its top move is f1g2
-     * (bishop recaptures the pawn that just took on g2) at 45.95%, well ahead of both queen
-     * promotions (b7a8q 29.74%, b7c8q 22.85%) - a good test precisely because the right answer isn't
-     * "just grab the highest-index promotion", it's picking correctly among a mixed set.
+     * the end of the 1858-entry table, as expected for the "underpromotion" plane group) through
+     * the actual ONNX model. lc0 native does <i>not</i> pick a promotion here - its top move is
+     * f1g2 (bishop recaptures the pawn that just took on g2) at 45.95%, well ahead of both queen
+     * promotions (b7a8q 29.74%, b7c8q 22.85%) - a good test precisely because the right answer
+     * isn't "just grab the highest-index promotion", it's picking correctly among a mixed set.
      */
     @Test
     public void promotionMovesAvailable_notNecessarilyChosen() throws Exception {
@@ -131,7 +131,8 @@ public class MaiaEngineGoldenTest {
         assertBestMove(1500, movesUci, expectedBestMove);
     }
 
-    private void assertBestMove(int rating, String movesUci, String expectedBestMove) throws Exception {
+    private void assertBestMove(int rating, String movesUci, String expectedBestMove)
+            throws Exception {
         MaiaEngine engine = new MaiaEngine(Runnable::run);
         CountDownLatch ready = new CountDownLatch(1);
         CountDownLatch moved = new CountDownLatch(1);

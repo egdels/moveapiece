@@ -28,7 +28,8 @@ public interface MaiaEngineListener {
      *     from the side-to-move's perspective - informational only, not used to choose the move
      *     (see the value-head discussion in MAIA_PROVENANCE_TEMPLATE.md for why)
      */
-    void onBestMove(String bestMoveUci, float winProbability, float drawProbability, float lossProbability);
+    void onBestMove(
+            String bestMoveUci, float winProbability, float drawProbability, float lossProbability);
 
     void onEngineError(Exception error);
 }

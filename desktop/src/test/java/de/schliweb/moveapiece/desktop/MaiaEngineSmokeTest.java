@@ -18,9 +18,9 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.Test;
 
 /**
- * First real, end-to-end correctness check of {@link MaiaEngine} against the bundled
- * {@code maia-1500.onnx} (see MAIA_PROVENANCE_TEMPLATE.md for its provenance) - runs the actual
- * ONNX Runtime inference, not a mock.
+ * First real, end-to-end correctness check of {@link MaiaEngine} against the bundled {@code
+ * maia-1500.onnx} (see MAIA_PROVENANCE_TEMPLATE.md for its provenance) - runs the actual ONNX
+ * Runtime inference, not a mock.
  *
  * <p>Only covers the starting position, which is the <b>simplest</b> case for {@code
  * MaiaPositionEncoder} (White to move, no mirroring, full castling rights on both sides, no real
@@ -52,8 +52,7 @@ public class MaiaEngineSmokeTest {
                     }
 
                     @Override
-                    public void onBestMove(
-                            String bestMoveUci, float win, float draw, float loss) {
+                    public void onBestMove(String bestMoveUci, float win, float draw, float loss) {
                         bestMove.set(bestMoveUci);
                         moved.countDown();
                     }
@@ -89,8 +88,7 @@ public class MaiaEngineSmokeTest {
     }
 
     private static InputStream openModel() throws IOException {
-        InputStream in =
-                MaiaEngineSmokeTest.class.getResourceAsStream("maia/maia-1500.onnx");
+        InputStream in = MaiaEngineSmokeTest.class.getResourceAsStream("maia/maia-1500.onnx");
         if (in == null) {
             throw new IOException("Missing test resource: maia/maia-1500.onnx");
         }

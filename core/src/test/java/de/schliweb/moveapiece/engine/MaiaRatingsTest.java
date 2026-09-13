@@ -10,10 +10,10 @@ import static org.junit.Assert.assertEquals;
 import org.junit.Test;
 
 /**
- * Locks in {@link MaiaRatings#nearest} against the exact bug it was written to fix: a JavaFX
- * {@code Slider} (or a value persisted by an earlier build's buggier rounding) reporting something
- * a hair off an exact multiple of 100, or clearly outside {@link MaiaRatings#ALL}'s 1100-1900
- * range, must still resolve to a rating a bundled model actually exists for.
+ * Locks in {@link MaiaRatings#nearest} against the exact bug it was written to fix: a JavaFX {@code
+ * Slider} (or a value persisted by an earlier build's buggier rounding) reporting something a hair
+ * off an exact multiple of 100, or clearly outside {@link MaiaRatings#ALL}'s 1100-1900 range, must
+ * still resolve to a rating a bundled model actually exists for.
  */
 public class MaiaRatingsTest {
 

@@ -137,7 +137,8 @@ final class GameController
     // bundled model to load, so picking a new value here swaps in a whole new MaiaEngine mid-game
     // (see #switchMaiaRating) instead of tweaking a parameter - the two pairs are shown one at a
     // time, never together (see #updateStrengthControlsVisibility). Bounds match MaiaRatings.ALL
-    // (1100-1900 in steps of 100); snapToTicks/majorTickUnit/blockIncrement below keep the slider on
+    // (1100-1900 in steps of 100); snapToTicks/majorTickUnit/blockIncrement below keep the slider
+    // on
     // those 9 values, since there's no bundled model for anything in between.
     private final Label maiaRatingLabel = new Label();
     private final Slider maiaRatingSlider = new Slider(1100, 1900, Settings.getMaiaRating());
@@ -418,12 +419,14 @@ final class GameController
         maiaRatingSlider.setMajorTickUnit(100);
         maiaRatingSlider.setMinorTickCount(0);
         maiaRatingSlider.setBlockIncrement(100);
-        // Label text tracks every tick while dragging for live feedback, but the actual (expensive -
+        // Label text tracks every tick while dragging for live feedback, but the actual (expensive
+        // -
         // a full model reload) engine swap only fires once the drag ends, via the valueChanging
         // listener below - not on every intermediate tick a fast drag passes through.
         //
         // Both listeners snap the reported value themselves via MaiaRatings.nearest rather than
-        // trusting the Slider's own snapToTicks to have already landed on an exact multiple of 100 -
+        // trusting the Slider's own snapToTicks to have already landed on an exact multiple of 100
+        // -
         // see that method's Javadoc for why relying on it directly once failed to load a rating the
         // user had, visually, already dragged onto.
         maiaRatingSlider
@@ -431,7 +434,8 @@ final class GameController
                 .addListener(
                         (obs, old, val) -> {
                             int rating = MaiaRatings.nearest(val.doubleValue());
-                            maiaRatingLabel.setText(Messages.get("dialog_maia_rating_format", rating));
+                            maiaRatingLabel.setText(
+                                    Messages.get("dialog_maia_rating_format", rating));
                             if (!maiaRatingSlider.isValueChanging()) {
                                 switchMaiaRating(rating);
                             }
@@ -1439,13 +1443,14 @@ final class GameController
     }
 
     /**
-     * Shared by {@link #startMaiaGame} and {@link #switchMaiaRating}: (re)loads {@link #maiaEngine}.
+     * Shared by {@link #startMaiaGame} and {@link #switchMaiaRating}: (re)loads {@link
+     * #maiaEngine}.
      *
-     * <p>Captures the freshly created engine in {@code loadedEngine} and has the listener check it's
-     * still the current {@link #maiaEngine} before touching {@link #maiaReady} - dragging {@link
-     * #maiaRatingSlider} across several ticks in one release can call this again before a slower,
-     * already-superseded model finishes loading, and that engine's belated {@code onReady} must not
-     * flip {@link #maiaReady} back on for an engine nobody is going to search with.
+     * <p>Captures the freshly created engine in {@code loadedEngine} and has the listener check
+     * it's still the current {@link #maiaEngine} before touching {@link #maiaReady} - dragging
+     * {@link #maiaRatingSlider} across several ticks in one release can call this again before a
+     * slower, already-superseded model finishes loading, and that engine's belated {@code onReady}
+     * must not flip {@link #maiaReady} back on for an engine nobody is going to search with.
      */
     private void loadMaiaEngine(int rating) {
         if (maiaEngine != null) {
@@ -1467,7 +1472,10 @@ final class GameController
 
                     @Override
                     public void onBestMove(
-                            String bestMoveUci, float winProbability, float drawProbability, float lossProbability) {
+                            String bestMoveUci,
+                            float winProbability,
+                            float drawProbability,
+                            float lossProbability) {
                         waitingForEngineMove = false;
                         if (bestMoveUci == null) {
                             refresh();
@@ -1475,7 +1483,8 @@ final class GameController
                         }
                         applyUciToGame(bestMoveUci);
                         if (pegasusBridge != null
-                                && pegasusBridge.getConnectionState() == ConnectionState.CONNECTED) {
+                                && pegasusBridge.getConnectionState()
+                                        == ConnectionState.CONNECTED) {
                             pegasusBridge.guideEngineMove(bestMoveUci);
                         }
                         refresh();
@@ -1485,7 +1494,8 @@ final class GameController
                     public void onEngineError(Exception error) {
                         waitingForEngineMove = false;
                         maiaRatingSlider.setDisable(false);
-                        statusLabel.setText(Messages.get("error_engine_generic") + ": " + error.getMessage());
+                        statusLabel.setText(
+                                Messages.get("error_engine_generic") + ": " + error.getMessage());
                     }
                 });
         try (java.io.InputStream model =
@@ -1512,8 +1522,9 @@ final class GameController
 
     /**
      * Shows exactly one of {@link #strengthSlider}/{@link #strengthLabel} (Stockfish) or {@link
-     * #maiaRatingLabel}/{@link #maiaRatingSlider} (Maia) depending on {@link #mode} - both pairs are
-     * live-adjustable for their running game, called from every place that changes {@link #mode}.
+     * #maiaRatingLabel}/{@link #maiaRatingSlider} (Maia) depending on {@link #mode} - both pairs
+     * are live-adjustable for their running game, called from every place that changes {@link
+     * #mode}.
      */
     private void updateStrengthControlsVisibility() {
         boolean isMaia = mode == Mode.HUMAN_VS_MAIA;
@@ -1612,12 +1623,12 @@ final class GameController
      * list always shows where you currently are.
      *
      * <p>In a paired-engine mode ({@link #isPairedEngineMode}, Stockfish or Maia) that's always the
-     * human's move plus the engine's paired reply (see {@link #jumpToPly}'s own pairing - navigation
-     * there can never land between the two), so both get the style, not just {@link
-     * ChessGame#moveCount()} alone: highlighting only the second half would look contradictory after
-     * clicking the human's own move - the reply next to it would light up instead of the one
-     * actually clicked. Outside those modes there is no such pairing, so only the exact current move
-     * gets it.
+     * human's move plus the engine's paired reply (see {@link #jumpToPly}'s own pairing -
+     * navigation there can never land between the two), so both get the style, not just {@link
+     * ChessGame#moveCount()} alone: highlighting only the second half would look contradictory
+     * after clicking the human's own move - the reply next to it would light up instead of the one
+     * actually clicked. Outside those modes there is no such pairing, so only the exact current
+     * move gets it.
      */
     private void updateMoveHistory() {
         moveListFlow.getChildren().clear();
@@ -1681,16 +1692,15 @@ final class GameController
      * outside TRAINING mode - see {@link #updateMoveHistory()}.
      *
      * <p>In a paired-engine mode ({@link #isPairedEngineMode}), never leaves the browsed position
-     * frozen on the engine's own turn - always advances one further ply forward instead, redoing the
-     * engine's already-recorded
-     * reply (mirroring {@link #undo()}/{@link #redo()}'s own pairing, never triggering a fresh
-     * engine decision - like other chess GUIs' history navigation, only already-recorded moves are
-     * ever skipped past). Always forward, regardless of which direction {@code targetPly} was
-     * reached from: pairing backward would instead undo the very move that was clicked on, and
-     * would make clicking the same history entry repeatedly land on a different position each time
-     * (the first click's pairing changes where the next click's "direction" is computed from) -
-     * this way {@code jumpToPly} is a pure function of {@code targetPly} alone, idempotent under
-     * repeated clicks on the same entry.
+     * frozen on the engine's own turn - always advances one further ply forward instead, redoing
+     * the engine's already-recorded reply (mirroring {@link #undo()}/{@link #redo()}'s own pairing,
+     * never triggering a fresh engine decision - like other chess GUIs' history navigation, only
+     * already-recorded moves are ever skipped past). Always forward, regardless of which direction
+     * {@code targetPly} was reached from: pairing backward would instead undo the very move that
+     * was clicked on, and would make clicking the same history entry repeatedly land on a different
+     * position each time (the first click's pairing changes where the next click's "direction" is
+     * computed from) - this way {@code jumpToPly} is a pure function of {@code targetPly} alone,
+     * idempotent under repeated clicks on the same entry.
      */
     private void jumpToPly(int targetPly) {
         abandonPendingSearches();
@@ -2038,7 +2048,8 @@ final class GameController
 
     private void continueFreePlay(Side trainedSide) {
         OpponentOption stockfishOption =
-                new OpponentOption(GameSetupDialog.Opponent.STOCKFISH, Messages.get("choice_stockfish"));
+                new OpponentOption(
+                        GameSetupDialog.Opponent.STOCKFISH, Messages.get("choice_stockfish"));
         OpponentOption maiaOption =
                 new OpponentOption(GameSetupDialog.Opponent.MAIA, Messages.get("choice_maia"));
         OpponentOption humanOption =

@@ -40,7 +40,9 @@ final class MaiaPolicyIndex {
         return BY_INDEX.get(index);
     }
 
-    /** @return the policy index for a network-space move string, or -1 if it names no slot. */
+    /**
+     * @return the policy index for a network-space move string, or -1 if it names no slot.
+     */
     static int indexOf(String networkMove) {
         Integer idx = INDEX_OF.get(networkMove);
         return idx == null ? -1 : idx;

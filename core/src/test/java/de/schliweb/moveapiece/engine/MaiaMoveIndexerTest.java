@@ -18,7 +18,10 @@ public class MaiaMoveIndexerTest {
     @Test
     public void whiteNormalMove_isUnchanged() {
         Board board = new Board();
-        assertEquals("e2e4", MaiaMoveIndexer.toNetworkMove(board, new Move("e2e4", com.github.bhlangonijr.chesslib.Side.WHITE)));
+        assertEquals(
+                "e2e4",
+                MaiaMoveIndexer.toNetworkMove(
+                        board, new Move("e2e4", com.github.bhlangonijr.chesslib.Side.WHITE)));
     }
 
     /**
@@ -33,13 +36,14 @@ public class MaiaMoveIndexerTest {
         // e7e5 for Black mirrors to e2e4 in network space (rank 7 -> rank 2, rank 5 -> rank 4).
         assertEquals(
                 "e2e4",
-                MaiaMoveIndexer.toNetworkMove(board, new Move("e7e5", com.github.bhlangonijr.chesslib.Side.BLACK)));
+                MaiaMoveIndexer.toNetworkMove(
+                        board, new Move("e7e5", com.github.bhlangonijr.chesslib.Side.BLACK)));
     }
 
     /**
      * White's kingside castle is "king captures own rook" in network space (e1h1, not e1g1) - see
-     * MAIA_PROVENANCE_TEMPLATE.md, confirmed against lc0's own {@code policy_index} table
-     * (e1g1 -> 102, e1h1 -> 103; only e1h1 is ever used for a real castling move).
+     * MAIA_PROVENANCE_TEMPLATE.md, confirmed against lc0's own {@code policy_index} table (e1g1 ->
+     * 102, e1h1 -> 103; only e1h1 is ever used for a real castling move).
      */
     @Test
     public void whiteKingsideCastle_isKingCapturesRook() throws MoveConversionException {
@@ -55,8 +59,7 @@ public class MaiaMoveIndexerTest {
     @Test
     public void whiteQueensideCastle_isKingCapturesRook() throws MoveConversionException {
         Board board = new Board();
-        board.loadFromFen(
-                "r3kbnr/pppqpppp/2n5/3p1b2/3P1B2/2N5/PPPQPPPP/R3KBNR w KQkq - 6 5");
+        board.loadFromFen("r3kbnr/pppqpppp/2n5/3p1b2/3P1B2/2N5/PPPQPPPP/R3KBNR w KQkq - 6 5");
         assertEquals(
                 "e1a1",
                 MaiaMoveIndexer.toNetworkMove(
@@ -64,9 +67,9 @@ public class MaiaMoveIndexerTest {
     }
 
     /**
-     * Black's kingside castle: king-captures-rook first (e8h8), then rank-mirrored for Black
-     * (rank 8 -> rank 1) - ends up as the exact same string as White's kingside castle, "e1h1",
-     * which is the intended effect of always presenting the network with "itself as White".
+     * Black's kingside castle: king-captures-rook first (e8h8), then rank-mirrored for Black (rank
+     * 8 -> rank 1) - ends up as the exact same string as White's kingside castle, "e1h1", which is
+     * the intended effect of always presenting the network with "itself as White".
      */
     @Test
     public void blackKingsideCastle_isMirroredKingCapturesRook() throws MoveConversionException {

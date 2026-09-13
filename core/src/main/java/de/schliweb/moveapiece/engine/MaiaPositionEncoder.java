@@ -8,11 +8,11 @@ package de.schliweb.moveapiece.engine;
 import java.util.List;
 
 /**
- * Builds the 112x8x8 input tensor a Maia/lc0 network (declared {@code
- * INPUT_CLASSICAL_112_PLANE}) expects, from a short window of prior board snapshots plus the
- * current position's castling rights and half-move clock. See MAIA_PROVENANCE_TEMPLATE.md for the
- * plane layout this mirrors (sourced from lc0's own {@code encoder.cc}) and for which parts of it
- * are empirically cross-checked versus reasoned-through-but-not-yet-verified.
+ * Builds the 112x8x8 input tensor a Maia/lc0 network (declared {@code INPUT_CLASSICAL_112_PLANE})
+ * expects, from a short window of prior board snapshots plus the current position's castling rights
+ * and half-move clock. See MAIA_PROVENANCE_TEMPLATE.md for the plane layout this mirrors (sourced
+ * from lc0's own {@code encoder.cc}) and for which parts of it are empirically cross-checked versus
+ * reasoned-through-but-not-yet-verified.
  *
  * <p><b>Simplification versus lc0's own encoder, confirmed equivalent by test:</b> lc0's internal
  * encoder alternates a per-history-step mirror flag, because its {@code Position} objects are
@@ -26,8 +26,8 @@ import java.util.List;
  * positions - not just this class in isolation.
  *
  * <p>Also confirmed by that same test battery: the repetition plane ({@code
- * MaiaEngineGoldenTest#repeatedStartingPosition_whiteToMove}, a position reached the second time via
- * a real knight-shuffle move sequence) and the zero-padding rule below actually changing the
+ * MaiaEngineGoldenTest#repeatedStartingPosition_whiteToMove}, a position reached the second time
+ * via a real knight-shuffle move sequence) and the zero-padding rule below actually changing the
  * network's output versus a fresh game reaching the same piece placement - see
  * MAIA_PROVENANCE_TEMPLATE.md for the exact lc0-native reference numbers each test asserts against.
  */
@@ -55,10 +55,15 @@ final class MaiaPositionEncoder {
 
     /** One historical position's piece placement plus how many times it had occurred so far. */
     static final class Snapshot {
-        /** Indexed by {@code Piece.ordinal()} (0-11; WHITE_PAWN..WHITE_KING, BLACK_PAWN..BLACK_KING). */
+        /**
+         * Indexed by {@code Piece.ordinal()} (0-11; WHITE_PAWN..WHITE_KING,
+         * BLACK_PAWN..BLACK_KING).
+         */
         final long[] pieceBitboards;
 
-        /** 0 if this exact position (by placement/side/castling/en-passant) hadn't occurred before. */
+        /**
+         * 0 if this exact position (by placement/side/castling/en-passant) hadn't occurred before.
+         */
         final int repetitions;
 
         Snapshot(long[] pieceBitboards, int repetitions) {
@@ -75,8 +80,8 @@ final class MaiaPositionEncoder {
      *     are left as all-zero planes rather than repeated - lc0's {@code encoder.cc} explicitly
      *     stops padding once it would have to "invent" a pre-game position that turns out to equal
      *     the starting position, rather than fabricating repeated history that never happened. Only
-     *     for a hypothetical mid-game FEN import (not something {@link MaiaEngine} does today) would
-     *     the oldest snapshot not be the starting position, in which case this falls back to
+     *     for a hypothetical mid-game FEN import (not something {@link MaiaEngine} does today)
+     *     would the oldest snapshot not be the starting position, in which case this falls back to
      *     repeating it - an approximation, not something cross-checked against lc0 itself.
      * @param blackToMove whose turn it is in the current (most recent) position
      * @param halfMoveClock the current position's 50-move-rule ply counter (not normalized - that

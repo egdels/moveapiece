@@ -32,14 +32,14 @@ import javafx.stage.Stage;
 /**
  * Modal "New Game" picker: opponent (human, Stockfish, Maia, or the opening trainer), which color
  * the human plays, and - for the opening trainer - which line to drill and whether the trainee's
- * own next move gets a highlighted hint. Mirrors the Android app's single {@code
- * showNewGameDialog} - the one deliberate difference is that neither engine's playing strength is
- * chosen here: both Stockfish's Elo and Maia's rating stay live, always-visible sidebar controls
- * on desktop (see {@link GameController}) rather than a dialog-only, one-time setting, since
- * unlike the Android dialog's SeekBar both can be adjusted mid-game - Maia's by swapping in a
- * different bundled model file (see {@link GameController#startMaiaGame}), not a UCI option on a
- * running instance, but adjustable all the same. A fresh Maia game simply starts at whichever
- * rating was last used (see {@link Settings#getMaiaRating}).
+ * own next move gets a highlighted hint. Mirrors the Android app's single {@code showNewGameDialog}
+ * - the one deliberate difference is that neither engine's playing strength is chosen here: both
+ * Stockfish's Elo and Maia's rating stay live, always-visible sidebar controls on desktop (see
+ * {@link GameController}) rather than a dialog-only, one-time setting, since unlike the Android
+ * dialog's SeekBar both can be adjusted mid-game - Maia's by swapping in a different bundled model
+ * file (see {@link GameController#startMaiaGame}), not a UCI option on a running instance, but
+ * adjustable all the same. A fresh Maia game simply starts at whichever rating was last used (see
+ * {@link Settings#getMaiaRating}).
  */
 final class GameSetupDialog {
 
