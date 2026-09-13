@@ -5,6 +5,7 @@
 
 package de.schliweb.moveapiece;
 
+import android.app.Dialog;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.net.Uri;
@@ -72,7 +73,10 @@ import java.util.Optional;
 import java.util.OptionalInt;
 
 public class MainActivity extends AppCompatActivity
-        implements BoardView.MoveSource, BoardView.OnMoveListener, EngineListener, PegasusGameBridge.Listener {
+        implements BoardView.MoveSource,
+                BoardView.OnMoveListener,
+                EngineListener,
+                PegasusGameBridge.Listener {
 
     private static final int ELO_MIN = 1320;
     private static final int ELO_MAX = 3190;
@@ -94,6 +98,19 @@ public class MainActivity extends AppCompatActivity
     }
 
     private ActivityMainBinding binding;
+    // Set by every dialog-showing method right after .show() (see e.g. showNewGameDialog) so
+    // onConfigurationChanged can dismiss whatever's currently up. Needed because a Dialog is a
+    // separate Window from the Activity's own content: when the manifest's configChanges handles
+    // rotation itself (see bindViews()'s Javadoc), the Activity's window gets a fresh layout pass,
+    // but an already-showing Dialog's window does not - AlertController caches its content area's
+    // measured height from the orientation the dialog was first shown in, so after rotating with
+    // one open, its window gets resized to the new screen bounds by WindowManager while its content
+    // keeps the old (now wrong) measurement, rendering as a dialog with a mostly-empty bottom half
+    // and content clipped well before the actual window edge. Simplest correct fix given how many
+    // call sites show a dialog: don't try to preserve or resize it, just dismiss it - the user
+    // re-opens it (in the correct orientation from the start) if still needed. isShowing() makes
+    // this safe to call unconditionally even if the tracked dialog already closed itself normally.
+    private Dialog currentDialog;
     private final ChessGame game = new ChessGame();
     private StockfishEngine engine;
     // Loaded fresh whenever a Maia game starts or the "New Game"/"Continue free play" dialog picks
@@ -354,6 +371,9 @@ public class MainActivity extends AppCompatActivity
     @Override
     public void onConfigurationChanged(Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
+        if (currentDialog != null && currentDialog.isShowing()) {
+            currentDialog.dismiss();
+        }
         bindViews();
     }
 
@@ -420,18 +440,19 @@ public class MainActivity extends AppCompatActivity
         ArrayAdapter<String> adapter =
                 new ArrayAdapter<>(this, android.R.layout.simple_list_item_1);
 
-        new MaterialAlertDialogBuilder(this)
-                .setTitle(R.string.dialog_pegasus_title)
-                .setAdapter(
-                        adapter,
-                        (dialog, which) -> {
-                            pegasusBridge.stopScan();
-                            pegasusBridge.connect(found.get(which).getAddress());
-                        })
-                .setNegativeButton(
-                        R.string.action_cancel, (dialog, which) -> pegasusBridge.stopScan())
-                .setOnDismissListener(dialog -> pegasusBridge.stopScan())
-                .show();
+        currentDialog =
+                new MaterialAlertDialogBuilder(this)
+                        .setTitle(R.string.dialog_pegasus_title)
+                        .setAdapter(
+                                adapter,
+                                (dialog, which) -> {
+                                    pegasusBridge.stopScan();
+                                    pegasusBridge.connect(found.get(which).getAddress());
+                                })
+                        .setNegativeButton(
+                                R.string.action_cancel, (dialog, which) -> pegasusBridge.stopScan())
+                        .setOnDismissListener(dialog -> pegasusBridge.stopScan())
+                        .show();
 
         Toast.makeText(this, R.string.pegasus_scan_empty, Toast.LENGTH_SHORT).show();
         pegasusBridge.startScan(
@@ -690,45 +711,57 @@ public class MainActivity extends AppCompatActivity
                 modeForCheckedId(
                         dialogBinding, dialogBinding.opponentGroup.getCheckedRadioButtonId()));
 
-        new MaterialAlertDialogBuilder(this)
-                .setTitle(R.string.dialog_new_game_title)
-                .setView(dialogBinding.getRoot())
-                .setPositiveButton(
-                        R.string.action_ok,
-                        (dialog, which) -> {
-                            GameMode chosenMode =
-                                    modeForCheckedId(
-                                            dialogBinding,
-                                            dialogBinding.opponentGroup.getCheckedRadioButtonId());
-                            Side chosenColor =
-                                    dialogBinding.colorWhite.isChecked() ? Side.WHITE : Side.BLACK;
-                            int chosenElo = ELO_MIN + dialogBinding.strengthSeekBar.getProgress();
-                            int chosenMaiaRating =
-                                    (Integer) dialogBinding.maiaRatingSpinner.getSelectedItem();
-                            // ENGINE/MAIA: chosenColor is the human's own color, so the opponent
-                            // plays the opposite side. TRAINING: chosenColor directly names the
-                            // side being trained - do not invert it here.
-                            Side chosenSide =
-                                    chosenMode == GameMode.ENGINE || chosenMode == GameMode.MAIA
-                                            ? (chosenColor == Side.WHITE ? Side.BLACK : Side.WHITE)
-                                            : chosenColor;
-                            OpeningLine chosenOpening =
-                                    chosenMode == GameMode.TRAINING
-                                            ? OpeningRepository.ALL.get(
-                                                    dialogBinding.openingSpinner
-                                                            .getSelectedItemPosition())
-                                            : null;
-                            boolean chosenHints = dialogBinding.hintCheckBox.isChecked();
-                            startNewGame(
-                                    chosenMode,
-                                    chosenSide,
-                                    chosenElo,
-                                    chosenMaiaRating,
-                                    chosenOpening,
-                                    chosenHints);
-                        })
-                .setNegativeButton(R.string.action_cancel, null)
-                .show();
+        currentDialog =
+                new MaterialAlertDialogBuilder(this)
+                        .setTitle(R.string.dialog_new_game_title)
+                        .setView(dialogBinding.getRoot())
+                        .setPositiveButton(
+                                R.string.action_ok,
+                                (dialog, which) -> {
+                                    GameMode chosenMode =
+                                            modeForCheckedId(
+                                                    dialogBinding,
+                                                    dialogBinding.opponentGroup
+                                                            .getCheckedRadioButtonId());
+                                    Side chosenColor =
+                                            dialogBinding.colorWhite.isChecked()
+                                                    ? Side.WHITE
+                                                    : Side.BLACK;
+                                    int chosenElo =
+                                            ELO_MIN + dialogBinding.strengthSeekBar.getProgress();
+                                    int chosenMaiaRating =
+                                            (Integer)
+                                                    dialogBinding.maiaRatingSpinner
+                                                            .getSelectedItem();
+                                    // ENGINE/MAIA: chosenColor is the human's own color, so the
+                                    // opponent
+                                    // plays the opposite side. TRAINING: chosenColor directly names
+                                    // the
+                                    // side being trained - do not invert it here.
+                                    Side chosenSide =
+                                            chosenMode == GameMode.ENGINE
+                                                            || chosenMode == GameMode.MAIA
+                                                    ? (chosenColor == Side.WHITE
+                                                            ? Side.BLACK
+                                                            : Side.WHITE)
+                                                    : chosenColor;
+                                    OpeningLine chosenOpening =
+                                            chosenMode == GameMode.TRAINING
+                                                    ? OpeningRepository.ALL.get(
+                                                            dialogBinding.openingSpinner
+                                                                    .getSelectedItemPosition())
+                                                    : null;
+                                    boolean chosenHints = dialogBinding.hintCheckBox.isChecked();
+                                    startNewGame(
+                                            chosenMode,
+                                            chosenSide,
+                                            chosenElo,
+                                            chosenMaiaRating,
+                                            chosenOpening,
+                                            chosenHints);
+                                })
+                        .setNegativeButton(R.string.action_cancel, null)
+                        .show();
     }
 
     private GameMode modeForCheckedId(DialogNewGameBinding dialogBinding, int checkedId) {
@@ -1059,12 +1092,11 @@ public class MainActivity extends AppCompatActivity
      * the opponent's already-recorded reply (mirroring {@link #undo()}/{@link #redo()}'s own
      * pairing, never triggering a fresh engine decision - like other chess GUIs' history
      * navigation, only already-recorded moves are ever skipped past). Always forward, regardless of
-     * which direction {@code targetPly} was reached
-     * from: pairing backward would instead undo the very move that was clicked on, and would make
-     * clicking the same history entry repeatedly land on a different position each time (the first
-     * click's pairing changes where the next click's "direction" is computed from) - this way
-     * {@code jumpToPly} is a pure function of {@code targetPly} alone, idempotent under repeated
-     * clicks on the same entry.
+     * which direction {@code targetPly} was reached from: pairing backward would instead undo the
+     * very move that was clicked on, and would make clicking the same history entry repeatedly land
+     * on a different position each time (the first click's pairing changes where the next click's
+     * "direction" is computed from) - this way {@code jumpToPly} is a pure function of {@code
+     * targetPly} alone, idempotent under repeated clicks on the same entry.
      */
     private void jumpToPly(int targetPly) {
         if (waitingForEngineMove) {
@@ -1312,6 +1344,7 @@ public class MainActivity extends AppCompatActivity
                         .setView(R.layout.dialog_pgn_import_progress)
                         .setCancelable(false)
                         .show();
+        currentDialog = progress;
         new Thread(
                         () -> {
                             String text;
@@ -1371,19 +1404,23 @@ public class MainActivity extends AppCompatActivity
         for (int i = 0; i < games.size(); i++) {
             labels[i] = PgnGames.summarize(games.get(i));
         }
-        new MaterialAlertDialogBuilder(this)
-                .setTitle(R.string.pgn_select_game_title)
-                .setItems(
-                        labels,
-                        (dialog, which) -> {
-                            if (!game.loadPgn(games.get(which))) {
-                                Toast.makeText(this, R.string.pgn_import_failed, Toast.LENGTH_SHORT)
-                                        .show();
-                                return;
-                            }
-                            finishPgnImport();
-                        })
-                .show();
+        currentDialog =
+                new MaterialAlertDialogBuilder(this)
+                        .setTitle(R.string.pgn_select_game_title)
+                        .setItems(
+                                labels,
+                                (dialog, which) -> {
+                                    if (!game.loadPgn(games.get(which))) {
+                                        Toast.makeText(
+                                                        this,
+                                                        R.string.pgn_import_failed,
+                                                        Toast.LENGTH_SHORT)
+                                                .show();
+                                        return;
+                                    }
+                                    finishPgnImport();
+                                })
+                        .show();
     }
 
     private void finishPgnImport() {
@@ -1813,11 +1850,12 @@ public class MainActivity extends AppCompatActivity
                 flaggedMoves.length() > 0
                         ? getString(R.string.analysis_flagged_moves_header) + "\n" + flaggedMoves
                         : getString(R.string.analysis_no_flagged_moves));
-        new MaterialAlertDialogBuilder(this)
-                .setTitle(R.string.analysis_dialog_title)
-                .setMessage(report.toString())
-                .setPositiveButton(R.string.action_ok, null)
-                .show();
+        currentDialog =
+                new MaterialAlertDialogBuilder(this)
+                        .setTitle(R.string.analysis_dialog_title)
+                        .setMessage(report.toString())
+                        .setPositiveButton(R.string.action_ok, null)
+                        .show();
     }
 
     /**
@@ -1938,28 +1976,30 @@ public class MainActivity extends AppCompatActivity
         OpeningLine line = trainingSession.line();
         Side side = trainingSession.humanSide();
         boolean hintsEnabled = trainingSession.hintsEnabled();
-        new MaterialAlertDialogBuilder(this)
-                .setTitle(R.string.dialog_training_complete_title)
-                .setMessage(
-                        getString(
-                                R.string.dialog_training_complete_message_format,
-                                OpeningNames.displayName(this, line)))
-                .setPositiveButton(
-                        R.string.action_repeat,
-                        (d, w) ->
-                                startNewGame(
-                                        GameMode.TRAINING,
-                                        side,
-                                        engineElo,
-                                        currentMaiaRating,
-                                        line,
-                                        hintsEnabled))
-                .setNegativeButton(R.string.action_pick_opening, (d, w) -> showNewGameDialog())
-                .setNeutralButton(
-                        R.string.action_continue_free_play,
-                        (d, w) -> showContinueFreePlayDialog(side))
-                .setCancelable(false)
-                .show();
+        currentDialog =
+                new MaterialAlertDialogBuilder(this)
+                        .setTitle(R.string.dialog_training_complete_title)
+                        .setMessage(
+                                getString(
+                                        R.string.dialog_training_complete_message_format,
+                                        OpeningNames.displayName(this, line)))
+                        .setPositiveButton(
+                                R.string.action_repeat,
+                                (d, w) ->
+                                        startNewGame(
+                                                GameMode.TRAINING,
+                                                side,
+                                                engineElo,
+                                                currentMaiaRating,
+                                                line,
+                                                hintsEnabled))
+                        .setNegativeButton(
+                                R.string.action_pick_opening, (d, w) -> showNewGameDialog())
+                        .setNeutralButton(
+                                R.string.action_continue_free_play,
+                                (d, w) -> showContinueFreePlayDialog(side))
+                        .setCancelable(false)
+                        .show();
     }
 
     /**
@@ -2004,44 +2044,53 @@ public class MainActivity extends AppCompatActivity
                     dialogBinding.maiaRatingSpinner.setVisibility(maiaRatingVisibility);
                 });
 
-        new MaterialAlertDialogBuilder(this)
-                .setTitle(R.string.action_continue_free_play)
-                .setView(dialogBinding.getRoot())
-                .setPositiveButton(
-                        R.string.action_ok,
-                        (dialog, which) -> {
-                            trainingSession = null;
-                            if (dialogBinding.opponentEngine.isChecked()) {
-                                mode = GameMode.ENGINE;
-                                engineSide = trainedSide == Side.WHITE ? Side.BLACK : Side.WHITE;
-                                engineElo = ELO_MIN + dialogBinding.strengthSeekBar.getProgress();
-                                settings.setEngineElo(engineElo);
-                                if (engineReady) {
-                                    engine.newGame();
-                                    engine.setStrength(engineElo);
-                                }
-                            } else if (dialogBinding.opponentMaia.isChecked()) {
-                                mode = GameMode.MAIA;
-                                engineSide = trainedSide == Side.WHITE ? Side.BLACK : Side.WHITE;
-                                currentMaiaRating =
-                                        (Integer) dialogBinding.maiaRatingSpinner.getSelectedItem();
-                                settings.setMaiaRating(currentMaiaRating);
-                                loadMaiaEngine(currentMaiaRating);
-                            } else {
-                                mode = GameMode.HUMAN;
-                            }
-                            binding.undoButton.setEnabled(true);
-                            refreshBoard();
-                            if (isPairedEngineMode()) {
-                                maybeTriggerEngineMove();
-                            }
-                        })
-                // Change of mind: back to the completion dialog rather than
-                // leaving the board stuck on an already-finished session.
-                .setNegativeButton(
-                        R.string.action_cancel, (dialog, which) -> showTrainingCompleteDialog())
-                .setCancelable(false)
-                .show();
+        currentDialog =
+                new MaterialAlertDialogBuilder(this)
+                        .setTitle(R.string.action_continue_free_play)
+                        .setView(dialogBinding.getRoot())
+                        .setPositiveButton(
+                                R.string.action_ok,
+                                (dialog, which) -> {
+                                    trainingSession = null;
+                                    if (dialogBinding.opponentEngine.isChecked()) {
+                                        mode = GameMode.ENGINE;
+                                        engineSide =
+                                                trainedSide == Side.WHITE ? Side.BLACK : Side.WHITE;
+                                        engineElo =
+                                                ELO_MIN
+                                                        + dialogBinding.strengthSeekBar
+                                                                .getProgress();
+                                        settings.setEngineElo(engineElo);
+                                        if (engineReady) {
+                                            engine.newGame();
+                                            engine.setStrength(engineElo);
+                                        }
+                                    } else if (dialogBinding.opponentMaia.isChecked()) {
+                                        mode = GameMode.MAIA;
+                                        engineSide =
+                                                trainedSide == Side.WHITE ? Side.BLACK : Side.WHITE;
+                                        currentMaiaRating =
+                                                (Integer)
+                                                        dialogBinding.maiaRatingSpinner
+                                                                .getSelectedItem();
+                                        settings.setMaiaRating(currentMaiaRating);
+                                        loadMaiaEngine(currentMaiaRating);
+                                    } else {
+                                        mode = GameMode.HUMAN;
+                                    }
+                                    binding.undoButton.setEnabled(true);
+                                    refreshBoard();
+                                    if (isPairedEngineMode()) {
+                                        maybeTriggerEngineMove();
+                                    }
+                                })
+                        // Change of mind: back to the completion dialog rather than
+                        // leaving the board stuck on an already-finished session.
+                        .setNegativeButton(
+                                R.string.action_cancel,
+                                (dialog, which) -> showTrainingCompleteDialog())
+                        .setCancelable(false)
+                        .show();
     }
 
     // ---- BoardView.MoveSource -------------------------------------------------
@@ -2145,6 +2194,7 @@ public class MainActivity extends AppCompatActivity
                         .setView(dialogBinding.getRoot())
                         .setCancelable(false)
                         .show();
+        currentDialog = dialog;
 
         View.OnClickListener pick =
                 v -> {
@@ -2175,11 +2225,14 @@ public class MainActivity extends AppCompatActivity
      */
     private void showAmbiguousMoveDialog(List<String> candidateUcis) {
         String[] items = candidateUcis.toArray(new String[0]);
-        new MaterialAlertDialogBuilder(this)
-                .setTitle(R.string.pegasus_ambiguous_title)
-                .setItems(items, (dialog, which) -> pegasusBridge.selectCandidate(items[which]))
-                .setCancelable(false)
-                .show();
+        currentDialog =
+                new MaterialAlertDialogBuilder(this)
+                        .setTitle(R.string.pegasus_ambiguous_title)
+                        .setItems(
+                                items,
+                                (dialog, which) -> pegasusBridge.selectCandidate(items[which]))
+                        .setCancelable(false)
+                        .show();
     }
 
     private void applyHumanMove(Square from, Square to, Piece promotion) {
@@ -2368,7 +2421,10 @@ public class MainActivity extends AppCompatActivity
 
                     @Override
                     public void onBestMove(
-                            String bestMoveUci, float winProbability, float drawProbability, float lossProbability) {
+                            String bestMoveUci,
+                            float winProbability,
+                            float drawProbability,
+                            float lossProbability) {
                         waitingForEngineMove = false;
                         if (bestMoveUci == null) {
                             refreshBoard();
