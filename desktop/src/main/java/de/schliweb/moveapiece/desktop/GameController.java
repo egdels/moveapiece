@@ -2023,11 +2023,12 @@ final class GameController
     }
 
     /**
-     * Continues playing from the position the completed line ended at, against Stockfish or a
-     * second human, instead of resetting - mirrors the Android app's "Continue free play"
-     * training-complete option.
+     * Continues playing from the position the completed line ended at, against Stockfish, Maia, or
+     * a second human, instead of resetting - mirrors the Android app's "Continue free play"
+     * training-complete option (Android has no Maia opponent yet, so its own version of this dialog
+     * still offers only Stockfish/human).
      */
-    private record OpponentOption(boolean vsStockfish, String label) {
+    private record OpponentOption(GameSetupDialog.Opponent opponent, String label) {
         @Override
         public String toString() {
             return label;
@@ -2035,10 +2036,14 @@ final class GameController
     }
 
     private void continueFreePlay(Side trainedSide) {
-        OpponentOption stockfishOption = new OpponentOption(true, Messages.get("choice_stockfish"));
-        OpponentOption humanOption = new OpponentOption(false, Messages.get("choice_human"));
+        OpponentOption stockfishOption =
+                new OpponentOption(GameSetupDialog.Opponent.STOCKFISH, Messages.get("choice_stockfish"));
+        OpponentOption maiaOption =
+                new OpponentOption(GameSetupDialog.Opponent.MAIA, Messages.get("choice_maia"));
+        OpponentOption humanOption =
+                new OpponentOption(GameSetupDialog.Opponent.HUMAN, Messages.get("choice_human"));
         ChoiceDialog<OpponentOption> dialog =
-                new ChoiceDialog<>(stockfishOption, stockfishOption, humanOption);
+                new ChoiceDialog<>(stockfishOption, stockfishOption, maiaOption, humanOption);
         dialog.initOwner(stage);
         dialog.setTitle(Messages.get("action_continue_free_play"));
         dialog.setHeaderText(null);
@@ -2050,15 +2055,32 @@ final class GameController
         }
         stopPendingBookMove();
         trainingSession = null;
-        boolean vsStockfish = choice.get().vsStockfish();
-        mode = vsStockfish ? Mode.HUMAN_VS_STOCKFISH : Mode.HUMAN_VS_HUMAN;
         humanSide = trainedSide;
-        strengthSlider.setDisable(!vsStockfish);
-        updateStrengthControlsVisibility();
         boardCanvas.setTrainingHint(null, null);
-        refresh();
-        if (vsStockfish && engineReady) {
-            engine.setStrength((int) strengthSlider.getValue());
+        switch (choice.get().opponent()) {
+            case STOCKFISH -> {
+                mode = Mode.HUMAN_VS_STOCKFISH;
+                strengthSlider.setDisable(false);
+                updateStrengthControlsVisibility();
+                refresh();
+                if (engineReady) {
+                    engine.setStrength((int) strengthSlider.getValue());
+                }
+            }
+            case MAIA -> {
+                mode = Mode.HUMAN_VS_MAIA;
+                strengthSlider.setDisable(true);
+                currentMaiaRating = Settings.getMaiaRating();
+                updateStrengthControlsVisibility();
+                loadMaiaEngine(currentMaiaRating);
+                refresh();
+            }
+            default -> {
+                mode = Mode.HUMAN_VS_HUMAN;
+                strengthSlider.setDisable(true);
+                updateStrengthControlsVisibility();
+                refresh();
+            }
         }
         maybeStartEngineMove();
     }

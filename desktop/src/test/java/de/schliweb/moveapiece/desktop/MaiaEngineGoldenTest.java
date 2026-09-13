@@ -90,7 +90,47 @@ public class MaiaEngineGoldenTest {
         assertBestMove("a2a4 h7h5 a4a5 h5h4 a5a6 h4h3 a6b7 h3g2", "f1g2");
     }
 
+    /**
+     * Complements {@link #promotionMovesAvailable_notNecessarilyChosen} with the opposite case: a
+     * position where promoting genuinely is the top move, not just legally available. Reached by
+     * White's h-pawn capturing on g7 while Black shuffles a knight back and forth rather than
+     * creating any competing threat (unlike the other promotion test's position, where a real
+     * counter-threat - Black's own pawn one step from promoting - made a defensive bishop move the
+     * actual top choice instead). lc0 native: g7h8q at 54.08%, ahead of the other capturing
+     * promotion g7f8q (42.94%) - both promotions dominate every non-promoting legal move, which sit
+     * at a small fraction of a percent each.
+     */
+    @Test
+    public void promotionMove_isActuallyBest() throws Exception {
+        assertBestMove("h2h4 b8c6 h4h5 c6b4 h5h6 b4c6 h6g7 c6e5", "g7h8q");
+    }
+
+    /**
+     * {@link MaiaEngineSmokeTest} only exercises {@code maia-1500.onnx} in detail; this is a
+     * lighter-weight sanity check that the other 8 bundled models (now individually selectable via
+     * the desktop app's live rating slider, see {@link MaiaRatings}) are wired up correctly too -
+     * same starting position, each rating's own real lc0-native top move rather than assuming they
+     * all agree. All 9 happen to pick e2e4 here (a very common human first move at every skill
+     * level), with policy mass tapering from ~51% at the lower ratings to ~44% at 1900 as d2d4 (and
+     * other moves) pick up relative weight - not tested here since only the top move matters for
+     * this sanity check, not the full distribution ({@link #multiPlyHistory_blackToMove} and
+     * friends already cover distribution-sensitive cases in depth for 1500).
+     */
+    @Test
+    public void otherRatingLevels_startingPositionTopMoveIsE2E4() throws Exception {
+        for (int rating : MaiaRatings.ALL) {
+            if (rating == 1500) {
+                continue; // covered in full detail by MaiaEngineSmokeTest
+            }
+            assertBestMove(rating, "", "e2e4");
+        }
+    }
+
     private void assertBestMove(String movesUci, String expectedBestMove) throws Exception {
+        assertBestMove(1500, movesUci, expectedBestMove);
+    }
+
+    private void assertBestMove(int rating, String movesUci, String expectedBestMove) throws Exception {
         MaiaEngine engine = new MaiaEngine(Runnable::run);
         CountDownLatch ready = new CountDownLatch(1);
         CountDownLatch moved = new CountDownLatch(1);
@@ -118,7 +158,7 @@ public class MaiaEngineGoldenTest {
                     }
                 });
 
-        try (InputStream model = openModel()) {
+        try (InputStream model = openModel(rating)) {
             engine.start(model);
         }
         if (!ready.await(30, TimeUnit.SECONDS)) {
@@ -141,10 +181,11 @@ public class MaiaEngineGoldenTest {
         engine.shutdown();
     }
 
-    private static InputStream openModel() throws IOException {
-        InputStream in = MaiaEngineGoldenTest.class.getResourceAsStream("maia/maia-1500.onnx");
+    private static InputStream openModel(int rating) throws IOException {
+        String resource = MaiaRatings.resourcePath(rating);
+        InputStream in = MaiaEngineGoldenTest.class.getResourceAsStream(resource);
         if (in == null) {
-            throw new IOException("Missing test resource: maia/maia-1500.onnx");
+            throw new IOException("Missing test resource: " + resource);
         }
         return in;
     }
