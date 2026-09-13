@@ -13,6 +13,7 @@
     <string name="dialog_new_game_title">Nouvelle partie</string>
     <string name="opponent_human">Humain (2 joueurs)</string>
     <string name="opponent_engine">Stockfish</string>
+    <string name="opponent_maia">Maia</string>
     <string name="opponent_training">Entraînement d\'ouvertures</string>
     <string name="dialog_color_title">Choisir la couleur</string>
     <string name="color_white">Blancs</string>
@@ -22,10 +23,13 @@
 
     <string name="dialog_strength_format">Force de jeu de Stockfish (Elo) : %1$d</string>
     <string name="status_engine_strength_format">Stockfish (Elo %1$d)</string>
+    <string name="dialog_maia_rating_label">Classement Maia :</string>
+    <string name="status_maia_strength_format">Maia (Classement %1$d)</string>
 
     <string name="status_white_to_move">Les Blancs jouent</string>
     <string name="status_black_to_move">Les Noirs jouent</string>
     <string name="status_engine_thinking">Stockfish réfléchit…</string>
+    <string name="status_maia_thinking">Maia réfléchit…</string>
     <string name="status_training_auto_move">Coup en cours…</string>
     <string name="status_training_progress_format">%1$s – coup %2$d sur %3$d</string>
     <string name="status_checkmate_white">Échec et mat – les Blancs gagnent</string>
@@ -34,6 +38,8 @@
     <string name="status_draw">Nulle</string>
     <string name="status_check">Échec !</string>
     <string name="status_engine_unavailable">Moteur Stockfish indisponible</string>
+    <string name="status_maia_unavailable">Moteur Maia indisponible</string>
+    <string name="status_maia_unavailable_format">Moteur Maia indisponible : %1$s</string>
 
     <string name="evaluation_toggle_label">Afficher l\'évaluation</string>
     <string name="evaluation_mate_format">Mat en %1$d (%2$s)</string>

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-package de.schliweb.moveapiece.desktop;
+package de.schliweb.moveapiece.engine;
 
 import static org.junit.Assert.assertEquals;
 

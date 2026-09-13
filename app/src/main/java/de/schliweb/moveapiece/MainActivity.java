@@ -20,6 +20,7 @@ import android.view.View;
 import android.view.WindowManager;
 import android.widget.ArrayAdapter;
 import android.widget.SeekBar;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.activity.result.ActivityResultLauncher;
@@ -36,6 +37,9 @@ import de.schliweb.moveapiece.databinding.DialogContinueFreePlayBinding;
 import de.schliweb.moveapiece.databinding.DialogNewGameBinding;
 import de.schliweb.moveapiece.databinding.DialogPromotionBinding;
 import de.schliweb.moveapiece.engine.EngineListener;
+import de.schliweb.moveapiece.engine.MaiaEngine;
+import de.schliweb.moveapiece.engine.MaiaEngineListener;
+import de.schliweb.moveapiece.engine.MaiaRatings;
 import de.schliweb.moveapiece.engine.NnueAssets;
 import de.schliweb.moveapiece.engine.StockfishEngine;
 import de.schliweb.moveapiece.engine.UciInfoParser;
@@ -68,10 +72,7 @@ import java.util.Optional;
 import java.util.OptionalInt;
 
 public class MainActivity extends AppCompatActivity
-        implements BoardView.MoveSource,
-                BoardView.OnMoveListener,
-                EngineListener,
-                PegasusGameBridge.Listener {
+        implements BoardView.MoveSource, BoardView.OnMoveListener, EngineListener, PegasusGameBridge.Listener {
 
     private static final int ELO_MIN = 1320;
     private static final int ELO_MAX = 3190;
@@ -82,18 +83,28 @@ public class MainActivity extends AppCompatActivity
     private static final long PEGASUS_SCAN_TIMEOUT_MS = 15000;
 
     /**
-     * How the human's moves are matched: against a second human, Stockfish, or a fixed opening
-     * line.
+     * How the human's moves are matched: against a second human, Stockfish, Maia, or a fixed
+     * opening line.
      */
     private enum GameMode {
         HUMAN,
         ENGINE,
+        MAIA,
         TRAINING
     }
 
     private ActivityMainBinding binding;
     private final ChessGame game = new ChessGame();
     private StockfishEngine engine;
+    // Loaded fresh whenever a Maia game starts or the "New Game"/"Continue free play" dialog picks
+    // a different rating, unlike engine above which is started once in onCreate and lives for the
+    // whole Activity lifetime - a different Maia rating is a different bundled model file, not a
+    // UCI option on a running instance. Unlike desktop, there is no live in-game rating control
+    // here (this app has no persistent sidebar to put one in) - matches how Stockfish's own Elo is
+    // also a one-time dialog choice on this platform, not a live slider.
+    private MaiaEngine maiaEngine;
+    private boolean maiaReady = false;
+    private int currentMaiaRating;
     private MoveSoundPlayer soundPlayer;
     private Settings settings;
     private PegasusGameBridge pegasusBridge;
@@ -243,6 +254,7 @@ public class MainActivity extends AppCompatActivity
         soundPlayer = new MoveSoundPlayer(getApplicationContext());
         settings = new Settings(getApplicationContext());
         engineElo = settings.getEngineElo(engineElo);
+        currentMaiaRating = settings.getMaiaRating();
         evaluationEnabled = settings.isEvaluationDisplayEnabled(evaluationEnabled);
         pegasusBridge =
                 new PegasusGameBridge(
@@ -658,6 +670,7 @@ public class MainActivity extends AppCompatActivity
                     @Override
                     public void onStopTrackingTouch(SeekBar seekBar) {}
                 });
+        setUpMaiaRatingSpinner(dialogBinding.maiaRatingLabel, dialogBinding.maiaRatingSpinner);
 
         List<String> openingNames = new ArrayList<>();
         for (OpeningLine line : OpeningRepository.ALL) {
@@ -690,11 +703,13 @@ public class MainActivity extends AppCompatActivity
                             Side chosenColor =
                                     dialogBinding.colorWhite.isChecked() ? Side.WHITE : Side.BLACK;
                             int chosenElo = ELO_MIN + dialogBinding.strengthSeekBar.getProgress();
-                            // ENGINE: chosenColor is the human's own color, so the engine
-                            // plays the opposite side. TRAINING: chosenColor directly
-                            // names the side being trained - do not invert it here.
+                            int chosenMaiaRating =
+                                    (Integer) dialogBinding.maiaRatingSpinner.getSelectedItem();
+                            // ENGINE/MAIA: chosenColor is the human's own color, so the opponent
+                            // plays the opposite side. TRAINING: chosenColor directly names the
+                            // side being trained - do not invert it here.
                             Side chosenSide =
-                                    chosenMode == GameMode.ENGINE
+                                    chosenMode == GameMode.ENGINE || chosenMode == GameMode.MAIA
                                             ? (chosenColor == Side.WHITE ? Side.BLACK : Side.WHITE)
                                             : chosenColor;
                             OpeningLine chosenOpening =
@@ -705,7 +720,12 @@ public class MainActivity extends AppCompatActivity
                                             : null;
                             boolean chosenHints = dialogBinding.hintCheckBox.isChecked();
                             startNewGame(
-                                    chosenMode, chosenSide, chosenElo, chosenOpening, chosenHints);
+                                    chosenMode,
+                                    chosenSide,
+                                    chosenElo,
+                                    chosenMaiaRating,
+                                    chosenOpening,
+                                    chosenHints);
                         })
                 .setNegativeButton(R.string.action_cancel, null)
                 .show();
@@ -714,6 +734,9 @@ public class MainActivity extends AppCompatActivity
     private GameMode modeForCheckedId(DialogNewGameBinding dialogBinding, int checkedId) {
         if (checkedId == dialogBinding.opponentEngine.getId()) {
             return GameMode.ENGINE;
+        }
+        if (checkedId == dialogBinding.opponentMaia.getId()) {
+            return GameMode.MAIA;
         }
         if (checkedId == dialogBinding.opponentTraining.getId()) {
             return GameMode.TRAINING;
@@ -726,6 +749,8 @@ public class MainActivity extends AppCompatActivity
                 dialogMode == GameMode.HUMAN ? android.view.View.GONE : android.view.View.VISIBLE;
         int strengthVisibility =
                 dialogMode == GameMode.ENGINE ? android.view.View.VISIBLE : android.view.View.GONE;
+        int maiaRatingVisibility =
+                dialogMode == GameMode.MAIA ? android.view.View.VISIBLE : android.view.View.GONE;
         int openingVisibility =
                 dialogMode == GameMode.TRAINING
                         ? android.view.View.VISIBLE
@@ -734,15 +759,28 @@ public class MainActivity extends AppCompatActivity
         dialogBinding.colorGroup.setVisibility(colorVisibility);
         dialogBinding.strengthLabel.setVisibility(strengthVisibility);
         dialogBinding.strengthSeekBar.setVisibility(strengthVisibility);
+        dialogBinding.maiaRatingLabel.setVisibility(maiaRatingVisibility);
+        dialogBinding.maiaRatingSpinner.setVisibility(maiaRatingVisibility);
         dialogBinding.openingLabel.setVisibility(openingVisibility);
         dialogBinding.openingSpinner.setVisibility(openingVisibility);
         dialogBinding.hintCheckBox.setVisibility(openingVisibility);
+    }
+
+    /** Shared by {@link #showNewGameDialog} and {@link #showContinueFreePlayDialog}. */
+    private void setUpMaiaRatingSpinner(TextView label, Spinner spinner) {
+        label.setText(R.string.dialog_maia_rating_label);
+        ArrayAdapter<Integer> adapter =
+                new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, MaiaRatings.ALL);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinner.setAdapter(adapter);
+        spinner.setSelection(MaiaRatings.ALL.indexOf(settings.getMaiaRating()));
     }
 
     private void startNewGame(
             GameMode chosenMode,
             Side chosenSide,
             int chosenElo,
+            int chosenMaiaRating,
             OpeningLine chosenOpening,
             boolean hintsEnabled) {
         abandonPendingSearches();
@@ -752,7 +790,10 @@ public class MainActivity extends AppCompatActivity
         trainingBookMovePending = false;
 
         mode = chosenMode;
-        engineSide = chosenMode == GameMode.ENGINE ? chosenSide : engineSide;
+        engineSide =
+                (chosenMode == GameMode.ENGINE || chosenMode == GameMode.MAIA)
+                        ? chosenSide
+                        : engineSide;
         engineElo = chosenElo;
         settings.setEngineElo(engineElo);
         trainingSession =
@@ -764,7 +805,7 @@ public class MainActivity extends AppCompatActivity
         game.reset();
         pegasusBridge.resetForNewGame();
         boolean flip =
-                (mode == GameMode.ENGINE && engineSide == Side.WHITE)
+                (isPairedEngineMode() && engineSide == Side.WHITE)
                         || (mode == GameMode.TRAINING && chosenSide == Side.BLACK);
         setBoardFlipped(flip);
         setLastMove(null, null);
@@ -780,13 +821,30 @@ public class MainActivity extends AppCompatActivity
                 engine.setFullStrength();
             }
         }
+        if (mode == GameMode.MAIA) {
+            currentMaiaRating = chosenMaiaRating;
+            settings.setMaiaRating(chosenMaiaRating);
+            loadMaiaEngine(chosenMaiaRating);
+        }
 
         refreshBoard();
-        if (mode == GameMode.ENGINE) {
+        if (isPairedEngineMode()) {
             maybeTriggerEngineMove();
         } else if (mode == GameMode.TRAINING) {
             maybeAdvanceTraining();
         }
+    }
+
+    /**
+     * Whether the current {@link #mode} plays exactly one opponent reply after each human move
+     * (Stockfish or Maia) - as opposed to {@code HUMAN} (no opponent turn at all) or {@code
+     * TRAINING} (its own book-move logic). Shared by every place that treats a human move and its
+     * paired opponent reply as one unit: undo/redo, move-history highlighting, and history
+     * navigation ({@link #jumpToPly}) all skip past the reply together rather than landing between
+     * the two.
+     */
+    private boolean isPairedEngineMode() {
+        return mode == GameMode.ENGINE || mode == GameMode.MAIA;
     }
 
     // ---- Board <-> game glue -------------------------------------------------
@@ -834,6 +892,7 @@ public class MainActivity extends AppCompatActivity
         }
         switch (mode) {
             case ENGINE:
+            case MAIA:
                 return game.sideToMove() != engineSide;
             case TRAINING:
                 return trainingSession != null
@@ -861,12 +920,15 @@ public class MainActivity extends AppCompatActivity
 
     private void updateEngineStrengthText() {
         TextView strength = binding.engineStrengthText;
-        if (mode != GameMode.ENGINE) {
+        if (!isPairedEngineMode()) {
             strength.setVisibility(android.view.View.GONE);
             return;
         }
         strength.setVisibility(android.view.View.VISIBLE);
-        strength.setText(getString(R.string.status_engine_strength_format, engineElo));
+        strength.setText(
+                mode == GameMode.ENGINE
+                        ? getString(R.string.status_engine_strength_format, engineElo)
+                        : getString(R.string.status_maia_strength_format, currentMaiaRating));
     }
 
     /**
@@ -931,19 +993,20 @@ public class MainActivity extends AppCompatActivity
      * #redo()}, or a previous history click) - are additionally bolded and drawn in a darker shade,
      * so the list always shows where you currently are.
      *
-     * <p>In ENGINE mode that's always the human's move plus the engine's paired reply (see {@link
-     * #jumpToPly}'s own pairing - navigation there can never land between the two), so both get
-     * highlighted, not just {@link ChessGame#moveCount()} alone: highlighting only the second half
-     * would look contradictory after clicking the human's own move - the reply next to it would
-     * light up instead of the one actually clicked. Outside ENGINE mode there is no such pairing,
-     * so only the exact current move is highlighted.
+     * <p>In a paired-engine mode ({@link #isPairedEngineMode}, Stockfish or Maia) that's always the
+     * human's move plus the opponent's paired reply (see {@link #jumpToPly}'s own pairing -
+     * navigation there can never land between the two), so both get highlighted, not just {@link
+     * ChessGame#moveCount()} alone: highlighting only the second half would look contradictory
+     * after clicking the human's own move - the reply next to it would light up instead of the one
+     * actually clicked. Outside a paired-engine mode there is no such pairing, so only the exact
+     * current move is highlighted.
      */
     private CharSequence clickableMoveHistory(String toSan) {
         SpannableStringBuilder text = new SpannableStringBuilder();
         int ply = 0;
         int currentPly = game.moveCount();
         int currentRoundStart =
-                mode == GameMode.ENGINE && currentPly > 1 ? currentPly - 1 : currentPly;
+                isPairedEngineMode() && currentPly > 1 ? currentPly - 1 : currentPly;
         for (String token : toSan.split("\\s+")) {
             if (token.isEmpty()) {
                 continue;
@@ -991,11 +1054,12 @@ public class MainActivity extends AppCompatActivity
      * trigger, and highlights the landed-on move like any other applied move. Only reachable
      * outside TRAINING mode - see {@link #updateMoveHistory()}.
      *
-     * <p>In ENGINE mode, never leaves the browsed position frozen on the engine's own turn - always
-     * advances one further ply forward instead, redoing the engine's already-recorded reply
-     * (mirroring {@link #undo()}/{@link #redo()}'s own pairing, never triggering a fresh engine
-     * decision - like other chess GUIs' history navigation, only already-recorded moves are ever
-     * skipped past). Always forward, regardless of which direction {@code targetPly} was reached
+     * <p>In a paired-engine mode ({@link #isPairedEngineMode}), never leaves the browsed position
+     * frozen on the opponent's own turn - always advances one further ply forward instead, redoing
+     * the opponent's already-recorded reply (mirroring {@link #undo()}/{@link #redo()}'s own
+     * pairing, never triggering a fresh engine decision - like other chess GUIs' history
+     * navigation, only already-recorded moves are ever skipped past). Always forward, regardless of
+     * which direction {@code targetPly} was reached
      * from: pairing backward would instead undo the very move that was clicked on, and would make
      * clicking the same history entry repeatedly land on a different position each time (the first
      * click's pairing changes where the next click's "direction" is computed from) - this way
@@ -1012,7 +1076,7 @@ public class MainActivity extends AppCompatActivity
         if (reached != targetPly) {
             return; // out of range; nothing changed
         }
-        if (reached != before && mode == GameMode.ENGINE && game.sideToMove() == engineSide) {
+        if (reached != before && isPairedEngineMode() && game.sideToMove() == engineSide) {
             game.redoMove();
             reached = game.moveCount();
         }
@@ -1054,7 +1118,10 @@ public class MainActivity extends AppCompatActivity
         } else if (game.isDraw()) {
             status.setText(R.string.status_draw);
         } else if (waitingForEngineMove) {
-            status.setText(R.string.status_engine_thinking);
+            status.setText(
+                    mode == GameMode.MAIA
+                            ? R.string.status_maia_thinking
+                            : R.string.status_engine_thinking);
         } else if (waitingForTrainingAutoMove) {
             status.setText(R.string.status_training_auto_move);
         } else if (game.isCheck()) {
@@ -1077,7 +1144,7 @@ public class MainActivity extends AppCompatActivity
         }
         abandonPendingSearches();
         game.undoLastMove();
-        if (mode == GameMode.ENGINE && game.moveCount() > 0 && game.sideToMove() == engineSide) {
+        if (isPairedEngineMode() && game.moveCount() > 0 && game.sideToMove() == engineSide) {
             game.undoLastMove();
         }
         setLastMove(null, null);
@@ -1087,9 +1154,9 @@ public class MainActivity extends AppCompatActivity
 
     /**
      * Mirrors {@link #undo()}: reapplies the move(s) undo most recently moved to the redo stack,
-     * landing back on the human's own turn in ENGINE mode the same way undo does (redo the human's
-     * move, then immediately redo the engine's reply too, rather than leaving the engine to move on
-     * its own). No-op if there is nothing to redo.
+     * landing back on the human's own turn in a paired-engine mode ({@link #isPairedEngineMode})
+     * the same way undo does (redo the human's move, then immediately redo the opponent's reply
+     * too, rather than leaving it to move on its own). No-op if there is nothing to redo.
      */
     private void redo() {
         if (waitingForEngineMove) {
@@ -1103,7 +1170,7 @@ public class MainActivity extends AppCompatActivity
         if (!game.redoMove()) {
             return;
         }
-        if (mode == GameMode.ENGINE && game.canRedo() && game.sideToMove() == engineSide) {
+        if (isPairedEngineMode() && game.canRedo() && game.sideToMove() == engineSide) {
             game.redoMove();
         }
         setLastMove(null, null);
@@ -1195,14 +1262,20 @@ public class MainActivity extends AppCompatActivity
     private void exportGamePgn() {
         String white;
         String black;
-        if (mode == GameMode.ENGINE) {
-            String engineName = getString(R.string.opponent_engine) + " (Elo " + engineElo + ")";
+        if (isPairedEngineMode()) {
+            String opponentName =
+                    mode == GameMode.ENGINE
+                            ? getString(R.string.opponent_engine) + " (Elo " + engineElo + ")"
+                            : getString(R.string.opponent_maia)
+                                    + " (Rating "
+                                    + currentMaiaRating
+                                    + ")";
             if (engineSide == Side.WHITE) {
-                white = engineName;
+                white = opponentName;
                 black = getString(R.string.color_black);
             } else {
                 white = getString(R.string.color_white);
-                black = engineName;
+                black = opponentName;
             }
         } else {
             white = getString(R.string.color_white);
@@ -1337,10 +1410,21 @@ public class MainActivity extends AppCompatActivity
     }
 
     private void maybeTriggerEngineMove() {
-        if (mode != GameMode.ENGINE
-                || game.isGameOver()
-                || game.sideToMove() != engineSide
-                || !engineReady) {
+        if (!isPairedEngineMode() || game.isGameOver() || game.sideToMove() != engineSide) {
+            return;
+        }
+        if (mode == GameMode.MAIA) {
+            if (!maiaReady) {
+                return;
+            }
+            waitingForEngineMove = true;
+            binding.boardView.setInteractive(false);
+            updateStatusText();
+            maiaEngine.setPosition(game.toUciMoveList());
+            maiaEngine.go();
+            return;
+        }
+        if (!engineReady) {
             return;
         }
         waitingForEngineMove = true;
@@ -1779,8 +1863,15 @@ public class MainActivity extends AppCompatActivity
         if (!engineReady) {
             return;
         }
-        boolean engineAboutToSearchAnyway =
-                mode == GameMode.ENGINE && game.sideToMove() == engineSide;
+        // Also skipped for MAIA, even though Maia's own move-generation never touches this
+        // Stockfish instance at all (no actual search conflict) - Maia replies near-instantly (a
+        // single forward pass), so starting a ~1.5s Stockfish analysis here would almost always
+        // just get thrown away a moment later when Maia's reply lands and the position moves on.
+        // One real cost: live move-quality/blunder-check (see #maybeFinalizeMoveQuality) then never
+        // gets a fresh eval for the position right after the human's own move before Maia replies,
+        // so blunder detection silently doesn't fire for that ply in Maia games - the eval display
+        // itself, hints, and post-game analysis are unaffected (see #isPairedEngineMode).
+        boolean engineAboutToSearchAnyway = isPairedEngineMode() && game.sideToMove() == engineSide;
         if (engineAboutToSearchAnyway) {
             return;
         }
@@ -1857,7 +1948,12 @@ public class MainActivity extends AppCompatActivity
                         R.string.action_repeat,
                         (d, w) ->
                                 startNewGame(
-                                        GameMode.TRAINING, side, engineElo, line, hintsEnabled))
+                                        GameMode.TRAINING,
+                                        side,
+                                        engineElo,
+                                        currentMaiaRating,
+                                        line,
+                                        hintsEnabled))
                 .setNegativeButton(R.string.action_pick_opening, (d, w) -> showNewGameDialog())
                 .setNeutralButton(
                         R.string.action_continue_free_play,
@@ -1867,9 +1963,9 @@ public class MainActivity extends AppCompatActivity
     }
 
     /**
-     * Asks whether to continue past a just-completed training line against a second human or
-     * Stockfish, without resetting {@link #game} or the Pegasus bridge - the whole point is picking
-     * up play from the position the opening line ended at, not starting over.
+     * Asks whether to continue past a just-completed training line against a second human,
+     * Stockfish, or Maia, without resetting {@link #game} or the Pegasus bridge - the whole point
+     * is picking up play from the position the opening line ended at, not starting over.
      */
     private void showContinueFreePlayDialog(Side trainedSide) {
         DialogContinueFreePlayBinding dialogBinding =
@@ -1891,14 +1987,21 @@ public class MainActivity extends AppCompatActivity
                     @Override
                     public void onStopTrackingTouch(SeekBar seekBar) {}
                 });
+        setUpMaiaRatingSpinner(dialogBinding.maiaRatingLabel, dialogBinding.maiaRatingSpinner);
         dialogBinding.opponentGroup.setOnCheckedChangeListener(
                 (group, checkedId) -> {
-                    int visibility =
+                    int strengthVisibility =
                             checkedId == dialogBinding.opponentEngine.getId()
                                     ? android.view.View.VISIBLE
                                     : android.view.View.GONE;
-                    dialogBinding.strengthLabel.setVisibility(visibility);
-                    dialogBinding.strengthSeekBar.setVisibility(visibility);
+                    int maiaRatingVisibility =
+                            checkedId == dialogBinding.opponentMaia.getId()
+                                    ? android.view.View.VISIBLE
+                                    : android.view.View.GONE;
+                    dialogBinding.strengthLabel.setVisibility(strengthVisibility);
+                    dialogBinding.strengthSeekBar.setVisibility(strengthVisibility);
+                    dialogBinding.maiaRatingLabel.setVisibility(maiaRatingVisibility);
+                    dialogBinding.maiaRatingSpinner.setVisibility(maiaRatingVisibility);
                 });
 
         new MaterialAlertDialogBuilder(this)
@@ -1907,9 +2010,8 @@ public class MainActivity extends AppCompatActivity
                 .setPositiveButton(
                         R.string.action_ok,
                         (dialog, which) -> {
-                            boolean vsEngine = dialogBinding.opponentEngine.isChecked();
                             trainingSession = null;
-                            if (vsEngine) {
+                            if (dialogBinding.opponentEngine.isChecked()) {
                                 mode = GameMode.ENGINE;
                                 engineSide = trainedSide == Side.WHITE ? Side.BLACK : Side.WHITE;
                                 engineElo = ELO_MIN + dialogBinding.strengthSeekBar.getProgress();
@@ -1918,12 +2020,19 @@ public class MainActivity extends AppCompatActivity
                                     engine.newGame();
                                     engine.setStrength(engineElo);
                                 }
+                            } else if (dialogBinding.opponentMaia.isChecked()) {
+                                mode = GameMode.MAIA;
+                                engineSide = trainedSide == Side.WHITE ? Side.BLACK : Side.WHITE;
+                                currentMaiaRating =
+                                        (Integer) dialogBinding.maiaRatingSpinner.getSelectedItem();
+                                settings.setMaiaRating(currentMaiaRating);
+                                loadMaiaEngine(currentMaiaRating);
                             } else {
                                 mode = GameMode.HUMAN;
                             }
                             binding.undoButton.setEnabled(true);
                             refreshBoard();
-                            if (mode == GameMode.ENGINE) {
+                            if (isPairedEngineMode()) {
                                 maybeTriggerEngineMove();
                             }
                         })
@@ -2222,11 +2331,74 @@ public class MainActivity extends AppCompatActivity
         binding.statusText.setText(R.string.status_engine_unavailable);
     }
 
+    // ---- MaiaEngineListener --------------------------------------------------------
+
+    /**
+     * (Re)loads {@link #maiaEngine} from the bundled {@code assets/maia/} model for {@code rating}
+     * - called both when a Maia game starts fresh ({@link #startNewGame}) and when "Continue free
+     * play" switches into Maia mode without resetting {@link #game} ({@link
+     * #showContinueFreePlayDialog}).
+     *
+     * <p>Captures the freshly created engine in {@code loadedEngine} and has its listener check
+     * it's still the current {@link #maiaEngine} before touching {@link #maiaReady} - if this were
+     * called again (e.g. choosing Maia again from "Continue free play") before a slower,
+     * now-superseded model finished loading, that engine's belated {@code onReady} must not flip
+     * {@link #maiaReady} back on for an engine nobody is going to search with. A fresh listener
+     * instance per call (rather than {@code MainActivity} implementing {@link MaiaEngineListener}
+     * directly, as it does {@link EngineListener} for the single, long-lived {@link #engine}) is
+     * what makes that per-instance check possible at all.
+     */
+    private void loadMaiaEngine(int rating) {
+        if (maiaEngine != null) {
+            maiaEngine.shutdown();
+        }
+        maiaReady = false;
+        MaiaEngine loadedEngine = new MaiaEngine(new Handler(Looper.getMainLooper())::post);
+        maiaEngine = loadedEngine;
+        loadedEngine.setListener(
+                new MaiaEngineListener() {
+                    @Override
+                    public void onReady() {
+                        if (maiaEngine != loadedEngine) {
+                            return;
+                        }
+                        maiaReady = true;
+                        maybeTriggerEngineMove();
+                    }
+
+                    @Override
+                    public void onBestMove(
+                            String bestMoveUci, float winProbability, float drawProbability, float lossProbability) {
+                        waitingForEngineMove = false;
+                        if (bestMoveUci == null) {
+                            refreshBoard();
+                            return;
+                        }
+                        applyConfirmedMove(bestMoveUci, true);
+                    }
+
+                    @Override
+                    public void onEngineError(Exception error) {
+                        waitingForEngineMove = false;
+                        binding.statusText.setText(R.string.status_maia_unavailable);
+                    }
+                });
+        try (InputStream model = getAssets().open(MaiaRatings.resourcePath(rating))) {
+            loadedEngine.start(model);
+        } catch (IOException e) {
+            binding.statusText.setText(
+                    getString(R.string.status_maia_unavailable_format, e.getMessage()));
+        }
+    }
+
     @Override
     protected void onDestroy() {
         trainingHandler.removeCallbacksAndMessages(null);
         if (engine != null) {
             engine.shutdown();
+        }
+        if (maiaEngine != null) {
+            maiaEngine.shutdown();
         }
         if (soundPlayer != null) {
             soundPlayer.release();

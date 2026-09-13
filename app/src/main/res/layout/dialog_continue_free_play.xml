@@ -39,6 +39,12 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/opponent_engine" />
+
+        <RadioButton
+            android:id="@+id/opponentMaia"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/opponent_maia" />
     </RadioGroup>
 
     <TextView
@@ -60,6 +66,26 @@
         android:progress="180"
         android:visibility="gone"
         app:layout_constraintTop_toBottomOf="@id/strengthLabel"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <TextView
+        android:id="@+id/maiaRatingLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:textAppearance="?attr/textAppearanceLabelLarge"
+        android:visibility="gone"
+        tools:text="Maia rating: 1500"
+        app:layout_constraintTop_toBottomOf="@id/opponentGroup"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <Spinner
+        android:id="@+id/maiaRatingSpinner"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/maiaRatingLabel"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />

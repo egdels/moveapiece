@@ -9,13 +9,21 @@ java {
 
 dependencies {
     implementation 'com.github.bhlangonijr:chesslib:1.3.7'
-    // MaiaEngine's ONNX Runtime dependency (MIT-licensed, official Microsoft
-    // package) - runs identically on desktop JVM and Android, unlike
-    // Stockfish's per-platform native process, so it lives here in :core
-    // rather than being split across :app/:desktop like stockfish.gradle.
-    implementation 'com.microsoft.onnxruntime:onnxruntime:1.29.0'
+    // MaiaEngine only needs the ai.onnxruntime.* API surface to compile here - compileOnly, not
+    // implementation, because desktop and Android need genuinely different artifacts at runtime
+    // (desktop JVM natives vs. Android AAR natives for arm64-v8a/armeabi-v7a/x86_64), both MIT and
+    // both published by Microsoft under the same ai.onnxruntime package. An implementation
+    // dependency here would leak the desktop JVM jar's useless-on-Android native binaries onto
+    // :app's runtime classpath (and duplicate-class with whichever artifact :app itself declares).
+    // Each platform module supplies its own matching artifact instead - see :desktop/build.gradle
+    // (onnxruntime) and :app/build.gradle (onnxruntime-android).
+    compileOnly 'com.microsoft.onnxruntime:onnxruntime:1.29.0'
 
     testImplementation 'junit:junit:4.13.2'
+    // MaiaEngine's own unit tests (MaiaMoveIndexerTest et al.) run on this module's local JVM, same
+    // platform as :desktop - the desktop JVM artifact is the correct runtime here regardless of
+    // which platform's UI is being worked on.
+    testImplementation 'com.microsoft.onnxruntime:onnxruntime:1.29.0'
     // Cross-checks ChessGame's FEN output against pegasus-core's own FEN
     // parser (see ChessGameTest#toFen_isParsableByPegasusCoreChessPosition);
     // test-only, :core has no runtime dependency on the physical-board module.

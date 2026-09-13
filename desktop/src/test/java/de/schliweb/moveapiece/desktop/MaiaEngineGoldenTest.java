@@ -10,6 +10,7 @@ import static org.junit.Assert.fail;
 
 import de.schliweb.moveapiece.engine.MaiaEngine;
 import de.schliweb.moveapiece.engine.MaiaEngineListener;
+import de.schliweb.moveapiece.engine.MaiaRatings;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.concurrent.CountDownLatch;

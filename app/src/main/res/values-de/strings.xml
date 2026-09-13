@@ -13,6 +13,7 @@
     <string name="dialog_new_game_title">Neues Spiel</string>
     <string name="opponent_human">Mensch (2 Spieler)</string>
     <string name="opponent_engine">Stockfish</string>
+    <string name="opponent_maia">Maia</string>
     <string name="opponent_training">Eröffnungstraining</string>
     <string name="dialog_color_title">Farbe wählen</string>
     <string name="color_white">Weiß</string>
@@ -22,10 +23,13 @@
 
     <string name="dialog_strength_format">Stockfish-Spielstärke (Elo): %1$d</string>
     <string name="status_engine_strength_format">Stockfish (Elo %1$d)</string>
+    <string name="dialog_maia_rating_label">Maia-Wertungszahl:</string>
+    <string name="status_maia_strength_format">Maia (Wertungszahl %1$d)</string>
 
     <string name="status_white_to_move">Weiß am Zug</string>
     <string name="status_black_to_move">Schwarz am Zug</string>
     <string name="status_engine_thinking">Stockfish denkt …</string>
+    <string name="status_maia_thinking">Maia denkt …</string>
     <string name="status_training_auto_move">Zug wird ausgeführt …</string>
     <string name="status_training_progress_format">%1$s – Zug %2$d von %3$d</string>
     <string name="status_checkmate_white">Schachmatt – Weiß gewinnt</string>
@@ -34,6 +38,8 @@
     <string name="status_draw">Remis</string>
     <string name="status_check">Schach!</string>
     <string name="status_engine_unavailable">Stockfish-Engine nicht verfügbar</string>
+    <string name="status_maia_unavailable">Maia-Engine nicht verfügbar</string>
+    <string name="status_maia_unavailable_format">Maia-Engine nicht verfügbar: %1$s</string>
 
     <string name="evaluation_toggle_label">Bewertung anzeigen</string>
     <string name="evaluation_mate_format">Matt in %1$d (%2$s)</string>

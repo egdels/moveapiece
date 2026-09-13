@@ -5,6 +5,7 @@
 
 package de.schliweb.moveapiece.desktop;
 
+import de.schliweb.moveapiece.engine.MaiaRatings;
 import java.util.prefs.Preferences;
 
 /** Persists user-adjustable settings (engine strength, evaluation display) across app restarts. */

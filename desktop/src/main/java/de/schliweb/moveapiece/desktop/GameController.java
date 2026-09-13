@@ -15,6 +15,7 @@ import de.schliweb.moveapiece.desktop.pegasus.WindowsPegasusBleTransport;
 import de.schliweb.moveapiece.engine.EngineListener;
 import de.schliweb.moveapiece.engine.MaiaEngine;
 import de.schliweb.moveapiece.engine.MaiaEngineListener;
+import de.schliweb.moveapiece.engine.MaiaRatings;
 import de.schliweb.moveapiece.engine.NnueAssets;
 import de.schliweb.moveapiece.engine.StockfishEngine;
 import de.schliweb.moveapiece.engine.UciInfoParser;

@@ -13,6 +13,7 @@
     <string name="dialog_new_game_title">Nieuw spel</string>
     <string name="opponent_human">Mens (2 spelers)</string>
     <string name="opponent_engine">Stockfish</string>
+    <string name="opponent_maia">Maia</string>
     <string name="opponent_training">Openingstraining</string>
     <string name="dialog_color_title">Kies kleur</string>
     <string name="color_white">Wit</string>
@@ -22,10 +23,13 @@
 
     <string name="dialog_strength_format">Speelsterkte Stockfish (Elo): %1$d</string>
     <string name="status_engine_strength_format">Stockfish (Elo %1$d)</string>
+    <string name="dialog_maia_rating_label">Maia-rating:</string>
+    <string name="status_maia_strength_format">Maia (Rating %1$d)</string>
 
     <string name="status_white_to_move">Wit aan zet</string>
     <string name="status_black_to_move">Zwart aan zet</string>
     <string name="status_engine_thinking">Stockfish denkt na…</string>
+    <string name="status_maia_thinking">Maia denkt na…</string>
     <string name="status_training_auto_move">Zet wordt uitgevoerd…</string>
     <string name="status_training_progress_format">%1$s – zet %2$d van %3$d</string>
     <string name="status_checkmate_white">Schaakmat – Wit wint</string>
@@ -34,6 +38,8 @@
     <string name="status_draw">Remise</string>
     <string name="status_check">Schaak!</string>
     <string name="status_engine_unavailable">Stockfish-engine niet beschikbaar</string>
+    <string name="status_maia_unavailable">Maia-engine niet beschikbaar</string>
+    <string name="status_maia_unavailable_format">Maia-engine niet beschikbaar: %1$s</string>
 
     <string name="evaluation_toggle_label">Waardering tonen</string>
     <string name="evaluation_mate_format">Mat in %1$d (%2$s)</string>
