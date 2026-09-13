@@ -9,10 +9,13 @@ This project (MoveAPiece) is licensed under the GNU General Public License v3.0
 |---|---|---|
 | Stockfish (`app/src/main/cpp/stockfish`, git submodule, pinned to tag `sf_18`, commit `cb3d4ee9b47d0c5aae855b12379378ea1439675c`) | GPLv3 | https://github.com/official-stockfish/Stockfish |
 | chesslib 1.3.7 | Apache 2.0 | https://github.com/bhlangonijr/chesslib |
+| Apache Commons Lang3 3.18.0 (transitive dependency of chesslib above, both `app` and `desktop`) | Apache 2.0 | https://github.com/apache/commons-lang |
 | AndroidX (appcompat, constraintlayout) | Apache 2.0 | https://developer.android.com/jetpack/androidx |
 | Material Components for Android | Apache 2.0 | https://github.com/material-components/material-components-android |
+| JavaFX (OpenJFX) 24.0.2 (`desktop` UI toolkit: javafx-controls/-graphics/-base/-media) | GPLv2 + Classpath Exception | https://github.com/openjdk/jfx |
 | bluez-dbus 0.3.5 (`desktop`, Linux Pegasus BLE transport) | MIT | https://github.com/hypfvieh/bluez-dbus |
 | dbus-java-core / dbus-java-transport-native-unixsocket 5.2.0 (`desktop`, transitive/direct deps of bluez-dbus above) | MIT | https://github.com/hypfvieh/dbus-java |
+| SLF4J API 2.0.18 (`desktop`, transitive dependency of dbus-java-core above) | MIT | https://www.slf4j.org/ |
 | ONNX Runtime 1.29.0 (runs the Maia neural network - see below; `core` only compiles against its API, `compileOnly` - `desktop` supplies the `onnxruntime` JVM artifact and `app` the `onnxruntime-android` AAR, since the two platforms need genuinely different native binaries) | MIT | https://github.com/microsoft/onnxruntime |
 
 ## NNUE evaluation networks
