@@ -13,7 +13,7 @@ This project (MoveAPiece) is licensed under the GNU General Public License v3.0
 | Material Components for Android | Apache 2.0 | https://github.com/material-components/material-components-android |
 | bluez-dbus 0.3.5 (`desktop`, Linux Pegasus BLE transport) | MIT | https://github.com/hypfvieh/bluez-dbus |
 | dbus-java-core / dbus-java-transport-native-unixsocket 5.2.0 (`desktop`, transitive/direct deps of bluez-dbus above) | MIT | https://github.com/hypfvieh/dbus-java |
-| ONNX Runtime 1.29.0 (`core`, runs the Maia neural network - see below) | MIT | https://github.com/microsoft/onnxruntime |
+| ONNX Runtime 1.29.0 (runs the Maia neural network - see below; `core` only compiles against its API, `compileOnly` - `desktop` supplies the `onnxruntime` JVM artifact and `app` the `onnxruntime-android` AAR, since the two platforms need genuinely different native binaries) | MIT | https://github.com/microsoft/onnxruntime |
 
 ## NNUE evaluation networks
 
@@ -37,12 +37,15 @@ Gradle task) and are extracted to app-private storage at first launch by
 `NnueAssets.java`, then pointed to via the standard UCI `EvalFile` /
 `EvalFileSmall` options.
 
-## Maia neural network (human-like opponent, desktop only)
+## Maia neural network (human-like opponent, desktop and Android)
 
-`desktop/src/main/resources/de/schliweb/moveapiece/desktop/maia/maia-<rating>.onnx`
-(nine files, ratings 1100–1900 in steps of 100), run via ONNX Runtime (see
-above) as an alternative, human-like opponent to Stockfish - see
-`GameController#startMaiaGame`.
+Nine files each (ratings 1100–1900 in steps of 100, byte-identical between the
+two copies), run via ONNX Runtime (see above) as an alternative, human-like
+opponent to Stockfish - see `GameController#startMaiaGame` (desktop) and
+`MainActivity#loadMaiaEngine` (Android):
+
+- `desktop/src/main/resources/de/schliweb/moveapiece/desktop/maia/maia-<rating>.onnx`
+- `app/src/main/assets/maia/maia-<rating>.onnx`
 
 - Source: original Maia weights from
   https://github.com/CSSLab/maia-chess (**not** the newer, AGPL-3.0-licensed
