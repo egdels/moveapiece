@@ -1,0 +1,5 @@
+Feature update.
+
+* New: Maia, a human-like chess opponent that plays like a real person, not a search engine - choose its rating (1100-1900) on desktop or Android
+* Fixed: the New Game dialog could appear broken after rotating the device
+* Fixed: disconnecting the Pegasus board mid-setup could trigger spurious errors
