@@ -25,7 +25,7 @@
 
     <string name="dialog_strength_format">Stockfish playing strength (Elo): %1$d</string>
     <string name="status_engine_strength_format">Stockfish (Elo %1$d)</string>
-    <string name="dialog_maia_rating_label">Maia rating:</string>
+    <string name="dialog_maia_rating_format">Maia rating: %1$d</string>
     <string name="status_maia_strength_format">Maia (Rating %1$d)</string>
 
     <string name="status_white_to_move">White to move</string>

@@ -21,7 +21,6 @@ import android.view.View;
 import android.view.WindowManager;
 import android.widget.ArrayAdapter;
 import android.widget.SeekBar;
-import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.activity.result.ActivityResultLauncher;
@@ -691,7 +690,7 @@ public class MainActivity extends AppCompatActivity
                     @Override
                     public void onStopTrackingTouch(SeekBar seekBar) {}
                 });
-        setUpMaiaRatingSpinner(dialogBinding.maiaRatingLabel, dialogBinding.maiaRatingSpinner);
+        setUpMaiaRatingSeekBar(dialogBinding.maiaRatingLabel, dialogBinding.maiaRatingSeekBar);
 
         List<String> openingNames = new ArrayList<>();
         for (OpeningLine line : OpeningRepository.ALL) {
@@ -730,9 +729,8 @@ public class MainActivity extends AppCompatActivity
                                     int chosenElo =
                                             ELO_MIN + dialogBinding.strengthSeekBar.getProgress();
                                     int chosenMaiaRating =
-                                            (Integer)
-                                                    dialogBinding.maiaRatingSpinner
-                                                            .getSelectedItem();
+                                            MaiaRatings.ALL.get(
+                                                    dialogBinding.maiaRatingSeekBar.getProgress());
                                     // ENGINE/MAIA: chosenColor is the human's own color, so the
                                     // opponent
                                     // plays the opposite side. TRAINING: chosenColor directly names
@@ -793,20 +791,39 @@ public class MainActivity extends AppCompatActivity
         dialogBinding.strengthLabel.setVisibility(strengthVisibility);
         dialogBinding.strengthSeekBar.setVisibility(strengthVisibility);
         dialogBinding.maiaRatingLabel.setVisibility(maiaRatingVisibility);
-        dialogBinding.maiaRatingSpinner.setVisibility(maiaRatingVisibility);
+        dialogBinding.maiaRatingSeekBar.setVisibility(maiaRatingVisibility);
         dialogBinding.openingLabel.setVisibility(openingVisibility);
         dialogBinding.openingSpinner.setVisibility(openingVisibility);
         dialogBinding.hintCheckBox.setVisibility(openingVisibility);
     }
 
-    /** Shared by {@link #showNewGameDialog} and {@link #showContinueFreePlayDialog}. */
-    private void setUpMaiaRatingSpinner(TextView label, Spinner spinner) {
-        label.setText(R.string.dialog_maia_rating_label);
-        ArrayAdapter<Integer> adapter =
-                new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, MaiaRatings.ALL);
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spinner.setAdapter(adapter);
-        spinner.setSelection(MaiaRatings.ALL.indexOf(settings.getMaiaRating()));
+    /**
+     * Shared by {@link #showNewGameDialog} and {@link #showContinueFreePlayDialog}. Mirrors
+     * strengthSeekBar's own live-label-while-dragging pattern, except the SeekBar's progress is an
+     * index into {@link MaiaRatings#ALL} (0-8), not the rating itself - {@code max="8"} in both
+     * layouts - since a plain Elo-style linear range would let it land on values with no bundled
+     * model.
+     */
+    private void setUpMaiaRatingSeekBar(TextView label, SeekBar seekBar) {
+        int initialRating = settings.getMaiaRating();
+        label.setText(getString(R.string.dialog_maia_rating_format, initialRating));
+        seekBar.setProgress(MaiaRatings.ALL.indexOf(initialRating));
+        seekBar.setOnSeekBarChangeListener(
+                new SeekBar.OnSeekBarChangeListener() {
+                    @Override
+                    public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                        label.setText(
+                                getString(
+                                        R.string.dialog_maia_rating_format,
+                                        MaiaRatings.ALL.get(progress)));
+                    }
+
+                    @Override
+                    public void onStartTrackingTouch(SeekBar seekBar) {}
+
+                    @Override
+                    public void onStopTrackingTouch(SeekBar seekBar) {}
+                });
     }
 
     private void startNewGame(
@@ -2027,7 +2044,7 @@ public class MainActivity extends AppCompatActivity
                     @Override
                     public void onStopTrackingTouch(SeekBar seekBar) {}
                 });
-        setUpMaiaRatingSpinner(dialogBinding.maiaRatingLabel, dialogBinding.maiaRatingSpinner);
+        setUpMaiaRatingSeekBar(dialogBinding.maiaRatingLabel, dialogBinding.maiaRatingSeekBar);
         dialogBinding.opponentGroup.setOnCheckedChangeListener(
                 (group, checkedId) -> {
                     int strengthVisibility =
@@ -2041,7 +2058,7 @@ public class MainActivity extends AppCompatActivity
                     dialogBinding.strengthLabel.setVisibility(strengthVisibility);
                     dialogBinding.strengthSeekBar.setVisibility(strengthVisibility);
                     dialogBinding.maiaRatingLabel.setVisibility(maiaRatingVisibility);
-                    dialogBinding.maiaRatingSpinner.setVisibility(maiaRatingVisibility);
+                    dialogBinding.maiaRatingSeekBar.setVisibility(maiaRatingVisibility);
                 });
 
         currentDialog =
@@ -2070,9 +2087,9 @@ public class MainActivity extends AppCompatActivity
                                         engineSide =
                                                 trainedSide == Side.WHITE ? Side.BLACK : Side.WHITE;
                                         currentMaiaRating =
-                                                (Integer)
-                                                        dialogBinding.maiaRatingSpinner
-                                                                .getSelectedItem();
+                                                MaiaRatings.ALL.get(
+                                                        dialogBinding.maiaRatingSeekBar
+                                                                .getProgress());
                                         settings.setMaiaRating(currentMaiaRating);
                                         loadMaiaEngine(currentMaiaRating);
                                     } else {

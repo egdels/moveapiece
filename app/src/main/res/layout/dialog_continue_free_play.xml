@@ -80,10 +80,14 @@
         app:layout_constraintTop_toBottomOf="@id/opponentGroup"
         app:layout_constraintStart_toStartOf="parent" />
 
-    <Spinner
-        android:id="@+id/maiaRatingSpinner"
+    <!-- 9 discrete steps (1100-1900 in 100s, see MaiaRatings.ALL) - max is a count-1 index into
+         that list, not a rating value itself, see dialog_new_game.xml's own copy of this control
+         for why. -->
+    <SeekBar
+        android:id="@+id/maiaRatingSeekBar"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
+        android:max="8"
         android:visibility="gone"
         app:layout_constraintTop_toBottomOf="@id/maiaRatingLabel"
         app:layout_constraintBottom_toBottomOf="parent"
