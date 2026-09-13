@@ -13,7 +13,10 @@ can play Stockfish on a real board instead of tapping the screen.
 
 ## Features
 
-- Local play: human vs. human, or human vs. Stockfish
+- Local play: human vs. human, human vs. Stockfish, or human vs. Maia — a
+  human-like opponent that predicts what a player of a chosen rating would
+  play, instead of searching for the objectively strongest move (see the
+  Tech stack table)
 - Opening trainer: drill a fixed line from a built-in library of 20
   well-known openings (Ruy Lopez, Italian, Sicilian Najdorf, Queen's Gambit
   Declined, King's Indian, Catalan, Trompowsky, ...). The app plays out the
@@ -23,7 +26,10 @@ can play Stockfish on a real board instead of tapping the screen.
 - Searchable opening library: a read-only, step-through reference viewer
   over the same 20 lines, separate from the trainer
 - Adjustable Stockfish playing strength (UCI_LimitStrength / UCI_Elo,
-  1320–3190)
+  1320–3190). Maia's rating (1100–1900 in steps of 100 - one of 9 separately
+  trained models, not a single tunable engine) is live-adjustable mid-game
+  on desktop; a one-time choice per game on Android, matching how Stockfish's
+  own strength already worked there
 - Move history in SAN notation, undo
 - Check / checkmate / stalemate / draw detection (repetition, 50-move rule,
   insufficient material)
@@ -54,6 +60,7 @@ can play Stockfish on a real board instead of tapping the screen.
 | Desktop UI | JavaFX, styled with a custom stylesheet using the Android app's own Material 3 colors (`desktop/.../app.css`) |
 | Chess rules | [chesslib](https://github.com/bhlangonijr/chesslib) (MIT) |
 | Engine | [Stockfish](https://github.com/official-stockfish/Stockfish) (GPLv3), built from source, driven over UCI through `ProcessBuilder` — via the NDK on Android, via the host's native toolchain (Makefile `COMP=gcc`/`clang`/`mingw`) on desktop |
+| Human-like opponent | [Maia](https://github.com/CSSLab/maia-chess) (GPLv3, original lc0-based weights, not the newer AGPL-3.0 Maia-3), 9 bundled rating levels (1100–1900), run in-process via [ONNX Runtime](https://github.com/microsoft/onnxruntime) (MIT) — a single forward pass per move, no subprocess/UCI involved unlike Stockfish |
 | Physical board | Vendored from a companion project's `core`/BLE-transport modules (GPLv3, own code — see [Third-Party Notices](THIRD-PARTY-NOTICES.md)). Transport implementations: Android (`android.bluetooth.*`), desktop/macOS (CoreBluetooth via a small in-house Objective-C/JNI bridge, `desktop/src/main/native/macos/`), desktop/Windows (Windows Runtime `Windows.Devices.Bluetooth` via a small in-house C++/WinRT/JNI bridge, `desktop/src/main/native/windows/`, MSVC-built), desktop/Linux ([bluez-dbus](https://github.com/hypfvieh/bluez-dbus)/[dbus-java](https://github.com/hypfvieh/dbus-java), both MIT — pure Java, no native code, since BlueZ's GATT client API is fully reachable over D-Bus). No third-party dependency for macOS/Windows: the one mature cross-platform BLE library (SimpleBLE) is BUSL-1.1-licensed, not GPL/FOSS |
 | License | GPLv3 (required by the Stockfish dependency) |
 
@@ -146,14 +153,18 @@ toolchains in the same job, see `desktop.yml`'s comments on that step).
 ## Testing
 
 ```sh
-./gradlew :core:test :pegasus-core:test :app:testDebugUnitTest    # JVM unit tests
+./gradlew :core:test :pegasus-core:test :desktop:test :app:testDebugUnitTest  # JVM unit tests
 ./gradlew :app:connectedDebugAndroidTest                          # instrumented tests, needs a device/emulator
 ```
 
-`:core:test` covers the chess logic, Stockfish engine wrapper, and opening
-trainer library shared by both apps; `:app:connectedDebugAndroidTest` covers
-the Android-only pieces (`StockfishEngine` against a real subprocess,
-`BoardView` real measure/layout/touch) that can't run on the plain JVM.
+`:core:test` covers the chess logic, Stockfish engine wrapper, opening
+trainer library, and Maia's ONNX position encoding/policy decoding shared by
+both apps; `:desktop:test` additionally golden-tests `MaiaEngine`'s actual
+ONNX Runtime output against lc0's own native `eigen` backend for several
+positions (multi-ply history, castling, repetition, promotion) across all 9
+bundled rating levels; `:app:connectedDebugAndroidTest` covers the
+Android-only pieces (`StockfishEngine` against a real subprocess, `BoardView`
+real measure/layout/touch) that can't run on the plain JVM.
 
 ## Project structure
 
@@ -161,7 +172,9 @@ the Android-only pieces (`StockfishEngine` against a real subprocess,
 core/                    Platform-agnostic chess logic, shared by :app and
                           :desktop (plain java-library, no Android dependency)
 ├── src/main/java/de/schliweb/moveapiece/
-│   ├── engine/           Stockfish process wrapper (UCI over stdin/stdout)
+│   ├── engine/           Stockfish process wrapper (UCI over stdin/stdout);
+│   │                     Maia (human-like opponent): ONNX position encoding/
+│   │                     policy decoding/engine + its bundled rating list
 │   ├── logic/             chesslib integration (ChessGame), PGN helpers
 │   └── training/          Opening trainer: curated line library + session progress
 
@@ -176,7 +189,7 @@ app/                    Android application module
 
 desktop/                JavaFX desktop application module
 ├── src/main/java/de/schliweb/moveapiece/desktop/
-│   ├── GameController.java    Wires ChessGame + StockfishEngine + the board together
+│   ├── GameController.java    Wires ChessGame + StockfishEngine + MaiaEngine + the board together
 │   ├── BoardCanvas.java       Board rendering + click-to-move (Canvas/GraphicsContext)
 │   ├── GameSetupDialog.java, PegasusConnectDialog.java, OpeningLibraryWindow.java,
 │   │   OpeningPreviewWindow.java
@@ -225,3 +238,7 @@ Intel) and Windows; Linux is implementation-complete but not yet
 hardware-verified - see the Features section above. The Linux leg of
 `desktop.yml` is newer than the macOS/Windows legs and not yet verified
 against a real CI run.
+
+Maia (human-like opponent) is feature-complete on both platforms, all 9
+bundled rating levels, hardware-verified (Android: real device via adb;
+desktop: `:desktop:test`'s golden tests against lc0's own native output).
