@@ -168,6 +168,14 @@ public class DesktopPegasusGameBridge {
     private ScheduledFuture<?> keepaliveFuture;
     private ScheduledFuture<?> checkIndicatorFuture;
 
+    /**
+     * Pending, not-yet-fired writes of {@link #sendOfficialInitSequence()}. The sequence spans 12 s
+     * (8 commands x 1.5 s); a disconnect during that window (manual toolbar click, unexpected drop)
+     * must cancel the remaining commands, otherwise each one fails with {@code WRITE_FAILED} on the
+     * now-disconnected transport and surfaces as its own error dialog.
+     */
+    private final List<ScheduledFuture<?>> initSequenceFutures = new ArrayList<>();
+
     public DesktopPegasusGameBridge(PegasusTransport transport, Listener listener) {
         this.transport = transport;
         this.listener = listener;
@@ -197,8 +205,10 @@ public class DesktopPegasusGameBridge {
                                         moveDetector.reset(moveDetector.position(), null);
                                         batteryReportPending = true;
                                         lastBatteryCritical = false;
-                                        cancel(keepaliveFuture);
+                                        cancelInitSequence();
                                         sendOfficialInitSequence();
+                                    } else {
+                                        cancelInitSequence();
                                     }
                                     Listener l = listener();
                                     if (l != null) {
@@ -254,11 +264,12 @@ public class DesktopPegasusGameBridge {
     }
 
     public void disconnect() {
+        cancelInitSequence();
         transport.disconnect();
     }
 
     public void shutdown() {
-        cancel(keepaliveFuture);
+        cancelInitSequence();
         cancel(checkIndicatorFuture);
         scheduler.shutdownNow();
         transport.disconnect();
@@ -328,21 +339,38 @@ public class DesktopPegasusGameBridge {
      */
     private void sendOfficialInitSequence() {
         byte[][] seq = {
-            PegasusCommands.encodeReset(),
-            PegasusCommands.encodeDevKey(),
-            PegasusCommands.encodeDevKeyStateRequest(),
-            {0x55},
-            {0x47},
-            PegasusCommands.encodeBoardStateRequest(),
-            {0x4C},
-            PegasusCommands.encodeUpdateMode(),
+                PegasusCommands.encodeReset(),
+                PegasusCommands.encodeDevKey(),
+                PegasusCommands.encodeDevKeyStateRequest(),
+                {0x55},
+                {0x47},
+                PegasusCommands.encodeBoardStateRequest(),
+                {0x4C},
+                PegasusCommands.encodeUpdateMode(),
         };
         for (int i = 0; i < seq.length; i++) {
             byte[] cmd = seq[i];
-            postDelayed(() -> transport.write(cmd), INIT_COMMAND_SPACING_MS * i);
+            initSequenceFutures.add(
+                    postDelayed(
+                            () -> {
+                                if (transport.getConnectionState() == ConnectionState.CONNECTED) {
+                                    transport.write(cmd);
+                                }
+                            },
+                            INIT_COMMAND_SPACING_MS * i));
         }
         keepaliveFuture =
                 postDelayed(this::sendKeepalivePoll, INIT_COMMAND_SPACING_MS * seq.length);
+    }
+
+    /** Cancels pending init-sequence writes and the keepalive; see {@link #initSequenceFutures}. */
+    private void cancelInitSequence() {
+        for (ScheduledFuture<?> future : initSequenceFutures) {
+            cancel(future);
+        }
+        initSequenceFutures.clear();
+        cancel(keepaliveFuture);
+        keepaliveFuture = null;
     }
 
     /**
@@ -466,7 +494,7 @@ public class DesktopPegasusGameBridge {
                 && !squaresSeenEmpty.contains(guideCaptureSquare)
                 && physicalBoard != null
                 && OccupancyProjection.normalize(physicalBoard)
-                        .equals(OccupancyProjection.occupancyOf(guideTargetPosition));
+                .equals(OccupancyProjection.occupancyOf(guideTargetPosition));
     }
 
     private void dispatchDetectionResult(MoveDetectionResult result) {
@@ -600,7 +628,7 @@ public class DesktopPegasusGameBridge {
             }
             if (physicalBoard == null
                     || !OccupancyProjection.normalize(physicalBoard)
-                            .equals(OccupancyProjection.occupancyOf(current))) {
+                    .equals(OccupancyProjection.occupancyOf(current))) {
                 return;
             }
             cancel(checkIndicatorFuture);
@@ -680,10 +708,10 @@ public class DesktopPegasusGameBridge {
                     Level.INFO,
                     "syncBoardToPosition: fen={0} physicalBoard={1}",
                     new Object[] {
-                        fen,
-                        physicalBoard == null
-                                ? "null (not yet received)"
-                                : ("\n" + OccupancyProjection.normalize(physicalBoard))
+                            fen,
+                            physicalBoard == null
+                                    ? "null (not yet received)"
+                                    : ("\n" + OccupancyProjection.normalize(physicalBoard))
                     });
             MoveDetectionResult result = moveDetector.reset(target, physicalBoard);
             updateMismatchLeds(result);
