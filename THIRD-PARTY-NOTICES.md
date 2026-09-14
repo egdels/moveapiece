@@ -16,7 +16,7 @@ This project (MoveAPiece) is licensed under the GNU General Public License v3.0
 | bluez-dbus 0.3.5 (`desktop`, Linux Pegasus BLE transport) | MIT | https://github.com/hypfvieh/bluez-dbus |
 | dbus-java-core / dbus-java-transport-native-unixsocket 5.2.0 (`desktop`, transitive/direct deps of bluez-dbus above) | MIT | https://github.com/hypfvieh/dbus-java |
 | SLF4J API 2.0.18 (`desktop`, transitive dependency of dbus-java-core above) | MIT | https://www.slf4j.org/ |
-| ONNX Runtime 1.29.0 (runs the Maia neural network - see below; `core` only compiles against its API, `compileOnly` - `desktop` supplies the `onnxruntime` JVM artifact and `app` the `onnxruntime-android` AAR, since the two platforms need genuinely different native binaries) | MIT | https://github.com/microsoft/onnxruntime |
+| ONNX Runtime (runs the Maia neural network - see below; `core` only compiles against its API, `compileOnly` - `desktop` supplies the `onnxruntime` JVM artifact at 1.23.2 and `app` the `onnxruntime-android` AAR at 1.29.0, since the two platforms need genuinely different native binaries and pinning them independently let desktop stay on the last release that still ships osx-x64 (Intel Mac) natives, dropped from 1.24.0 onward) | MIT | https://github.com/microsoft/onnxruntime |
 
 ## NNUE evaluation networks
 

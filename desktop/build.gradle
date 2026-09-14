@@ -40,7 +40,7 @@ dependencies {
     implementation 'com.github.bhlangonijr:chesslib:1.3.7'
     // MaiaEngine (in :core) only compiles against the ai.onnxruntime.* API there (compileOnly,
     // see core/build.gradle) - this module supplies the actual desktop JVM runtime.
-    implementation 'com.microsoft.onnxruntime:onnxruntime:1.29.0'
+    implementation 'com.microsoft.onnxruntime:onnxruntime:1.23.2'
     // Linux only (see LinuxPegasusBleTransport's Javadoc) - unlike the
     // macOS/Windows transports, BlueZ's whole D-Bus API is reachable from
     // pure Java, so no native bridge is needed there at all. Both are
