@@ -1,0 +1,4 @@
+Bugfix release.
+
+* Fixed: the Maia opponent failed to start on Intel-based Mac computers
+  (desktop app only - no functional change on Android).
