@@ -42,6 +42,11 @@ jobs:
           # macos-latest is Apple Silicon (arm64); this covers Intel Macs
           # (desktop/stockfish.gradle's sfArch already branches on
           # isArm/os.arch, so no code change was needed - just the runner).
+          # Note this leg also silently picks a different ONNX Runtime JVM
+          # artifact: ext.onnxruntimeVersion in the root build.gradle
+          # resolves to 1.16.3 on Intel macOS hosts (last version with
+          # osx-x64 natives that load on macOS 12), 1.29.0 everywhere else -
+          # the version actually chosen is logged at configuration time.
           - os: macos-15-intel
             shell: bash
           - os: windows-latest

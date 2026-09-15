@@ -103,6 +103,10 @@ jobs:
           - os: macos-latest
             shell: bash
             asset: macos-arm64
+          # Intel Mac: ext.onnxruntimeVersion in the root build.gradle resolves
+          # to ONNX Runtime 1.16.3 here (last version whose osx-x64 natives
+          # load on macOS 12), 1.29.0 on every other leg - so this asset is
+          # the only one that ships the older ONNX Runtime.
           - os: macos-15-intel
             shell: bash
             asset: macos-x86_64

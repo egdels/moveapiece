@@ -18,18 +18,17 @@ dependencies {
     // Each platform module supplies its own matching artifact instead - see :desktop/build.gradle
     // (onnxruntime) and :app/build.gradle (onnxruntime-android).
     //
-    // Pinned to 1.23.2, not the latest release: Microsoft dropped osx-x64 (Intel Mac) natives
-    // from the `onnxruntime` JVM artifact starting with 1.24.0, only shipping osx-aarch64 since -
-    // 1.23.2 is the last version that still runs Maia on an Intel Mac. onnxruntime-android is
-    // unaffected (still ships x86_64 alongside arm64-v8a/armeabi-v7a) and stays on the latest
-    // release in :app/build.gradle.
-    compileOnly 'com.microsoft.onnxruntime:onnxruntime:1.23.2'
+    // The version is chosen per build host in the root build.gradle (ext.onnxruntimeVersion):
+    // Intel Macs need the old 1.16.3, every other host gets the current release - see the
+    // comment there. onnxruntime-android is unaffected (still ships x86_64 alongside
+    // arm64-v8a/armeabi-v7a) and stays on the latest release in :app/build.gradle.
+    compileOnly "com.microsoft.onnxruntime:onnxruntime:${rootProject.ext.onnxruntimeVersion}"
 
     testImplementation 'junit:junit:4.13.2'
     // MaiaEngine's own unit tests (MaiaMoveIndexerTest et al.) run on this module's local JVM, same
     // platform as :desktop - the desktop JVM artifact is the correct runtime here regardless of
     // which platform's UI is being worked on.
-    testImplementation 'com.microsoft.onnxruntime:onnxruntime:1.23.2'
+    testImplementation "com.microsoft.onnxruntime:onnxruntime:${rootProject.ext.onnxruntimeVersion}"
     // Cross-checks ChessGame's FEN output against pegasus-core's own FEN
     // parser (see ChessGameTest#toFen_isParsableByPegasusCoreChessPosition);
     // test-only, :core has no runtime dependency on the physical-board module.

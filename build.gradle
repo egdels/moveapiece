@@ -4,6 +4,27 @@ plugins {
     id 'com.diffplug.spotless' version '8.10.1' apply false
 }
 
+// ONNX Runtime JVM artifact version shared by :core (compileOnly + tests) and :desktop (runtime).
+// Chosen per build host, because the `onnxruntime` natives Microsoft ships are not equally usable
+// everywhere:
+//  - Intel Mac (macOS on x86_64): 1.16.3. Microsoft dropped osx-x64 natives from 1.24.0 onward,
+//    and 1.17.0+ is built with a macOS 13.3 deployment target (C++20, e.g. std::to_chars(double)),
+//    so it fails to dlopen on macOS 12 with "Symbol not found: __ZNSt3__18to_charsEPcS0_d"
+//    (https://github.com/microsoft/onnxruntime/issues/21033). 1.16.3 is the last version that runs
+//    Maia on an Intel Mac, including macOS 12.
+//  - Everything else (Apple Silicon, Linux, Windows - i.e. all other CI runners in
+//    .github/workflows/desktop.yml): the current release, kept in step with the
+//    onnxruntime-android version in :app/build.gradle.
+// The Java API is identical across both versions as far as MaiaEngine uses it.
+ext {
+    def hostOs = System.getProperty('os.name').toLowerCase()
+    def hostArch = System.getProperty('os.arch')
+    def isIntelMac = hostOs.contains('mac') && (hostArch == 'x86_64' || hostArch == 'amd64')
+    onnxruntimeVersion = isIntelMac ? '1.16.3' : '1.29.0'
+    // Logged so CI runs (.github/workflows/desktop.yml, release.yml) show which version a leg got.
+    logger.lifecycle("ONNX Runtime JVM artifact: ${onnxruntimeVersion} (host ${hostOs}/${hostArch})")
+}
+
 subprojects {
     apply plugin: 'com.diffplug.spotless'
 
