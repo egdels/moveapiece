@@ -63,7 +63,14 @@ jobs:
           distribution: temurin
           java-version: "21"
 
+      # packages: platform-tools only - the action's default ("tools
+      # platform-tools") requests the legacy 'tools' package, which
+      # Google removed from the SDK repository; the platform/build-tools/
+      # ndk versions this workflow needs are pinned and installed
+      # explicitly in the next step.
       - uses: android-actions/setup-android@v3
+        with:
+          packages: "platform-tools"
 
       - name: Install pinned SDK components
         run: sdkmanager --install "platforms;${PLATFORM_VERSION}" "build-tools;${BUILD_TOOLS_VERSION}" "ndk;${NDK_VERSION}"
