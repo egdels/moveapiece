@@ -30,6 +30,17 @@
         android:name="android.hardware.bluetooth_le"
         android:required="false" />
 
+    <!-- com.microsoft.onnxruntime:onnxruntime-android's own manifest declares these
+         two for its optional Microsoft "1DS" telemetry (see the <provider> removal
+         below) - MoveAPiece has no other use for either and stays offline, so both
+         are stripped from the merged manifest rather than silently shipped. -->
+    <uses-permission
+        android:name="android.permission.INTERNET"
+        tools:node="remove" />
+    <uses-permission
+        android:name="android.permission.ACCESS_NETWORK_STATE"
+        tools:node="remove" />
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
@@ -37,6 +48,19 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.MoveAPiece">
+
+        <!-- Disables onnxruntime-android's auto-init ContentProvider (see
+             ai.onnxruntime.TelemetryInitializer in the AAR's own manifest): it
+             unconditionally builds an HttpClient wired to Microsoft's proprietary
+             "1DS" telemetry pipeline at process start, collecting Settings.Secure
+             .ANDROID_ID plus manufacturer/model/app version/OS version/timezone.
+             MaiaEngine never calls into ai.onnxruntime.telemetry.*, and
+             OrtEnvironment/OrtSession load the native library themselves on
+             demand, so removing this provider (and the two permissions above it
+             only existed for) doesn't affect actual ONNX inference. -->
+        <provider
+            android:name="ai.onnxruntime.TelemetryInitializer"
+            tools:node="remove" />
 
         <activity
             android:name=".MainActivity"

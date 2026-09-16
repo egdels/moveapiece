@@ -18,6 +18,25 @@ This project (MoveAPiece) is licensed under the GNU General Public License v3.0
 | SLF4J API 2.0.18 (`desktop`, transitive dependency of dbus-java-core above) | MIT | https://www.slf4j.org/ |
 | ONNX Runtime (runs the Maia neural network - see below; `core` only compiles against its API, `compileOnly` - `desktop` supplies the `onnxruntime` JVM artifact, 1.29.0 on Apple Silicon/Linux/Windows hosts and 1.16.3 when built on an Intel Mac (`ext.onnxruntimeVersion` in the root `build.gradle`; osx-x64 natives were dropped from 1.24.0 onward and 1.17.0+ requires macOS 13.3), and `app` the `onnxruntime-android` AAR at 1.29.0, since the two platforms need genuinely different native binaries) | MIT | https://github.com/microsoft/onnxruntime |
 
+### onnxruntime-android's bundled telemetry (removed on Android)
+
+`onnxruntime-android`'s own `AndroidManifest.xml` declares `INTERNET` and
+`ACCESS_NETWORK_STATE`, plus an auto-init `ContentProvider`
+(`ai.onnxruntime.TelemetryInitializer`) that unconditionally builds an
+`HttpClient` for Microsoft's proprietary "1DS" telemetry pipeline at process
+start - collecting `Settings.Secure.ANDROID_ID`, manufacturer, model, app
+version, OS version, and timezone. MoveAPiece has no use for this (it stays
+fully offline on every platform) and doesn't want it running regardless, so
+`app/src/main/AndroidManifest.xml` strips both permissions and the provider
+via `tools:node="remove"`. Verified this doesn't affect Maia itself: ONNX
+Runtime's own native log confirms a graceful fallback
+(`telemetry.cc:453 Initialize: Android telemetry is unavailable because the
+1DS Java HttpClient was not initialized`), and inference otherwise runs
+unchanged - `OrtEnvironment`/`OrtSession` load the native library themselves
+on demand, independent of the removed provider. Desktop's `onnxruntime` JVM
+artifact never bundled this (JVM-only, no Android manifest), so no
+equivalent change is needed there.
+
 ## NNUE evaluation networks
 
 Originally obtained from the Stockfish project's own network distribution
