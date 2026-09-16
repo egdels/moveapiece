@@ -18,7 +18,7 @@ This project (MoveAPiece) is licensed under the GNU General Public License v3.0
 | SLF4J API 2.0.18 (`desktop`, transitive dependency of dbus-java-core above) | MIT | https://www.slf4j.org/ |
 | ONNX Runtime (runs the Maia neural network - see below; `core` only compiles against its API, `compileOnly` - `desktop` supplies the `onnxruntime` JVM artifact, 1.29.0 on Apple Silicon/Linux/Windows hosts and 1.16.3 when built on an Intel Mac (`ext.onnxruntimeVersion` in the root `build.gradle`; osx-x64 natives were dropped from 1.24.0 onward and 1.17.0+ requires macOS 13.3), and `app` the `onnxruntime-android` AAR at 1.29.0, since the two platforms need genuinely different native binaries) | MIT | https://github.com/microsoft/onnxruntime |
 
-### onnxruntime-android's bundled telemetry (removed on Android)
+### ONNX Runtime's bundled telemetry (disabled on both platforms)
 
 `onnxruntime-android`'s own `AndroidManifest.xml` declares `INTERNET` and
 `ACCESS_NETWORK_STATE`, plus an auto-init `ContentProvider`
@@ -33,9 +33,36 @@ Runtime's own native log confirms a graceful fallback
 (`telemetry.cc:453 Initialize: Android telemetry is unavailable because the
 1DS Java HttpClient was not initialized`), and inference otherwise runs
 unchanged - `OrtEnvironment`/`OrtSession` load the native library themselves
-on demand, independent of the removed provider. Desktop's `onnxruntime` JVM
-artifact never bundled this (JVM-only, no Android manifest), so no
-equivalent change is needed there.
+on demand, independent of the removed provider.
+
+The same "1DS"/OneCollector telemetry system (`onnxruntime/core/platform/
+posix/telemetry.cc` on macOS/Linux) is compiled into the shared native
+`libonnxruntime` core, so desktop's plain JVM `onnxruntime` artifact - no
+Android manifest, no `INTERNET` permission concept - has it too, just
+reached differently: `OrtEnvironment.getEnvironment()` starts it
+unconditionally, evidenced by a `Failed to persist telemetry device ID`
+warning and a per-install UUID it tries to write to disk on every run that
+loads a Maia model (see the now-removed `:memory:.ses` `.gitignore` entry).
+Two changes address this:
+
+- `MaiaEngine.start()` (`:core`, shared by desktop and Android) calls the
+  official `OrtEnvironment.setTelemetry(false)` right after
+  `OrtEnvironment.getEnvironment()` - the documented API for disabling
+  telemetry *event collection/sending*. It doesn't suppress the device-ID
+  bootstrap above (that already runs by the time this call executes), but
+  it is defense-in-depth on Android too, in case the native telemetry
+  system ever starts there independently of the removed
+  `TelemetryInitializer` provider.
+- Desktop's jpackage entry point (`desktop/.../Launcher.java`, not
+  `DesktopApp` - see its Javadoc) actually prevents the bootstrap: it
+  re-execs itself once with the `ORT_DISABLE_TELEMETRY=1` environment
+  variable set (a real OS env var the native library reads via `getenv()`
+  before any Java code runs, so it can't be set from within the same
+  process after the fact) before continuing into `DesktopApp.main()`.
+  Verified against a real `jpackageAppImage` build: neither the warning nor
+  the device-ID file appear, the app starts and plays normally, and the
+  relaunch is invisible - it only affects the packaged app, not
+  `:desktop:run` dev mode, which goes through `DesktopApp` directly.
 
 ## NNUE evaluation networks
 

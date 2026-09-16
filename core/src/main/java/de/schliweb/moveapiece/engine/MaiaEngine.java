@@ -119,6 +119,19 @@ public class MaiaEngine {
                 () -> {
                     try {
                         environment = OrtEnvironment.getEnvironment();
+                        // ONNX Runtime's native core bundles Microsoft's cross-platform "1DS"
+                        // telemetry system (see THIRD-PARTY-NOTICES.md) - on by default, so it's
+                        // turned off explicitly rather than relying on the app never opting in.
+                        // Confirmed via OrtEnvironment#setTelemetry's OrtException signature
+                        // that this call can itself fail; letting Maia continue to work even
+                        // then is more important than telemetry actually being off, so a failure
+                        // here is swallowed rather than treated like a fatal engine-start error.
+                        try {
+                            environment.setTelemetry(false);
+                        } catch (OrtException ignored) {
+                            // Best-effort; native telemetry staying on is not worth failing
+                            // Maia's startup over.
+                        }
                         session =
                                 environment.createSession(
                                         modelBytes, new OrtSession.SessionOptions());
