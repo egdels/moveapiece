@@ -1,0 +1,7 @@
+Privacy fix.
+
+* Fixed: the bundled ONNX Runtime library (used for the Maia opponent)
+  silently started its own telemetry on every launch, including on
+  Android requesting network access MoveAPiece itself never needed.
+  This is now disabled on both Android and desktop - the app stays
+  fully offline, no accounts, no telemetry, as intended.
