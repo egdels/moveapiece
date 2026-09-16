@@ -22,15 +22,15 @@ public final class Launcher {
     private Launcher() {}
 
     /**
-     * ONNX Runtime's native core reads this at {@code OrtEnvironment} creation time, before
-     * {@code MaiaEngine}'s {@code environment.setTelemetry(false)} call can have any effect (see
-     * THIRD-PARTY-NOTICES.md's "onnxruntime-android's bundled telemetry" section - the same
-     * native telemetry system backs the desktop {@code onnxruntime} JVM artifact too). It's a
-     * real OS environment variable, not a JVM system property, so it has to be set before this
-     * process's JVM - and with it the bundled onnxruntime native library - exists at all; Java
-     * has no supported way to mutate its own process's already-running environment block. Hence
-     * the self-relaunch below, scoped to this jpackage entry point only: {@code :desktop:run}
-     * (dev mode) goes through {@link DesktopApp} directly and is unaffected.
+     * ONNX Runtime's native core reads this at {@code OrtEnvironment} creation time, before {@code
+     * MaiaEngine}'s {@code environment.setTelemetry(false)} call can have any effect (see
+     * THIRD-PARTY-NOTICES.md's "onnxruntime-android's bundled telemetry" section - the same native
+     * telemetry system backs the desktop {@code onnxruntime} JVM artifact too). It's a real OS
+     * environment variable, not a JVM system property, so it has to be set before this process's
+     * JVM - and with it the bundled onnxruntime native library - exists at all; Java has no
+     * supported way to mutate its own process's already-running environment block. Hence the
+     * self-relaunch below, scoped to this jpackage entry point only: {@code :desktop:run} (dev
+     * mode) goes through {@link DesktopApp} directly and is unaffected.
      */
     private static final String TELEMETRY_ENV_VAR = "ORT_DISABLE_TELEMETRY";
 
@@ -43,12 +43,12 @@ public final class Launcher {
     }
 
     /**
-     * Re-execs the current jpackage-built launcher binary (not a bare {@code java} invocation -
-     * see {@link ProcessHandle.Info#command()}) with {@link #TELEMETRY_ENV_VAR} added to its
+     * Re-execs the current jpackage-built launcher binary (not a bare {@code java} invocation - see
+     * {@link ProcessHandle.Info#command()}) with {@link #TELEMETRY_ENV_VAR} added to its
      * environment, then waits for it and forwards its exit code. {@code ProcessHandle.Info
      * #arguments()} already carries this same process's own argv - jpackage's native launcher
-     * passes module-path/main-class etc. to the embedded JVM internally, straight from its
-     * {@code .cfg} file, so those never appear in argv for this method to reconstruct by hand.
+     * passes module-path/main-class etc. to the embedded JVM internally, straight from its {@code
+     * .cfg} file, so those never appear in argv for this method to reconstruct by hand.
      */
     private static int relaunchWithTelemetryDisabled() throws IOException, InterruptedException {
         ProcessHandle.Info info = ProcessHandle.current().info();
