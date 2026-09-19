@@ -4,3 +4,5 @@ Maia polish.
   moving instantly - more natural to play against.
 * Fixed: move-quality/blunder-check now also works during Maia games, not
   just against Stockfish.
+* Fixed: in the New Game dialog, the White/Black color choice was
+  vertically misaligned.
