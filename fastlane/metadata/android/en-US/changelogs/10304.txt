@@ -1,0 +1,6 @@
+Maia polish.
+
+* New: Maia now takes a brief, human-like pause before replying instead of
+  moving instantly - more natural to play against.
+* Fixed: move-quality/blunder-check now also works during Maia games, not
+  just against Stockfish.
