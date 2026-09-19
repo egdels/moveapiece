@@ -85,11 +85,10 @@ import javafx.util.Duration;
  *
  * <p>Stockfish and Maia coexist rather than one replacing the other during a Maia game: only
  * generating the opponent's own reply move goes through {@link #maiaEngine} - the live evaluation
- * display, hints, and post-game analysis all still go through the same always-running {@link
- * #engine} (Stockfish) regardless of {@link #mode}, since none of them care who played the last
- * move (see {@link #isPairedEngineMode}). The one feature that silently sits out a HUMAN_VS_MAIA
- * game is live move-quality/blunder-check right after the human's own move, a deliberate tradeoff
- * documented on {@link #maybeTriggerAnalysis}.
+ * display, hints, post-game analysis, and live move-quality/blunder-check all still go through the
+ * same always-running {@link #engine} (Stockfish) regardless of {@link #mode}, since none of them
+ * care who played the last move (see {@link #isPairedEngineMode} and {@link
+ * #maybeTriggerAnalysis}).
  */
 final class GameController
         implements BoardCanvas.MoveSource, EngineListener, DesktopPegasusGameBridge.Listener {
@@ -123,6 +122,13 @@ final class GameController
     private static final int HINT_MULTI_PV_LINES = 3;
     private static final int POST_GAME_MOVETIME_MS = 400;
     private static final int TRAINING_AUTO_MOVE_DELAY_MS = 600;
+    // Maia's own forward pass is near-instant (no search - see MaiaEngine's Javadoc), which reads
+    // as inhumanly fast next to Stockfish's fixed MOVETIME_MS think time. #scheduleMaiaMove fills
+    // the gap up to a randomized target somewhere in this range (never adds it on top of whatever
+    // the forward pass itself took), so a slow device's own inference time doesn't stack with the
+    // pause.
+    private static final int MAIA_MOVE_MIN_DELAY_MS = 600;
+    private static final int MAIA_MOVE_MAX_DELAY_MS = 1400;
 
     private final Stage stage;
     private final ChessGame game = new ChessGame();
@@ -211,6 +217,13 @@ final class GameController
     private MaiaEngine maiaEngine;
     private boolean maiaReady = false;
     private int currentMaiaRating;
+    // Bridges a #maybeStartEngineMove call's searchGeneration snapshot and go()-start time across
+    // to the Maia listener's onBestMove and #finishMaiaMove, which run later and can't otherwise
+    // tell a fresh reply from one that's since been left behind by an undo/new game/PGN import -
+    // see #scheduleMaiaMove.
+    private int maiaSearchGeneration = -1;
+    private long maiaRequestStartNanos;
+    private PauseTransition pendingMaiaMove;
     private boolean waitingForEngineMove = false;
     private boolean waitingForHint = false;
     private boolean boardFlipped = false;
@@ -674,6 +687,8 @@ final class GameController
             waitingForEngineMove = true;
             boardCanvas.setInteractive(false);
             maiaRatingSlider.setDisable(true);
+            maiaSearchGeneration = searchGeneration;
+            maiaRequestStartNanos = System.nanoTime();
             maiaEngine.setPosition(game.toUciMoveList());
             maiaEngine.go();
             return;
@@ -1281,7 +1296,8 @@ final class GameController
 
     /**
      * Cancels any outstanding engine search and marks its eventual reply (and any other
-     * already-queued one) as belonging to a position we've since left - used wherever the game is
+     * already-queued one, including a Maia move still waiting out {@link #scheduleMaiaMove}'s
+     * humanlike pause) as belonging to a position we've since left - used wherever the game is
      * reset out from under a possibly in-flight search (new game, undo, PGN import).
      */
     private void abandonPendingSearches() {
@@ -1290,6 +1306,7 @@ final class GameController
         }
         searchGeneration++;
         waitingForEngineMove = false;
+        stopPendingMaiaMove();
         waitingForHint = false;
         if (multiPvSearchActive) {
             // A hint search was interrupted mid-flight (new game/undo/PGN import/post-game analysis
@@ -1325,15 +1342,23 @@ final class GameController
         if (!engineReady) {
             return;
         }
-        // Also skipped for HUMAN_VS_MAIA, even though Maia's own move-generation never touches
-        // this Stockfish instance at all (no actual search conflict) - Maia replies near-instantly
-        // (a single forward pass), so starting a ~1.5s Stockfish analysis here would almost always
-        // just get thrown away a moment later when Maia's reply lands and the position moves on.
-        // One real cost: live move-quality/blunder-check (see #maybeFinalizeMoveQuality) then never
-        // gets a fresh eval for the position right after the human's own move before Maia replies,
-        // so blunder detection silently doesn't fire for that ply in HUMAN_VS_MAIA games - the eval
-        // display itself, hints, and post-game analysis are unaffected (see #isPairedEngineMode).
-        boolean engineAboutToSearchAnyway = isPairedEngineMode() && game.sideToMove() != humanSide;
+        // Skipped only when Stockfish is the paired engine and it's about to search for its own
+        // reply move anyway (#maybeStartEngineMove) - that search's own "info" stream already
+        // covers the evaluation display and move-quality grading, so a second, redundant search
+        // here would be wasted. HUMAN_VS_MAIA doesn't get that for free: Maia's own move-generation
+        // never touches this Stockfish instance at all, and its reply is a near-instant single
+        // forward pass with no search - without #scheduleMaiaMove's deliberate humanlike pause
+        // there'd be no time for a fresh analysis search to produce anything before the position
+        // moved on. With that pause now in place there's genuine idle wall-clock time, so this
+        // search always runs for HUMAN_VS_MAIA too - which is what lets #maybeFinalizeMoveQuality
+        // grade the human's move (blunder/mistake/inaccuracy) in Maia games as well, not just
+        // Stockfish ones. A slight mismatch is tolerated at the tail end: ANALYSIS_MOVETIME_MS
+        // (1.5s) can outlast #scheduleMaiaMove's pause (max 1.4s), so this search sometimes gets
+        // engine.stop()'d by the next one (started for the post-reply position) before finishing -
+        // same "stopped and superseded" pattern already used everywhere else searches chain here,
+        // and harmless since grading only needs the first info line, which arrives in milliseconds.
+        boolean engineAboutToSearchAnyway =
+                mode == Mode.HUMAN_VS_STOCKFISH && game.sideToMove() != humanSide;
         if (engineAboutToSearchAnyway) {
             return;
         }
@@ -1476,18 +1501,19 @@ final class GameController
                             float winProbability,
                             float drawProbability,
                             float lossProbability) {
-                        waitingForEngineMove = false;
+                        if (maiaEngine != loadedEngine
+                                || maiaSearchGeneration != searchGeneration) {
+                            // Stale: the game moved on (undo/new game/PGN import/...) while this
+                            // reply was in flight - discard it rather than applying a move to a
+                            // position it no longer matches.
+                            return;
+                        }
                         if (bestMoveUci == null) {
+                            waitingForEngineMove = false;
                             refresh();
                             return;
                         }
-                        applyUciToGame(bestMoveUci);
-                        if (pegasusBridge != null
-                                && pegasusBridge.getConnectionState()
-                                        == ConnectionState.CONNECTED) {
-                            pegasusBridge.guideEngineMove(bestMoveUci);
-                        }
-                        refresh();
+                        scheduleMaiaMove(bestMoveUci);
                     }
 
                     @Override
@@ -1506,6 +1532,60 @@ final class GameController
             loadedEngine.start(model);
         } catch (IOException e) {
             statusLabel.setText(Messages.get("status_maia_unavailable") + ": " + e.getMessage());
+        }
+    }
+
+    /**
+     * Applies Maia's already-computed reply after a short, randomized pause between {@link
+     * #MAIA_MOVE_MIN_DELAY_MS} and {@link #MAIA_MOVE_MAX_DELAY_MS} so the opponent doesn't look
+     * inhumanly instant next to Stockfish's own fixed think time - filled up to that random target
+     * from {@link #maiaRequestStartNanos} (when {@link MaiaEngine#go} was called), not added on top
+     * of it, so a slower device's own (still near-instant) inference time doesn't stack with the
+     * pause. Skipped (applies immediately) when the Pegasus board is connected, where physically
+     * guiding the move there already takes real time of its own.
+     */
+    private void scheduleMaiaMove(String bestMoveUci) {
+        stopPendingMaiaMove();
+        boolean pegasusConnected =
+                pegasusBridge != null
+                        && pegasusBridge.getConnectionState() == ConnectionState.CONNECTED;
+        long elapsedMs = (System.nanoTime() - maiaRequestStartNanos) / 1_000_000;
+        long targetMs =
+                pegasusConnected
+                        ? 0
+                        : java.util.concurrent.ThreadLocalRandom.current()
+                                .nextInt(MAIA_MOVE_MIN_DELAY_MS, MAIA_MOVE_MAX_DELAY_MS + 1);
+        long remainingMs = targetMs - elapsedMs;
+        if (remainingMs <= 0) {
+            finishMaiaMove(bestMoveUci);
+            return;
+        }
+        PauseTransition pause = new PauseTransition(Duration.millis(remainingMs));
+        pause.setOnFinished(e -> finishMaiaMove(bestMoveUci));
+        pendingMaiaMove = pause;
+        pause.play();
+    }
+
+    private void finishMaiaMove(String bestMoveUci) {
+        pendingMaiaMove = null;
+        if (maiaSearchGeneration != searchGeneration) {
+            // Stale: undo/new game/PGN import/... reset the game while this pause was running.
+            return;
+        }
+        waitingForEngineMove = false;
+        applyUciToGame(bestMoveUci);
+        if (pegasusBridge != null
+                && pegasusBridge.getConnectionState() == ConnectionState.CONNECTED) {
+            pegasusBridge.guideEngineMove(bestMoveUci);
+        }
+        refresh();
+    }
+
+    /** Cancels a pause queued by {@link #scheduleMaiaMove}, if any - see {@link #pendingMaiaMove}. */
+    private void stopPendingMaiaMove() {
+        if (pendingMaiaMove != null) {
+            pendingMaiaMove.stop();
+            pendingMaiaMove = null;
         }
     }
 
