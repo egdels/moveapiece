@@ -133,7 +133,8 @@ public class MainActivity extends AppCompatActivity
     // Bridges a #maybeTriggerEngineMove call's searchGeneration snapshot and go()-start time across
     // to the Maia listener's onBestMove and #finishMaiaMove, which run later and can't otherwise
     // tell a fresh reply from one that's since been left behind by a new game/PGN import/... - see
-    // #scheduleMaiaMove. A dedicated Handler (rather than reusing trainingHandler) so cancelling one
+    // #scheduleMaiaMove. A dedicated Handler (rather than reusing trainingHandler) so cancelling
+    // one
     // never has to reason about the other's unrelated callbacks.
     private final Handler maiaMoveHandler = new Handler(Looper.getMainLooper());
     private Runnable pendingMaiaMove;
@@ -2505,14 +2506,13 @@ public class MainActivity extends AppCompatActivity
      * #MAIA_MOVE_MIN_DELAY_MS} and {@link #MAIA_MOVE_MAX_DELAY_MS} so the opponent doesn't look
      * inhumanly instant next to Stockfish's own fixed think time - filled up to that random target
      * from {@link #maiaRequestStartElapsedMs} (when {@link MaiaEngine#go} was called), not added on
-     * top of it, so a slower device's own (still near-instant) inference time doesn't stack with the
-     * pause. Skipped (applies immediately) when the Pegasus board is connected, where physically
-     * guiding the move there already takes real time of its own.
+     * top of it, so a slower device's own (still near-instant) inference time doesn't stack with
+     * the pause. Skipped (applies immediately) when the Pegasus board is connected, where
+     * physically guiding the move there already takes real time of its own.
      */
     private void scheduleMaiaMove(String bestMoveUci) {
         stopPendingMaiaMove();
-        boolean pegasusConnected =
-                pegasusBridge.getConnectionState() == ConnectionState.CONNECTED;
+        boolean pegasusConnected = pegasusBridge.getConnectionState() == ConnectionState.CONNECTED;
         long elapsedMs = SystemClock.elapsedRealtime() - maiaRequestStartElapsedMs;
         long targetMs =
                 pegasusConnected
@@ -2539,7 +2539,9 @@ public class MainActivity extends AppCompatActivity
         applyConfirmedMove(bestMoveUci, true);
     }
 
-    /** Cancels a pause queued by {@link #scheduleMaiaMove}, if any - see {@link #pendingMaiaMove}. */
+    /**
+     * Cancels a pause queued by {@link #scheduleMaiaMove}, if any - see {@link #pendingMaiaMove}.
+     */
     private void stopPendingMaiaMove() {
         if (pendingMaiaMove != null) {
             maiaMoveHandler.removeCallbacks(pendingMaiaMove);

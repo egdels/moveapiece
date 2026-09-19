@@ -1581,7 +1581,9 @@ final class GameController
         refresh();
     }
 
-    /** Cancels a pause queued by {@link #scheduleMaiaMove}, if any - see {@link #pendingMaiaMove}. */
+    /**
+     * Cancels a pause queued by {@link #scheduleMaiaMove}, if any - see {@link #pendingMaiaMove}.
+     */
     private void stopPendingMaiaMove() {
         if (pendingMaiaMove != null) {
             pendingMaiaMove.stop();
