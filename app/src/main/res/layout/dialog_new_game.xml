@@ -75,10 +75,17 @@
         app:layout_constraintTop_toBottomOf="@id/opponentGroup"
         app:layout_constraintStart_toStartOf="parent" />
 
+    <!-- baselineAligned="false": this LinearLayout subclass defaults to aligning horizontal
+         children by text baseline, but colorWhite/colorBlack's compound radio drawable renders at
+         a different intrinsic size per checked state, throwing that baseline off between the
+         initially-checked White and the unchecked Black - top-aligning both instead (gravity
+         below) keeps their icons and text level regardless of which one is checked. -->
     <RadioGroup
         android:id="@+id/colorGroup"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
+        android:baselineAligned="false"
+        android:gravity="center_vertical"
         android:orientation="horizontal"
         app:layout_constraintTop_toBottomOf="@id/colorLabel"
         app:layout_constraintStart_toStartOf="parent"
