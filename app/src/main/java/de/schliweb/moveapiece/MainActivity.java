@@ -12,6 +12,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.text.Spannable;
 import android.text.SpannableStringBuilder;
 import android.text.TextPaint;
@@ -70,6 +71,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class MainActivity extends AppCompatActivity
         implements BoardView.MoveSource,
@@ -84,6 +86,13 @@ public class MainActivity extends AppCompatActivity
     private static final int HINT_MOVETIME_MS = 1500;
     private static final int HINT_MULTI_PV_LINES = 3;
     private static final long PEGASUS_SCAN_TIMEOUT_MS = 15000;
+    // Maia's own forward pass is near-instant (no search - see MaiaEngine's Javadoc), which reads
+    // as inhumanly fast next to Stockfish's fixed ENGINE_MOVETIME_MS think time. #scheduleMaiaMove
+    // fills the gap up to a randomized target somewhere in this range (never adds it on top of
+    // whatever the forward pass itself took), so a slow device's own inference time doesn't stack
+    // with the pause.
+    private static final int MAIA_MOVE_MIN_DELAY_MS = 600;
+    private static final int MAIA_MOVE_MAX_DELAY_MS = 1400;
 
     /**
      * How the human's moves are matched: against a second human, Stockfish, Maia, or a fixed
@@ -121,6 +130,15 @@ public class MainActivity extends AppCompatActivity
     private MaiaEngine maiaEngine;
     private boolean maiaReady = false;
     private int currentMaiaRating;
+    // Bridges a #maybeTriggerEngineMove call's searchGeneration snapshot and go()-start time across
+    // to the Maia listener's onBestMove and #finishMaiaMove, which run later and can't otherwise
+    // tell a fresh reply from one that's since been left behind by a new game/PGN import/... - see
+    // #scheduleMaiaMove. A dedicated Handler (rather than reusing trainingHandler) so cancelling one
+    // never has to reason about the other's unrelated callbacks.
+    private final Handler maiaMoveHandler = new Handler(Looper.getMainLooper());
+    private Runnable pendingMaiaMove;
+    private long maiaRequestStartElapsedMs;
+    private int maiaSearchGeneration = -1;
     private MoveSoundPlayer soundPlayer;
     private Settings settings;
     private PegasusGameBridge pegasusBridge;
@@ -1474,6 +1492,8 @@ public class MainActivity extends AppCompatActivity
             waitingForEngineMove = true;
             binding.boardView.setInteractive(false);
             updateStatusText();
+            maiaSearchGeneration = searchGeneration;
+            maiaRequestStartElapsedMs = SystemClock.elapsedRealtime();
             maiaEngine.setPosition(game.toUciMoveList());
             maiaEngine.go();
             return;
@@ -1884,6 +1904,7 @@ public class MainActivity extends AppCompatActivity
         engine.stop();
         searchGeneration++;
         waitingForEngineMove = false;
+        stopPendingMaiaMove();
         waitingForHint = false;
         if (multiPvSearchActive) {
             // A hint search was interrupted mid-flight (new game/undo/PGN import/post-game analysis
@@ -2442,12 +2463,19 @@ public class MainActivity extends AppCompatActivity
                             float winProbability,
                             float drawProbability,
                             float lossProbability) {
-                        waitingForEngineMove = false;
+                        if (maiaEngine != loadedEngine
+                                || maiaSearchGeneration != searchGeneration) {
+                            // Stale: the game moved on (new game/PGN import/...) while this reply
+                            // was in flight - discard it rather than applying a move to a position
+                            // it no longer matches.
+                            return;
+                        }
                         if (bestMoveUci == null) {
+                            waitingForEngineMove = false;
                             refreshBoard();
                             return;
                         }
-                        applyConfirmedMove(bestMoveUci, true);
+                        scheduleMaiaMove(bestMoveUci);
                     }
 
                     @Override
@@ -2461,6 +2489,53 @@ public class MainActivity extends AppCompatActivity
         } catch (IOException e) {
             binding.statusText.setText(
                     getString(R.string.status_maia_unavailable_format, e.getMessage()));
+        }
+    }
+
+    /**
+     * Applies Maia's already-computed reply after a short, randomized pause between {@link
+     * #MAIA_MOVE_MIN_DELAY_MS} and {@link #MAIA_MOVE_MAX_DELAY_MS} so the opponent doesn't look
+     * inhumanly instant next to Stockfish's own fixed think time - filled up to that random target
+     * from {@link #maiaRequestStartElapsedMs} (when {@link MaiaEngine#go} was called), not added on
+     * top of it, so a slower device's own (still near-instant) inference time doesn't stack with the
+     * pause. Skipped (applies immediately) when the Pegasus board is connected, where physically
+     * guiding the move there already takes real time of its own.
+     */
+    private void scheduleMaiaMove(String bestMoveUci) {
+        stopPendingMaiaMove();
+        boolean pegasusConnected =
+                pegasusBridge.getConnectionState() == ConnectionState.CONNECTED;
+        long elapsedMs = SystemClock.elapsedRealtime() - maiaRequestStartElapsedMs;
+        long targetMs =
+                pegasusConnected
+                        ? 0
+                        : ThreadLocalRandom.current()
+                                .nextInt(MAIA_MOVE_MIN_DELAY_MS, MAIA_MOVE_MAX_DELAY_MS + 1);
+        long remainingMs = targetMs - elapsedMs;
+        if (remainingMs <= 0) {
+            finishMaiaMove(bestMoveUci);
+            return;
+        }
+        Runnable action = () -> finishMaiaMove(bestMoveUci);
+        pendingMaiaMove = action;
+        maiaMoveHandler.postDelayed(action, remainingMs);
+    }
+
+    private void finishMaiaMove(String bestMoveUci) {
+        pendingMaiaMove = null;
+        if (maiaSearchGeneration != searchGeneration) {
+            // Stale: a new game/PGN import/... reset the game while this pause was running.
+            return;
+        }
+        waitingForEngineMove = false;
+        applyConfirmedMove(bestMoveUci, true);
+    }
+
+    /** Cancels a pause queued by {@link #scheduleMaiaMove}, if any - see {@link #pendingMaiaMove}. */
+    private void stopPendingMaiaMove() {
+        if (pendingMaiaMove != null) {
+            maiaMoveHandler.removeCallbacks(pendingMaiaMove);
+            pendingMaiaMove = null;
         }
     }
 
