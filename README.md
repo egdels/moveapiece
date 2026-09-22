@@ -1,8 +1,9 @@
 # MoveAPiece
 
 A native chess app for Android and desktop (Windows/macOS/Linux), written in
-Java, playing against a locally compiled Stockfish engine — fully offline,
-no accounts, no network access, no proprietary services. The Android app is
+Java, playing against a locally compiled Stockfish engine or against Maia, a
+human-like neural-network opponent that runs on-device — fully offline, no
+accounts, no network access, no proprietary services. The Android app is
 built for eventual distribution via [F-Droid](https://f-droid.org); the
 desktop app is packaged as a native, double-clickable application image via
 the JDK's own `jpackage`.
@@ -120,6 +121,9 @@ build process) and does not apply to the desktop app.
 ```sh
 ./gradlew :desktop:run                 # run directly
 ./gradlew :desktop:jpackageAppImage    # build a native app image (desktop/build/jpackage)
+./gradlew :desktop:jpackageDmg         # macOS installer (DMG)
+./gradlew :desktop:jpackageDeb         # Linux installer (DEB, needs dpkg-deb + fakeroot)
+./gradlew :desktop:jpackageMsi         # Windows installer (MSI, needs the WiX Toolset v3)
 ```
 
 Stockfish is built from the same pinned submodule and the same committed
@@ -127,12 +131,18 @@ NNUE networks as Android, but for the host OS/architecture directly (no
 NDK) — see `desktop/stockfish.gradle`. `jpackageAppImage` bundles that
 binary plus a full JRE into a double-clickable `.app`/`.exe`/Linux binary
 via the JDK's `jpackage` tool (`desktop/packaging.gradle`), using the same
-launcher icon as the Android app. It's an unsigned app image
-(`--type app-image`), not a signed installer — macOS will warn about an
-unidentified developer on first launch.
+launcher icon as the Android app. The app image (`--type app-image`) is the
+plain, no-prerequisites output for local testing; the actual release
+artifacts are one installer per OS (DMG, DEB, MSI — see the `jpackageDmg`/
+`jpackageDeb`/`jpackageMsi` tasks in `desktop/packaging.gradle` for why not
+a raw app image). None of them are code-signed, so the OS shows its usual
+"unidentified developer" style warning on first launch/install.
 
 `.github/workflows/desktop.yml` builds and packages the desktop app across
-Linux (x86-64 and arm64), macOS (Apple Silicon and Intel), and Windows.
+Linux (x86-64 and arm64), macOS (Apple Silicon and Intel), and Windows on
+every push; `.github/workflows/release.yml` builds the same legs on a version
+tag and attaches the installers (plus the signed Android APKs) to the GitHub
+Release.
 
 On macOS, the build additionally compiles a small Objective-C/JNI bridge to
 CoreBluetooth for the physical-board feature (`desktop/pegasus-ble-macos.gradle`,
@@ -235,9 +245,9 @@ verified (automated tests + real-hardware testing). Desktop: covers the
 same feature set, including physical-board support (DGT Pegasus BLE) on
 macOS, Windows, and Linux. Hardware-verified on macOS (Apple Silicon and
 Intel) and Windows; Linux is implementation-complete but not yet
-hardware-verified - see the Features section above. The Linux leg of
-`desktop.yml` is newer than the macOS/Windows legs and not yet verified
-against a real CI run.
+hardware-verified - see the Features section above. All five desktop CI
+legs (Linux x86-64/arm64, macOS Apple Silicon/Intel, Windows) build and
+package in CI and ship installers with every GitHub Release.
 
 Maia (human-like opponent) is feature-complete on both platforms, all 9
 bundled rating levels, hardware-verified (Android: real device via adb;
