@@ -115,15 +115,25 @@ jobs:
         if: runner.os == 'macOS'
         run: brew install xz
 
-      - name: Run core unit tests
-        run: ./gradlew --no-daemon :core:test
+      # :desktop:test includes the Maia golden tests (MaiaEngineGoldenTest,
+      # MaiaEngineSmokeTest): a real ONNX Runtime forward pass over the
+      # bundled networks, checked against lc0's own output. Running it on
+      # every leg is what verifies the per-OS/arch onnxruntime natives
+      # (including the 1.16.3 fallback on Intel macOS, see the matrix
+      # comment above) actually load and agree - not just that they package.
+      # It also triggers buildStockfishHost (via processResources), which
+      # the jpackage step below then finds up to date.
+      - name: Run core and desktop unit tests
+        run: ./gradlew --no-daemon :core:test :desktop:test
 
-      - name: Upload test report
+      - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: desktop-core-test-results-${{ matrix.os }}
-          path: core/build/test-results/test
+          name: desktop-test-results-${{ matrix.os }}
+          path: |
+            core/build/test-results/test
+            desktop/build/test-results/test
 
       - name: Build desktop DEB (Linux)
         if: runner.os == 'Linux'

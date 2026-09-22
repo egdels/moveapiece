@@ -54,8 +54,8 @@ git log --format="%b" | grep -c "Co-Authored-By: Claude"    # AI-assisted commit
   the `SPDX-License-Identifier` headers in source files); AI assistance
   does not change authorship
 - Publication: pushing to GitHub, tagging versions (which triggers the
-  release workflow), and any submission to F-Droid are done by the
-  developer, never initiated by the agent
+  release workflow), and any submission to F-Droid happen only on the
+  developer's explicit instruction, never on the agent's own initiative
 
 ## What this does *not* mean
 
@@ -63,23 +63,26 @@ This document is about how the software was **built**, not what it
 **does**. MoveAPiece makes no network calls at runtime — not to any AI
 service, not to anything else (see the [README](README.md)).
 
-The app does ship one machine-learning component: the optional
-[Maia](https://github.com/CSSLab/maia-chess) opponent, a set of nine
-pre-trained neural networks (GPLv3, bundled as `.onnx` files) that predict
-human-like moves. They run entirely on-device through ONNX Runtime, a
-single forward pass per move, with ONNX Runtime's built-in telemetry
-disabled on both Android and desktop (see
-[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)). Maia is a
-chess-move predictor, not a language model, and has nothing to do with the
-AI tooling used during development. Everything else the app does — playing
-against Stockfish, the opening trainer, PGN handling, the physical-board
-link — is conventional code with no AI involvement at runtime.
+The app does bundle two kinds of chess neural networks, both run entirely
+on-device: the optional [Maia](https://github.com/CSSLab/maia-chess)
+opponent, nine pre-trained networks (GPLv3, shipped as `.onnx` files) that
+predict human-like moves via a single ONNX Runtime forward pass per move,
+with ONNX Runtime's built-in telemetry disabled on both Android and desktop
+(see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)); and Stockfish's own
+NNUE evaluation networks, which are part of any modern Stockfish build.
+Both are chess-position models, not language models, and have nothing to do
+with the AI tooling used during development. Everything else the app does —
+the opening trainer, PGN handling, the physical-board link — is conventional
+code.
 
 ## Verification
 
 AI-authored changes go through the same scrutiny any change would:
 automated tests, [Spotless](https://github.com/diffplug/spotless) formatting
-checks, and Android Lint, all enforced in CI (`.github/workflows/build.yml`
-for Android, `desktop.yml` for the desktop builds on macOS, Windows, and
-Linux); the physical Pegasus board integration is additionally verified in
-real hardware sessions with the developer.
+checks, and Android Lint, all enforced in CI. `.github/workflows/build.yml`
+runs the Android unit and instrumented tests plus a two-runner
+reproducible-build comparison; `desktop.yml` runs the shared `core` tests
+and the desktop tests (including the Maia golden tests against lc0's
+output) on every supported OS/architecture before packaging. The physical
+Pegasus board integration is additionally verified in real hardware
+sessions with the developer.
