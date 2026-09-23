@@ -132,8 +132,12 @@ jobs:
         with:
           distribution: temurin
           # See desktop.yml: jpackage bundles its app-image runtime from
-          # whichever JDK runs it, and javafx 24.0.2's class files need 22+.
-          java-version: "22"
+          # whichever JDK runs it, javafx 24.0.2's class files need 22+, and
+          # on Windows the JDK's bundled MSVC runtime must be new enough for
+          # onnxruntime.dll to initialize (Temurin 22's is not) - so a
+          # currently maintained release, and the same one desktop.yml
+          # verifies with.
+          java-version: "25"
 
       - name: Set up MinGW toolchain (Windows)
         if: runner.os == 'Windows'

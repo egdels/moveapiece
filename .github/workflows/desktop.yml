@@ -73,7 +73,20 @@ jobs:
           # (Java 22) - a JDK 21 runtime can't load them at all
           # (UnsupportedClassVersionError at launch), even though the CI
           # build itself succeeds since packaging never loads the classes.
-          java-version: "22"
+          #
+          # 25 (current LTS), not 22: on Windows the JDK ships its own copy
+          # of the MSVC runtime (msvcp140.dll etc.) in bin/, and the loader
+          # takes that one over System32's. ONNX Runtime's onnxruntime.dll
+          # (1.21 and later) is built against a newer MSVC runtime than the
+          # one in Temurin 22 (whose last build is 22.0.2, July 2024), so
+          # it fails to initialize under that JDK - "A dynamic link library
+          # (DLL) initialization routine failed", i.e. Maia can't start.
+          # That applies to the jpackaged runtime image just the same, so
+          # this is about the shipped MSI, not just :desktop:test. See
+          # https://github.com/microsoft/onnxruntime/issues/24287 - the
+          # maintainers' answer is "use a JDK compiled against a newer VC
+          # redist", which any currently maintained release is.
+          java-version: "25"
 
       - name: Set up MinGW toolchain (Windows)
         if: runner.os == 'Windows'
