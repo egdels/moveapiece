@@ -38,12 +38,46 @@ jobs:
     name: Create the GitHub Release
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
+      # The android and desktop jobs name their assets after gradle.properties'
+      # appVersion but upload them to the tag that triggered this run. A tag
+      # pushed before the version bump (or on the wrong commit) would silently
+      # attach 1.3.5-named assets to v1.3.6, so fail here - before any job
+      # builds - unless the two agree. A pre-release suffix ("-rc1") is
+      # allowed on the tag and ignored for the comparison.
+      - name: Verify the tag matches appVersion
+        run: |
+          TAG="${{ github.ref_name }}"
+          VERSION=$(grep '^appVersion=' gradle.properties | cut -d= -f2)
+          TAG_VERSION="${TAG#v}"
+          TAG_VERSION="${TAG_VERSION%%-*}"
+          if [[ "$TAG_VERSION" != "$VERSION" ]]; then
+            echo "::error::tag $TAG does not match appVersion=$VERSION in gradle.properties"
+            exit 1
+          fi
+
+      # Release notes come from the Fastlane changelog for this versionCode
+      # (the same file F-Droid shows as "What's new"), so the notes are
+      # written once. versionCode is derived exactly as app/build.gradle does:
+      # major*10000 + minor*100 + patch. Falls back to GitHub's generated
+      # commit list only if no changelog exists for this version (pre-releases).
       - name: Create release (no assets yet)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="${{ github.ref_name }}"
-          extra_args=(--title "$TAG" --generate-notes --repo "${{ github.repository }}")
+          VERSION=$(grep '^appVersion=' gradle.properties | cut -d= -f2)
+          IFS=. read -r MAJOR MINOR PATCH <<< "$VERSION"
+          VERSION_CODE=$(( ${MAJOR:-0} * 10000 + ${MINOR:-0} * 100 + ${PATCH:-0} ))
+          NOTES="fastlane/metadata/android/en-US/changelogs/${VERSION_CODE}.txt"
+          extra_args=(--title "$TAG" --repo "${{ github.repository }}")
+          if [[ -f "$NOTES" ]]; then
+            extra_args+=(--notes-file "$NOTES")
+          else
+            echo "::warning::no changelog at $NOTES, using generated notes"
+            extra_args+=(--generate-notes)
+          fi
           if [[ "$TAG" == *-* ]]; then
             extra_args+=(--prerelease)
           fi

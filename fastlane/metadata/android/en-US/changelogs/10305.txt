@@ -1,11 +1,9 @@
-Windows fix for Maia.
+Maia reliability fixes.
 
 * Fixed: on Windows, the Maia opponent could fail to start at all. The
   Java runtime bundled with the desktop app shipped a Microsoft C++
   runtime too old for the ONNX Runtime library Maia runs on; the desktop
-  app is now built with a current JDK.
+  app is now built with a current JDK (desktop app only).
 * Fixed: if Maia's native library cannot be loaded, the app now reports
   the error instead of silently never making a move (Android and
   desktop).
-* Desktop builds now run the Maia verification tests on every supported
-  OS and architecture before packaging.

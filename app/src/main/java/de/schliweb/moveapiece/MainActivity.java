@@ -2490,7 +2490,10 @@ public class MainActivity extends AppCompatActivity
                     @Override
                     public void onEngineError(Exception error) {
                         waitingForEngineMove = false;
-                        binding.statusText.setText(R.string.status_maia_unavailable);
+                        binding.statusText.setText(
+                                getString(
+                                        R.string.status_maia_unavailable_format,
+                                        error.getMessage()));
                     }
                 });
         try (InputStream model = getAssets().open(MaiaRatings.resourcePath(rating))) {
