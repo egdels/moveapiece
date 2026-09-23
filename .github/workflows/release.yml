@@ -62,7 +62,12 @@ jobs:
       # written once. versionCode is derived exactly as app/build.gradle does:
       # major*10000 + minor*100 + patch. Falls back to GitHub's generated
       # commit list only if no changelog exists for this version (pre-releases).
-      - name: Create release (no assets yet)
+      #
+      # Idempotent on purpose: if the release for this tag already exists
+      # (the tag was moved and force-pushed to re-release), its notes are
+      # updated in place and the android/desktop jobs then replace the
+      # assets via --clobber, instead of failing on "release already exists".
+      - name: Create or update release (no assets yet)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -71,17 +76,26 @@ jobs:
           IFS=. read -r MAJOR MINOR PATCH <<< "$VERSION"
           VERSION_CODE=$(( ${MAJOR:-0} * 10000 + ${MINOR:-0} * 100 + ${PATCH:-0} ))
           NOTES="fastlane/metadata/android/en-US/changelogs/${VERSION_CODE}.txt"
-          extra_args=(--title "$TAG" --repo "${{ github.repository }}")
-          if [[ -f "$NOTES" ]]; then
-            extra_args+=(--notes-file "$NOTES")
-          else
-            echo "::warning::no changelog at $NOTES, using generated notes"
-            extra_args+=(--generate-notes)
-          fi
+          common_args=(--title "$TAG" --repo "${{ github.repository }}")
           if [[ "$TAG" == *-* ]]; then
-            extra_args+=(--prerelease)
+            common_args+=(--prerelease)
           fi
-          gh release create "$TAG" "${extra_args[@]}"
+          if gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "release $TAG exists - updating notes, assets will be replaced"
+            if [[ -f "$NOTES" ]]; then
+              gh release edit "$TAG" "${common_args[@]}" --notes-file "$NOTES"
+            else
+              gh release edit "$TAG" "${common_args[@]}"
+            fi
+          else
+            if [[ -f "$NOTES" ]]; then
+              common_args+=(--notes-file "$NOTES")
+            else
+              echo "::warning::no changelog at $NOTES, using generated notes"
+              common_args+=(--generate-notes)
+            fi
+            gh release create "$TAG" "${common_args[@]}"
+          fi
 
   android:
     name: Build & sign release APKs
