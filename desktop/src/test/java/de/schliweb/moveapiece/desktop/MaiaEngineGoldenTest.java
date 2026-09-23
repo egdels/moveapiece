@@ -23,9 +23,8 @@ import org.junit.Test;
  * targeting the parts of {@code MaiaPositionEncoder} its own Javadoc flagged as
  * "reasoned-but-not-yet-cross-checked": real multi-ply history, Black to move, castling rights that
  * have actually changed through play (not just the all-rights starting case), and the repetition
- * plane. See MAIA_PROVENANCE_TEMPLATE.md for how each expected move/ranking below was obtained (lc0
- * itself, native {@code eigen} backend, {@code VerboseMoveStats}, same network) - none of it is
- * guessed.
+ * plane. See MAIA_PROVENANCE.md for how each expected move/ranking below was obtained (lc0 itself,
+ * native {@code eigen} backend, {@code VerboseMoveStats}, same network) - none of it is guessed.
  *
  * <p>Not covered here: underpromotion in a live ONNX comparison (only unit-tested at the
  * move-string level in {@code MaiaMoveIndexerTest}) and a from-scratch FEN import (this project

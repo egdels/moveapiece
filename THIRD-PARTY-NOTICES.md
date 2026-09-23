@@ -105,7 +105,7 @@ opponent to Stockfish - see `GameController#startMaiaGame` (desktop) and
 - Full provenance (exact upstream commit, per-file SHA-256 of both the
   original `.pb.gz` weights and the converted `.onnx` files, declared
   network-format fields, and how the conversion was verified against lc0's
-  own native output): see `MAIA_PROVENANCE_TEMPLATE.md`
+  own native output): see `MAIA_PROVENANCE.md`
 
 `core/src/main/resources/de/schliweb/moveapiece/engine/maia/policy_index_1858.txt`
 is a separate, small artifact: the fixed lookup table mapping the network's
@@ -116,7 +116,7 @@ is a separate, small artifact: the fixed lookup table mapping the network's
   `dfccc33d4968d15922437a64608bcc7584a5ead6`
 - License: GPLv3
 - Independently cross-checked against lc0's own live `VerboseMoveStats`
-  debug output (see `MAIA_PROVENANCE_TEMPLATE.md`) rather than trusted as-is
+  debug output (see `MAIA_PROVENANCE.md`) rather than trusted as-is
 
 ## Chess piece artwork (and app icon)
 

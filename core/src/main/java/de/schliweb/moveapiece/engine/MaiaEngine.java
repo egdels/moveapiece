@@ -34,8 +34,8 @@ import java.util.function.Consumer;
 
 /**
  * Runs a Maia network (original CSSLab/maia-chess weights, converted to ONNX - see
- * MAIA_PROVENANCE_TEMPLATE.md) via ONNX Runtime for a single "what would a human of this network's
- * rating play here" forward pass, no search involved.
+ * MAIA_PROVENANCE.md) via ONNX Runtime for a single "what would a human of this network's rating
+ * play here" forward pass, no search involved.
  *
  * <p>Unlike {@link StockfishEngine}, there is no subprocess and no UCI protocol: inference runs
  * in-process on a dedicated background executor (a forward pass is cheap for this network's size -
@@ -48,7 +48,7 @@ import java.util.function.Consumer;
  * changed through play, and a position reached the second time (repetition plane) all round-trip
  * end to end via ONNX Runtime and match lc0's own native output exactly - not just the winning
  * move, but (for the starting position) closely the logit gap to the runner-up too. See
- * MAIA_PROVENANCE_TEMPLATE.md for the exact reference numbers each test asserts against.
+ * MAIA_PROVENANCE.md for the exact reference numbers each test asserts against.
  *
  * <p>Two real bugs were caught by these tests during development, both fixed before the tests were
  * considered passing: this class's history padding originally repeated the current position for
@@ -59,9 +59,11 @@ import java.util.function.Consumer;
  * correctly by this class's simpler constant-mirror approach once actually tested against a real
  * multi-ply, Black-to-move position rather than left as a reasoned guess.
  *
- * <p><b>Not yet done</b> (tracked in MAIA_PROVENANCE_TEMPLATE.md): en passant and underpromotion in
- * a live ONNX comparison (only unit-tested at the move-string level so far), and the other 8 rating
- * levels (1100-1400, 1600-1900) - only maia-1500 has been downloaded, converted and tested.
+ * <p>All 9 rating levels (1100-1900) are downloaded, converted and covered by {@code
+ * MaiaEngineGoldenTest}; the queen-promotion case is in the golden test too. <b>Deliberately not
+ * covered</b> by a live ONNX comparison (see MAIA_PROVENANCE.md): en passant, which has no input
+ * plane of its own in the classical 112-plane format, so a golden test would exercise no additional
+ * code path; and underpromotion, which is only unit-tested at the move-string level.
  */
 public class MaiaEngine {
 
@@ -184,8 +186,8 @@ public class MaiaEngine {
      *
      * @param temperature 0.0 picks the single highest-scoring legal move (deterministic); 1.0 uses
      *     the network's own logits unscaled. lc0 reports {@code PolicyTemperature: 1.359} as this
-     *     network's own default (see MAIA_PROVENANCE_TEMPLATE.md) if a more human-like spread of
-     *     choices is wanted instead of the strongest-by-policy move every time.
+     *     network's own default (see MAIA_PROVENANCE.md) if a more human-like spread of choices is
+     *     wanted instead of the strongest-by-policy move every time.
      */
     public void go(double temperature) {
         ioExecutor.execute(() -> runInference(temperature));

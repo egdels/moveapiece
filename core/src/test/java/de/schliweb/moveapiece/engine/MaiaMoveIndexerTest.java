@@ -26,8 +26,7 @@ public class MaiaMoveIndexerTest {
 
     /**
      * Black's move gets rank-mirrored (file unchanged) so the network always sees "itself" as White
-     * sitting at the bottom of the board - the same convention lc0 uses, see
-     * MAIA_PROVENANCE_TEMPLATE.md.
+     * sitting at the bottom of the board - the same convention lc0 uses, see MAIA_PROVENANCE.md.
      */
     @Test
     public void blackNormalMove_isRankMirrored() throws MoveConversionException {
@@ -42,8 +41,8 @@ public class MaiaMoveIndexerTest {
 
     /**
      * White's kingside castle is "king captures own rook" in network space (e1h1, not e1g1) - see
-     * MAIA_PROVENANCE_TEMPLATE.md, confirmed against lc0's own {@code policy_index} table (e1g1 ->
-     * 102, e1h1 -> 103; only e1h1 is ever used for a real castling move).
+     * MAIA_PROVENANCE.md, confirmed against lc0's own {@code policy_index} table (e1g1 -> 102, e1h1
+     * -> 103; only e1h1 is ever used for a real castling move).
      */
     @Test
     public void whiteKingsideCastle_isKingCapturesRook() throws MoveConversionException {

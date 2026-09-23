@@ -16,7 +16,7 @@ import com.github.bhlangonijr.chesslib.move.Move;
  * Translates between a real chesslib {@link Move} (real board coordinates, normal UCI castling
  * notation like "e1g1") and the "network space" move string a Maia/lc0 policy output is addressed
  * by via {@link MaiaPolicyIndex} (always as if White is to move, castling written as "king captures
- * own rook") - see MAIA_PROVENANCE_TEMPLATE.md for why both quirks exist.
+ * own rook") - see MAIA_PROVENANCE.md for why both quirks exist.
  *
  * <p>Translation only ever runs forward, from a real legal {@link Move} to its network string,
  * never the other way around: {@link MaiaEngine} keeps the original {@link Move} object alongside

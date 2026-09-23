@@ -18,8 +18,8 @@ import java.util.Map;
 /**
  * The fixed 1858-entry move index that lc0/Maia policy outputs are addressed by, loaded from a
  * bundled resource rather than re-derived from the AlphaZero-style 8x8x73 plane geometry - see
- * MAIA_PROVENANCE_TEMPLATE.md ("Policy-Index-Tabelle real gegengeprüft") for how the resource was
- * generated and cross-checked against lc0's own live {@code VerboseMoveStats} output.
+ * MAIA_PROVENANCE.md ("Policy index table") for how the resource was generated and cross-checked
+ * against lc0's own live {@code VerboseMoveStats} output.
  *
  * <p>Every entry is a UCI-shaped move string (e.g. "e2e4") in <b>network space</b>: always as if
  * White is to move and sitting at the bottom of the board, and with castling written as "king

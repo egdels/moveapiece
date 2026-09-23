@@ -26,7 +26,7 @@ public interface MaiaEngineListener {
      *     or {@code null} if the position had no legal moves
      * @param winProbability Maia's own win/draw/loss estimate for the position it was asked about,
      *     from the side-to-move's perspective - informational only, not used to choose the move
-     *     (see the value-head discussion in MAIA_PROVENANCE_TEMPLATE.md for why)
+     *     (Maia plays the policy head's top move without search; see MAIA_PROVENANCE.md)
      */
     void onBestMove(
             String bestMoveUci, float winProbability, float drawProbability, float lossProbability);

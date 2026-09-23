@@ -10,8 +10,8 @@ import java.util.List;
 /**
  * Builds the 112x8x8 input tensor a Maia/lc0 network (declared {@code INPUT_CLASSICAL_112_PLANE})
  * expects, from a short window of prior board snapshots plus the current position's castling rights
- * and half-move clock. See MAIA_PROVENANCE_TEMPLATE.md for the plane layout this mirrors (sourced
- * from lc0's own {@code encoder.cc}) and for which parts of it are empirically cross-checked versus
+ * and half-move clock. See MAIA_PROVENANCE.md for the plane layout this mirrors (sourced from lc0's
+ * own {@code encoder.cc}) and for which parts of it are empirically cross-checked versus
  * reasoned-through-but-not-yet-verified.
  *
  * <p><b>Simplification versus lc0's own encoder, confirmed equivalent by test:</b> lc0's internal
@@ -28,8 +28,8 @@ import java.util.List;
  * <p>Also confirmed by that same test battery: the repetition plane ({@code
  * MaiaEngineGoldenTest#repeatedStartingPosition_whiteToMove}, a position reached the second time
  * via a real knight-shuffle move sequence) and the zero-padding rule below actually changing the
- * network's output versus a fresh game reaching the same piece placement - see
- * MAIA_PROVENANCE_TEMPLATE.md for the exact lc0-native reference numbers each test asserts against.
+ * network's output versus a fresh game reaching the same piece placement - see MAIA_PROVENANCE.md
+ * for the exact lc0-native reference numbers each test asserts against.
  */
 final class MaiaPositionEncoder {
 

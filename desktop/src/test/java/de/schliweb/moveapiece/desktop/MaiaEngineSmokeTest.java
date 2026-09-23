@@ -19,8 +19,8 @@ import org.junit.Test;
 
 /**
  * First real, end-to-end correctness check of {@link MaiaEngine} against the bundled {@code
- * maia-1500.onnx} (see MAIA_PROVENANCE_TEMPLATE.md for its provenance) - runs the actual ONNX
- * Runtime inference, not a mock.
+ * maia-1500.onnx} (see MAIA_PROVENANCE.md for its provenance) - runs the actual ONNX Runtime
+ * inference, not a mock.
  *
  * <p>Only covers the starting position, which is the <b>simplest</b> case for {@code
  * MaiaPositionEncoder} (White to move, no mirroring, full castling rights on both sides, no real
@@ -28,11 +28,11 @@ import org.junit.Test;
  * multi-ply/Black-to-move history mirroring flagged in that class's Javadoc. A pass here is a
  * meaningful first signal (bitboard-to-plane bit order, tensor shape, castling/aux planes, the
  * policy index round-trip all have to be right for this to work at all) but is not the full
- * golden-test battery MAIA_PROVENANCE_TEMPLATE.md still lists as open.
+ * golden-test battery in {@code MaiaEngineGoldenTest}.
  *
  * <p>The expected move comes from running lc0 itself natively (not this code) on the same network
  * and position during the provenance investigation: {@code bestmove e2e4} with 50.22% policy mass,
- * far ahead of the second choice (d2d4, 23.34%) - see MAIA_PROVENANCE_TEMPLATE.md.
+ * far ahead of the second choice (d2d4, 23.34%) - see MAIA_PROVENANCE.md.
  */
 public class MaiaEngineSmokeTest {
 

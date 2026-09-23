@@ -8,14 +8,14 @@ package de.schliweb.moveapiece.engine;
 import java.util.List;
 
 /**
- * The 9 bundled Maia rating levels and where to find each one's ONNX model - see
- * MAIA_PROVENANCE_TEMPLATE.md for their provenance/conversion. Lives in {@code core} (not the
- * desktop module, despite the original integration being desktop-only) since both desktop and
- * Android need the same rating list, resource-path convention, and snapping logic - each platform
- * just opens {@link #resourcePath} differently (desktop: {@code Class#getResourceAsStream} against
- * a classpath resource under {@code desktop/src/main/resources/.../maia/}; Android: {@code
- * AssetManager#open} against {@code app/src/main/assets/maia/}), both bundling the identical set of
- * 9 {@code .onnx} files at that same relative path.
+ * The 9 bundled Maia rating levels and where to find each one's ONNX model - see MAIA_PROVENANCE.md
+ * for their provenance/conversion. Lives in {@code core} (not the desktop module, despite the
+ * original integration being desktop-only) since both desktop and Android need the same rating
+ * list, resource-path convention, and snapping logic - each platform just opens {@link
+ * #resourcePath} differently (desktop: {@code Class#getResourceAsStream} against a classpath
+ * resource under {@code desktop/src/main/resources/.../maia/}; Android: {@code AssetManager#open}
+ * against {@code app/src/main/assets/maia/}), both bundling the identical set of 9 {@code .onnx}
+ * files at that same relative path.
  */
 public final class MaiaRatings {
 
