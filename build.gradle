@@ -38,4 +38,14 @@ subprojects {
             licenseHeaderFile(rootProject.file('config/spotless/license-header.txt'))
         }
     }
+
+    // CI only has the console log at hand (the XML reports are artifacts
+    // behind a login), so a failing test must print its full stack trace
+    // there rather than Gradle's default one-line "AssertionError at X:123".
+    tasks.withType(Test).configureEach {
+        testLogging {
+            events 'failed'
+            exceptionFormat 'full'
+        }
+    }
 }

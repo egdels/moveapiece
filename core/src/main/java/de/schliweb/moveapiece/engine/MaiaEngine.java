@@ -139,6 +139,15 @@ public class MaiaEngine {
                         post(MaiaEngineListener::onReady);
                     } catch (Exception e) {
                         notifyError(e);
+                    } catch (LinkageError e) {
+                        // OrtEnvironment.getEnvironment() is where ONNX Runtime extracts and
+                        // loads its native library, and that fails with an
+                        // UnsatisfiedLinkError / ExceptionInInitializerError - an Error, not an
+                        // Exception. Left uncaught it silently kills this executor thread: the
+                        // listener never sees onReady *or* onEngineError, so the UI (and any
+                        // test) just waits forever. Surface it as a reported startup failure
+                        // instead.
+                        notifyError(nativeLoadFailure(e));
                     }
                 });
     }
@@ -265,6 +274,10 @@ public class MaiaEngine {
             }
         } catch (Exception e) {
             notifyError(e);
+        } catch (LinkageError e) {
+            // Same reasoning as in start(): lazily-initialized ONNX Runtime classes can still
+            // fail to link here, and an Error must not silently swallow the reply.
+            notifyError(nativeLoadFailure(e));
         }
     }
 
@@ -347,6 +360,10 @@ public class MaiaEngine {
 
     private void notifyError(Exception e) {
         post(l -> l.onEngineError(e));
+    }
+
+    private static IllegalStateException nativeLoadFailure(LinkageError e) {
+        return new IllegalStateException("ONNX Runtime native library failed to load: " + e, e);
     }
 
     private interface ListenerAction {
