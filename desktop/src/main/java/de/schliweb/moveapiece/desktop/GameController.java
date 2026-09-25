@@ -316,6 +316,16 @@ final class GameController
     private boolean trainingBookMovePending = false;
 
     /**
+     * Whether the book move currently pending physical confirmation ({@link
+     * #trainingBookMovePending}) was a capture - remembered for its move sound, which is played
+     * when the board confirms the move rather than when it is applied to the game: applying happens
+     * in the same instant the trainee's own move is confirmed, so both sounds would collapse into
+     * one (heard on hardware 2026-09-25); without a board the book move follows after a short pause
+     * and sounds on its own anyway.
+     */
+    private boolean trainingBookMoveWasCapture;
+
+    /**
      * An engine reply that arrived while the physical board was out of sync (mismatched, or no
      * board dump received yet). Automatic moves are never applied onto a board that cannot follow
      * them; the reply is applied and guided as soon as {@link #onBoardMismatch} reports the board
@@ -975,6 +985,8 @@ final class GameController
                 // the physical board just confirmed it was played correctly.
                 guidingTrainingHumanMove = false;
                 applyUciToGame(trainingSession.currentExpectedUci());
+            } else if (trainingBookMovePending) {
+                playMoveSound(trainingBookMoveWasCapture);
             }
             trainingBookMovePending = false;
             trainingSession.advance();
@@ -2130,7 +2142,9 @@ final class GameController
                 return;
             }
             String uci = trainingSession.currentExpectedUci();
-            applyUciToGame(uci);
+            Square to = Square.fromValue(uci.substring(2, 4).toUpperCase(Locale.ROOT));
+            trainingBookMoveWasCapture = game.pieceAt(to) != Piece.NONE;
+            applyUciToGame(uci, false); // sound follows on physical confirmation
             refresh();
             trainingBookMovePending = true;
             pegasusBridge.guideEngineMove(uci);
@@ -2348,6 +2362,11 @@ final class GameController
     }
 
     private boolean applyUciToGame(String uci) {
+        return applyUciToGame(uci, true);
+    }
+
+    /** As {@link #applyUciToGame(String)}; {@code withSound=false} defers the move sound. */
+    private boolean applyUciToGame(String uci, boolean withSound) {
         Square from = Square.fromValue(uci.substring(0, 2).toUpperCase(Locale.ROOT));
         Square to = Square.fromValue(uci.substring(2, 4).toUpperCase(Locale.ROOT));
         boolean wasCapture = game.pieceAt(to) != Piece.NONE;
@@ -2356,7 +2375,9 @@ final class GameController
             return false;
         }
         boardCanvas.setLastMove(from, to);
-        playMoveSound(wasCapture);
+        if (withSound) {
+            playMoveSound(wasCapture);
+        }
         scrollMoveHistoryToEnd = true;
         return true;
     }
