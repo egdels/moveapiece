@@ -1,0 +1,10 @@
+Opening trainer polish for the Pegasus board.
+
+* Fixed: castling in a trainer line was reported as a board mismatch
+  (the rook's squares lit up as wrong) as soon as it was shown.
+* Fixed: with the board connected, the move sounds for your move and
+  the reply played at the same instant - the reply now sounds when it
+  is actually played on the board, in the trainer and against the
+  engine.
+* Fixed: the "opening complete" dialog could not be closed with the
+  window's close button (desktop).
