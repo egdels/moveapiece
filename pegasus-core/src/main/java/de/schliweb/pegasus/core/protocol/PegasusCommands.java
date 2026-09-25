@@ -57,6 +57,12 @@ public final class PegasusCommands {
      * report real occupancy (0x01 occupied / 0x00 empty) and field updates flow. Payload semantics
      * (0x07 likely payload length, key possibly device-specific): UNKNOWN; byte sequence:
      * CONFIRMED_ON_HARDWARE (as sent by official app, verified to unlock).
+     *
+     * <p>Provenance and permission: the key is the one the official DGT app sends, not one issued
+     * to this project. Asked whether a separate key could be issued, DGT Support answered on
+     * 2026-09-25 that they do not provide additional developer keys and that using this one is fine
+     * as long as the project is non-commercial - which MoveAPiece is (free, open source, no
+     * monetization). That condition is the one to keep in mind should the project ever change.
      */
     public static byte[] encodeDevKey() {
         return new byte[] {
