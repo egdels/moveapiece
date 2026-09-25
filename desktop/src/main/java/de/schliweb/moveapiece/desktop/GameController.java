@@ -2260,11 +2260,18 @@ final class GameController
         alert.setContentText(
                 Messages.get(
                         "dialog_training_complete_message_format", OpeningNames.displayName(line)));
-        alert.getButtonTypes().setAll(repeatType, pickType, continueType);
+        // JavaFX only honors the window's close button (X, Esc) when a button with the
+        // CANCEL_CLOSE role exists; none of the three choices has it. Add one but keep it
+        // out of sight so the dialog still reads as the same three-way choice - closing
+        // simply leaves the finished line on the board.
+        alert.getButtonTypes().setAll(repeatType, pickType, continueType, ButtonType.CLOSE);
         Styles.apply(alert.getDialogPane());
+        javafx.scene.Node closeButton = alert.getDialogPane().lookupButton(ButtonType.CLOSE);
+        closeButton.setVisible(false);
+        closeButton.setManaged(false);
 
         Optional<ButtonType> result = alert.showAndWait();
-        if (result.isEmpty()) {
+        if (result.isEmpty() || result.get() == ButtonType.CLOSE) {
             return;
         }
         if (result.get() == repeatType) {

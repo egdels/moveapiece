@@ -197,6 +197,16 @@ public class DesktopPegasusGameBridge {
     private boolean guideShowLed = true;
     private int guideExpectedFrom = -1;
     private int guideExpectedTo = -1;
+
+    /**
+     * Every square whose occupancy the guided move itself changes - origin and destination plus,
+     * for castling, the rook's two squares and, for en passant, the captured pawn's square. The
+     * board is expected to differ from the target on these until the move is played, so they are
+     * never a "deviation" ({@link #guideDeviationSquares}) and never revealed in quiz mode ({@link
+     * #shouldRevealGuideLeds}). Empty while no guide is active.
+     */
+    private java.util.Set<Integer> guideMoveSquares = Collections.emptySet();
+
     private String guideMoveUci;
     private ChessPosition guideTargetPosition;
     private Integer guideCaptureSquare;
@@ -826,12 +836,12 @@ public class DesktopPegasusGameBridge {
                         OccupancyProjection.normalize(physicalBoard));
         List<Integer> squares = new ArrayList<>();
         for (int square : diff.missingOccupied()) {
-            if (square != guideExpectedFrom && square != guideExpectedTo) {
+            if (!guideMoveSquares.contains(square)) {
                 squares.add(square);
             }
         }
         for (int square : diff.unexpectedOccupied()) {
-            if (square != guideExpectedFrom && square != guideExpectedTo) {
+            if (!guideMoveSquares.contains(square)) {
                 squares.add(square);
             }
         }
@@ -932,6 +942,16 @@ public class DesktopPegasusGameBridge {
             guideExpectedTo = move.to();
             guideMoveUci = move.uci();
             guideTargetPosition = current.apply(move);
+            java.util.Set<Integer> moveSquares = new java.util.HashSet<>();
+            moveSquares.add(move.from());
+            moveSquares.add(move.to());
+            BoardMismatch footprint =
+                    BoardMismatch.between(
+                            OccupancyProjection.occupancyOf(current),
+                            OccupancyProjection.occupancyOf(guideTargetPosition));
+            moveSquares.addAll(footprint.missingOccupied());
+            moveSquares.addAll(footprint.unexpectedOccupied());
+            guideMoveSquares = moveSquares;
             guideCaptureSquare = current.pieceAt(move.to()) != null ? move.to() : null;
             squaresSeenEmpty.clear();
             LOG.log(
@@ -964,7 +984,7 @@ public class DesktopPegasusGameBridge {
             return true;
         }
         for (int square : squares) {
-            if (square != guideExpectedFrom && square != guideExpectedTo) {
+            if (!guideMoveSquares.contains(square)) {
                 return true;
             }
         }
@@ -998,6 +1018,7 @@ public class DesktopPegasusGameBridge {
         guideShowLed = true;
         guideExpectedFrom = -1;
         guideExpectedTo = -1;
+        guideMoveSquares = Collections.emptySet();
     }
 
     /**

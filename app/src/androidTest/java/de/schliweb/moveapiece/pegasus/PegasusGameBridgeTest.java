@@ -135,6 +135,7 @@ public class PegasusGameBridgeTest {
         final CountDownLatch mismatchDetected = new CountDownLatch(1);
         final CountDownLatch mismatchResolved = new CountDownLatch(1);
         final CountDownLatch promotionRequired = new CountDownLatch(1);
+        final CountDownLatch guideDeviated = new CountDownLatch(1);
         final AtomicReference<String> confirmedUci = new AtomicReference<>();
 
         @Override
@@ -163,6 +164,13 @@ public class PegasusGameBridgeTest {
         @Override
         public void onEngineMoveGuidanceComplete() {
             guidanceComplete.countDown();
+        }
+
+        @Override
+        public void onGuideDeviation(boolean deviating) {
+            if (deviating) {
+                guideDeviated.countDown();
+            }
         }
 
         @Override
@@ -731,5 +739,47 @@ public class PegasusGameBridgeTest {
         assertTrue(
                 "expected guidance to start despite the lifted pawn and complete on e4",
                 listener.guidanceComplete.await(TIMEOUT_SECONDS, TimeUnit.SECONDS));
+    }
+
+    /**
+     * Castling moves two pieces: the board legitimately differs from the guide's target on the
+     * rook's squares as well, not just on the king's origin/destination. Those must never be
+     * reported as a deviation (the on-screen mismatch banner) - observed on hardware 2026-09-25
+     * with the Ruy Lopez trainer line, where the banner listed f1 and h1 the moment 5. O-O was
+     * requested.
+     */
+    @Test
+    public void guideCastling_doesNotReportRookSquaresAsDeviation() throws InterruptedException {
+        FakeTransport transport = new FakeTransport();
+        RecordingListener listener = new RecordingListener();
+        PegasusGameBridge bridge = newBridgeOnMainThread(transport, listener);
+
+        InstrumentationRegistry.getInstrumentation()
+                .runOnMainSync(() -> bridge.connect(DEVICE_ADDRESS));
+        assertTrue(listener.connected.await(TIMEOUT_SECONDS, TimeUnit.SECONDS));
+
+        String castlingFen = "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1";
+        InstrumentationRegistry.getInstrumentation()
+                .runOnMainSync(() -> bridge.syncBoardToPosition(castlingFen));
+
+        byte[] payload = new byte[BoardState.SQUARE_COUNT];
+        for (String square : new String[] {"a8", "e8", "h8", "a1", "e1", "h1"}) {
+            payload[BoardState.squareIndex(square)] = 1;
+        }
+        transport.feed(frame(PegasusMessageType.BOARD_DUMP, payload));
+        assertTrue(listener.synced.await(TIMEOUT_SECONDS, TimeUnit.SECONDS));
+
+        InstrumentationRegistry.getInstrumentation()
+                .runOnMainSync(() -> bridge.guideEngineMove("e1g1"));
+        transport.feed(fieldUpdateFrame("e1", 0));
+        transport.feed(fieldUpdateFrame("g1", 1));
+        transport.feed(fieldUpdateFrame("h1", 0));
+        assertFalse(
+                "rook squares of a castling guide must not count as a deviation",
+                listener.guideDeviated.await(300, TimeUnit.MILLISECONDS));
+
+        transport.feed(fieldUpdateFrame("f1", 1));
+        assertTrue(listener.guidanceComplete.await(TIMEOUT_SECONDS, TimeUnit.SECONDS));
+        assertFalse(listener.guideDeviated.await(100, TimeUnit.MILLISECONDS));
     }
 }
