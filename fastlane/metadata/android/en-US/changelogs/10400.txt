@@ -1,0 +1,10 @@
+Pegasus board: fixes and clearer feedback.
+
+* Fixed: after the opponent's capture on the Pegasus board, the app could
+  stop accepting moves if the captured and the capturing piece were
+  swapped quickly.
+* New: if the board no longer matches the position, the app shows which
+  squares differ - on screen and via LEDs - and waits until they are
+  fixed before the engine or the trainer plays its next move.
+* Fixed: the opening trainer no longer stalls when a line starts
+  with a piece in hand.
