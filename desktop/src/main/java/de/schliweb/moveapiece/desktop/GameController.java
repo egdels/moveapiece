@@ -326,6 +326,16 @@ final class GameController
     private boolean trainingBookMoveWasCapture;
 
     /**
+     * Whether an engine reply applied to the game still owes its move sound: with a Pegasus board
+     * connected the reply is applied silently and sounds once the guide reports it executed on the
+     * board (same reasoning as {@link #trainingBookMoveWasCapture}); {@code engineMoveWasCapture}
+     * remembers which sound. Cleared when the game is reset/undone.
+     */
+    private boolean engineMoveSoundPending;
+
+    private boolean engineMoveWasCapture;
+
+    /**
      * An engine reply that arrived while the physical board was out of sync (mismatched, or no
      * board dump received yet). Automatic moves are never applied onto a board that cannot follow
      * them; the reply is applied and guided as soon as {@link #onBoardMismatch} reports the board
@@ -904,10 +914,23 @@ final class GameController
             refresh();
             return;
         }
-        applyUciToGame(uci);
-        if (pegasusBridge != null
-                && pegasusBridge.getConnectionState() == ConnectionState.CONNECTED) {
-            pegasusBridge.guideEngineMove(uci);
+        boolean connected =
+                pegasusBridge != null
+                        && pegasusBridge.getConnectionState() == ConnectionState.CONNECTED;
+        if (!connected) {
+            applyUciToGame(uci);
+            refresh();
+            return;
+        }
+        Square to = Square.fromValue(uci.substring(2, 4).toUpperCase(Locale.ROOT));
+        boolean wasCapture = game.pieceAt(to) != Piece.NONE;
+        applyUciToGame(uci, false); // sound follows on physical confirmation
+        pegasusBridge.guideEngineMove(uci);
+        if (pegasusBridge.isGuideActive()) {
+            engineMoveSoundPending = true;
+            engineMoveWasCapture = wasCapture;
+        } else {
+            playMoveSound(wasCapture); // nothing to wait for
         }
         refresh();
     }
@@ -995,7 +1018,11 @@ final class GameController
             return;
         }
         // GameController's own state was already updated when the engine move
-        // was applied in onBestMove(); nothing further to do here.
+        // was applied (applyEngineReply); only its deferred sound is left.
+        if (engineMoveSoundPending) {
+            engineMoveSoundPending = false;
+            playMoveSound(engineMoveWasCapture);
+        }
     }
 
     @Override
@@ -1447,6 +1474,7 @@ final class GameController
         searchGeneration++;
         waitingForEngineMove = false;
         heldEngineMoveUci = null;
+        engineMoveSoundPending = false;
         stopPendingMaiaMove();
         waitingForHint = false;
         if (multiPvSearchActive) {

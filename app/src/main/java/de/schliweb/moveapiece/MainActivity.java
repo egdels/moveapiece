@@ -288,6 +288,16 @@ public class MainActivity extends AppCompatActivity
     private boolean trainingBookMoveWasCapture;
 
     /**
+     * Whether an engine reply applied to the game still owes its move sound: with a Pegasus board
+     * connected the reply is applied silently and sounds once the guide reports it executed on the
+     * board (same reasoning as {@link #trainingBookMoveWasCapture}); {@code engineMoveWasCapture}
+     * remembers which sound. Cleared when the game is reset/undone.
+     */
+    private boolean engineMoveSoundPending;
+
+    private boolean engineMoveWasCapture;
+
+    /**
      * An engine reply that arrived while the physical board was out of sync (mismatched, or no
      * board dump received yet). Automatic moves are never applied onto a board that cannot follow
      * them; the reply is applied and guided as soon as {@link #onBoardMismatch} reports the board
@@ -572,12 +582,21 @@ public class MainActivity extends AppCompatActivity
      * promotion choice there comes from a dialog, not a UCI move string.
      */
     private void applyConfirmedMove(String uci, boolean isEngineMove) {
-        if (applyUciToGame(uci)) {
-            if (isEngineMove) {
-                if (pegasusBridge.getConnectionState() == ConnectionState.CONNECTED) {
-                    pegasusBridge.guideEngineMove(uci);
+        boolean guided =
+                isEngineMove && pegasusBridge.getConnectionState() == ConnectionState.CONNECTED;
+        Square to = Square.valueOf(uci.substring(2, 4).toUpperCase(Locale.ROOT));
+        boolean wasCapture = game.pieceAt(to) != Piece.NONE;
+        // A guided engine move sounds on physical confirmation, not when applied.
+        if (applyUciToGame(uci, !guided)) {
+            if (guided) {
+                pegasusBridge.guideEngineMove(uci);
+                if (pegasusBridge.isGuideActive()) {
+                    engineMoveSoundPending = true;
+                    engineMoveWasCapture = wasCapture;
+                } else {
+                    playMoveSound(wasCapture); // nothing to wait for
                 }
-            } else {
+            } else if (!isEngineMove) {
                 maybeTriggerEngineMove();
             }
         }
@@ -819,7 +838,11 @@ public class MainActivity extends AppCompatActivity
             return;
         }
         // MoveAPiece's own state was already updated when the engine move was
-        // applied in applyConfirmedMove(); nothing further to do here.
+        // applied in applyConfirmedMove(); only its deferred sound is left.
+        if (engineMoveSoundPending) {
+            engineMoveSoundPending = false;
+            playMoveSound(engineMoveWasCapture);
+        }
     }
 
     @Override
@@ -2056,6 +2079,7 @@ public class MainActivity extends AppCompatActivity
         searchGeneration++;
         waitingForEngineMove = false;
         heldEngineMoveUci = null;
+        engineMoveSoundPending = false;
         stopPendingMaiaMove();
         waitingForHint = false;
         if (multiPvSearchActive) {
