@@ -93,6 +93,9 @@
     <string name="pegasus_error_format">Errore Pegasus: %1$s</string>
     <string name="pegasus_battery_format">Batteria scacchiera Pegasus: %1$d %%</string>
     <string name="pegasus_battery_critical_format">Batteria scacchiera Pegasus critica (%1$d %%): si spegnerà a breve</string>
+    <string name="pegasus_board_mismatch">La scacchiera non corrisponde alla posizione: sistema i pezzi come indicato dai LED</string>
+    <string name="pegasus_auto_move_held">La mossa dell\'app attende che la scacchiera corrisponda</string>
+    <string name="pegasus_mismatch_squares_format">Case: %1$s</string>
     <string name="pegasus_ambiguous_title">Mossa ambigua – seleziona</string>
 
     <string name="opening_ruy_lopez">Apertura spagnola (Ruy López)</string>

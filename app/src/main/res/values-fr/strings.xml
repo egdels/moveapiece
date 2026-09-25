@@ -93,6 +93,9 @@
     <string name="pegasus_error_format">Erreur Pegasus : %1$s</string>
     <string name="pegasus_battery_format">Batterie de l\'échiquier Pegasus : %1$d %%</string>
     <string name="pegasus_battery_critical_format">Batterie de l\'échiquier Pegasus critique (%1$d %%) — extinction imminente</string>
+    <string name="pegasus_board_mismatch">L\'échiquier ne correspond pas à la position — corrigez les pièces selon les LED</string>
+    <string name="pegasus_auto_move_held">Le coup de l\'application attend que l\'échiquier corresponde</string>
+    <string name="pegasus_mismatch_squares_format">Cases : %1$s</string>
     <string name="pegasus_ambiguous_title">Coup ambigu – veuillez choisir</string>
 
     <string name="opening_ruy_lopez">Partie espagnole (Ruy Lopez)</string>

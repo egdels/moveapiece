@@ -18,6 +18,7 @@ import android.text.SpannableStringBuilder;
 import android.text.TextPaint;
 import android.text.method.LinkMovementMethod;
 import android.text.style.ClickableSpan;
+import android.util.Log;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.ArrayAdapter;
@@ -56,6 +57,7 @@ import de.schliweb.moveapiece.ui.OpeningLibraryActivity;
 import de.schliweb.moveapiece.ui.OpeningNames;
 import de.schliweb.pegasus.bluetooth.AndroidPegasusBleTransport;
 import de.schliweb.pegasus.bluetooth.BlePermissions;
+import de.schliweb.pegasus.core.protocol.BoardState;
 import de.schliweb.pegasus.core.transport.ConnectionState;
 import de.schliweb.pegasus.core.transport.DiscoveredDevice;
 import de.schliweb.pegasus.core.transport.ScanListener;
@@ -98,6 +100,8 @@ public class MainActivity extends AppCompatActivity
      * How the human's moves are matched: against a second human, Stockfish, Maia, or a fixed
      * opening line.
      */
+    private static final String TAG = "MainActivity";
+
     private enum GameMode {
         HUMAN,
         ENGINE,
@@ -272,6 +276,15 @@ public class MainActivity extends AppCompatActivity
      * back too, or {@link #game} and {@link #trainingSession} end up one ply out of step.
      */
     private boolean trainingBookMovePending = false;
+
+    /**
+     * An engine reply that arrived while the physical board was out of sync (mismatched, or no
+     * board dump received yet). Automatic moves are never applied onto a board that cannot follow
+     * them; the reply is applied and guided as soon as {@link #onBoardMismatch} reports the board
+     * back in sync, and dropped whenever the game is reset/undone ({@link
+     * #abandonPendingSearches}).
+     */
+    private String heldEngineMoveUci;
 
     private final Handler trainingHandler = new Handler(Looper.getMainLooper());
     private static final long TRAINING_AUTO_MOVE_DELAY_MS = 600;
@@ -585,6 +598,7 @@ public class MainActivity extends AppCompatActivity
     @Override
     public void onConnectionStateChanged(ConnectionState state) {
         updatePegasusButtonLabel(state);
+        updatePegasusMismatchText();
         // Real-hardware finding: with the screen off, this Samsung device's
         // power management drops the active BLE GATT connection (status=8)
         // almost exactly at the screen-off timeout, and subsequent reconnect
@@ -619,18 +633,31 @@ public class MainActivity extends AppCompatActivity
 
     @Override
     public void onPhysicalMoveConfirmed(String uci) {
+        if (mode == GameMode.TRAINING) {
+            onTrainingMoveConfirmedByDetection(uci);
+            return;
+        }
         applyConfirmedMove(uci, false);
     }
 
     @Override
     public void onBoardMismatch(boolean mismatched) {
-        // The board itself already shows the mismatched squares via LEDs;
-        // no additional on-screen indicator in the MVP.
-        if (!mismatched
-                && mode == GameMode.TRAINING
-                && trainingSession != null
-                && !trainingSession.isComplete()
-                && trainingSession.isHumanTurnNow()) {
+        updatePegasusMismatchText();
+        if (mismatched) {
+            // The board shows the squares via LEDs, the screen shows the banner; any automatic
+            // move due meanwhile is held back (see pegasusBlocksAutoMoves) until resolved.
+            return;
+        }
+        if (heldEngineMoveUci != null && isPairedEngineMode()) {
+            String uci = heldEngineMoveUci;
+            heldEngineMoveUci = null;
+            applyEngineReply(uci);
+            return;
+        }
+        if (mode != GameMode.TRAINING || trainingSession == null || trainingSession.isComplete()) {
+            return;
+        }
+        if (trainingSession.isHumanTurnNow()) {
             // Retries a guideEngineMove() that silently no-op'd because the
             // physical board wasn't synced yet when maybeAdvanceTraining()
             // first tried it (e.g. "Wiederholen" pressed while the board
@@ -641,7 +668,40 @@ public class MainActivity extends AppCompatActivity
             // syncGuide.isActive() branch), so this callback cannot fire at
             // all unless no guide is currently running.
             maybeAdvanceTraining();
+            return;
         }
+        if (!trainingBookMovePending) {
+            // The book side's move was held back because the board was out of sync when its
+            // turn came (pegasusBlocksAutoMoves); play it now.
+            maybeAdvanceTraining();
+            return;
+        }
+        {
+            // Same for the book side's move (applied to the game right away,
+            // guide skipped because the board wasn't in sync at that moment,
+            // e.g. a piece still in hand when the line was restarted). Two
+            // ways the board can have come back in sync: with the position
+            // BEFORE the book move (the bridge still tracks it) - guide it
+            // now - or already WITH it (the bridge was pulled onto the game's
+            // position by onTrainingMoveConfirmedByDetection and the player
+            // set the board up accordingly) - nothing left to guide.
+            if (samePosition(pegasusBridge.trackedFen(), game.toFen())) {
+                guidingTrainingHumanMove = false;
+                onEngineMoveGuidanceComplete();
+            } else {
+                maybeAdvanceTraining();
+            }
+        }
+    }
+
+    /**
+     * Whether two FENs describe the same position for guidance purposes: piece placement and side
+     * to move only. The bridge's own FEN and chesslib's may differ in en-passant/clock fields.
+     */
+    private static boolean samePosition(String fenA, String fenB) {
+        String[] a = fenA.split(" ");
+        String[] b = fenB.split(" ");
+        return a.length >= 2 && b.length >= 2 && a[0].equals(b[0]) && a[1].equals(b[1]);
     }
 
     @Override
@@ -652,6 +712,76 @@ public class MainActivity extends AppCompatActivity
     @Override
     public void onAmbiguousMove(List<String> candidateUcis) {
         showAmbiguousMoveDialog(candidateUcis);
+    }
+
+    @Override
+    public void onGuideDeviation(boolean deviating) {
+        updatePegasusMismatchText();
+    }
+
+    /**
+     * Whether an automatic move (engine reply, book move) must currently be held back: the Pegasus
+     * board is connected but not in sync with the game, so it could not be guided and the player
+     * would be left with a screen that ran ahead of the board.
+     */
+    private boolean pegasusBlocksAutoMoves() {
+        return pegasusBridge.getConnectionState() == ConnectionState.CONNECTED
+                && !pegasusBridge.isBoardInSync();
+    }
+
+    /**
+     * Applies an engine reply to the game and guides it on the physical board - or, while the board
+     * is out of sync, holds it back in {@link #heldEngineMoveUci} until {@link #onBoardMismatch}
+     * reports the board restored.
+     */
+    private void applyEngineReply(String uci) {
+        if (pegasusBlocksAutoMoves()) {
+            Log.i(TAG, "holding engine move " + uci + ": physical board not in sync");
+            heldEngineMoveUci = uci;
+            refreshBoard();
+            return;
+        }
+        applyConfirmedMove(uci, true);
+    }
+
+    /** Banner + board highlight while the physical board disagrees with the position on screen. */
+    private void updatePegasusMismatchText() {
+        boolean mismatched =
+                pegasusBridge.getConnectionState() == ConnectionState.CONNECTED
+                        && pegasusBridge.isBoardMismatched();
+        if (!mismatched) {
+            binding.pegasusMismatchText.setVisibility(View.GONE);
+            binding.boardView.setMismatchSquares(java.util.Collections.emptyList());
+            return;
+        }
+        List<Square> squares = new ArrayList<>();
+        List<String> names = new ArrayList<>();
+        for (int index : pegasusBridge.mismatchSquares()) {
+            String name = BoardState.squareName(index);
+            names.add(name);
+            squares.add(Square.valueOf(name.toUpperCase(Locale.ROOT)));
+        }
+        binding.boardView.setMismatchSquares(squares);
+        boolean autoMoveHeld =
+                heldEngineMoveUci != null
+                        || (mode == GameMode.TRAINING
+                                && trainingSession != null
+                                && !trainingSession.isComplete()
+                                && !trainingSession.isHumanTurnNow()
+                                && !trainingBookMovePending);
+        StringBuilder text = new StringBuilder(getString(R.string.pegasus_board_mismatch));
+        if (!names.isEmpty()) {
+            text.append('\n')
+                    .append(
+                            getString(
+                                    R.string.pegasus_mismatch_squares_format,
+                                    String.join(", ", names)));
+        }
+        if (autoMoveHeld) {
+            text.append('\n').append(getString(R.string.pegasus_auto_move_held));
+        }
+        binding.pegasusMismatchText.setText(text.toString());
+        binding.pegasusMismatchText.setVisibility(View.VISIBLE);
     }
 
     @Override
@@ -929,6 +1059,7 @@ public class MainActivity extends AppCompatActivity
         updateStatusText();
         updateMoveHistory();
         updateTrainingProgressText();
+        updatePegasusMismatchText();
         updateEngineStrengthText();
         updateTrainingHintHighlight();
         maybeTriggerAnalysis();
@@ -1905,6 +2036,7 @@ public class MainActivity extends AppCompatActivity
         engine.stop();
         searchGeneration++;
         waitingForEngineMove = false;
+        heldEngineMoveUci = null;
         stopPendingMaiaMove();
         waitingForHint = false;
         if (multiPvSearchActive) {
@@ -1966,6 +2098,30 @@ public class MainActivity extends AppCompatActivity
     // ---- Training mode ------------------------------------------------------
 
     /** Applies a training move confirmed by disconnected auto-play or an on-screen tap. */
+
+    /**
+     * A move confirmed by plain move detection during training. Normally impossible: while a guide
+     * is active, the bridge routes physical events to it exclusively, and the trainee's own move is
+     * always guided. The one exception is a book-side capture completed by follow-up proof (the
+     * trainee already lifted a piece before the capture was proven, see the bridge's {@code
+     * isGuidedCaptureProvenByFollowUp}): the board was mid-move when the trainee's guide would have
+     * started, so {@code guideEngineMove} no-op'd and the move arrives here instead. Accept it if
+     * it is the line's expected move; otherwise pull the bridge's position back to the game's so
+     * the wrong move lights up as a mismatch until undone, after which the retry in {@link
+     * #onBoardMismatch} starts the guide as usual.
+     */
+    private void onTrainingMoveConfirmedByDetection(String uci) {
+        guidingTrainingHumanMove = false;
+        if (trainingSession != null
+                && !trainingSession.isComplete()
+                && trainingSession.isHumanTurnNow()
+                && uci.equals(trainingSession.currentExpectedUci())) {
+            applyTrainingMove(uci);
+            return;
+        }
+        syncPegasusPosition();
+    }
+
     private void applyTrainingMove(String uci) {
         if (!applyUciToGame(uci)) {
             refreshBoard();
@@ -1992,7 +2148,7 @@ public class MainActivity extends AppCompatActivity
         }
         boolean connected = pegasusBridge.getConnectionState() == ConnectionState.CONNECTED;
         if (trainingSession.isHumanTurnNow()) {
-            if (connected) {
+            if (connected && !pegasusBridge.isGuideActive()) {
                 guidingTrainingHumanMove = true;
                 pegasusBridge.guideEngineMove(
                         trainingSession.currentExpectedUci(), trainingSession.hintsEnabled());
@@ -2000,6 +2156,20 @@ public class MainActivity extends AppCompatActivity
             // Disconnected: the board is already interactive and waits for a matching tap.
             refreshBoard();
         } else if (connected) {
+            if (trainingBookMovePending && pegasusBridge.isGuideActive()) {
+                return; // already applied and being guided
+            }
+            if (pegasusBlocksAutoMoves()) {
+                // Never run ahead of a board that can't follow: onBoardMismatch(false) calls
+                // back here once the board is in sync.
+                Log.i(
+                        TAG,
+                        "holding book move "
+                                + trainingSession.currentExpectedUci()
+                                + ": physical board not in sync");
+                refreshBoard();
+                return;
+            }
             String uci = trainingSession.currentExpectedUci();
             applyUciToGame(uci);
             refreshBoard();
@@ -2367,7 +2537,7 @@ public class MainActivity extends AppCompatActivity
             refreshBoard();
             return;
         }
-        applyConfirmedMove(bestMoveUci, true);
+        applyEngineReply(bestMoveUci);
     }
 
     @Override
@@ -2539,7 +2709,7 @@ public class MainActivity extends AppCompatActivity
             return;
         }
         waitingForEngineMove = false;
-        applyConfirmedMove(bestMoveUci, true);
+        applyEngineReply(bestMoveUci);
     }
 
     /**

@@ -615,4 +615,121 @@ public class PegasusGameBridgeTest {
                 "expected guidance to complete once the capture was actually reproduced",
                 listener.guidanceComplete.await(TIMEOUT_SECONDS, TimeUnit.SECONDS));
     }
+
+    /**
+     * Complement to {@link
+     * #guideEngineCaptureMove_completesOnlyAfterTheCapturedPieceIsActuallyReplaced}: swapping the
+     * captured piece for the attacker can be faster than the board's scan, so the destination is
+     * never reported empty at all. The proof the guide waits for then can never arrive, and without
+     * a way out every later move would be silently ignored (observed on hardware 2026-09-25). Once
+     * the board has been at rest in that state for {@code GUIDED_CAPTURE_SETTLE_MS}, guidance must
+     * complete on its own.
+     */
+    @Test
+    public void guideEngineCaptureMove_completesAfterSettleWindowWhenDestinationNeverSeenEmpty()
+            throws InterruptedException {
+        FakeTransport transport = new FakeTransport();
+        RecordingListener listener = new RecordingListener();
+        PegasusGameBridge bridge = newBridgeOnMainThread(transport, listener);
+
+        InstrumentationRegistry.getInstrumentation()
+                .runOnMainSync(() -> bridge.connect(DEVICE_ADDRESS));
+        assertTrue(listener.connected.await(TIMEOUT_SECONDS, TimeUnit.SECONDS));
+
+        String captureFen = "7k/8/8/q7/N7/8/8/7K b - - 0 1";
+        InstrumentationRegistry.getInstrumentation()
+                .runOnMainSync(() -> bridge.syncBoardToPosition(captureFen));
+
+        byte[] payload = new byte[BoardState.SQUARE_COUNT];
+        payload[BoardState.squareIndex("h8")] = 1;
+        payload[BoardState.squareIndex("a5")] = 1;
+        payload[BoardState.squareIndex("a4")] = 1;
+        payload[BoardState.squareIndex("h1")] = 1;
+        transport.feed(frame(PegasusMessageType.BOARD_DUMP, payload));
+        assertTrue(listener.synced.await(TIMEOUT_SECONDS, TimeUnit.SECONDS));
+
+        InstrumentationRegistry.getInstrumentation()
+                .runOnMainSync(() -> bridge.guideEngineMove("a5a4"));
+
+        // Only the origin ever changes: the knight on a4 was swapped for the
+        // queen without a4 ever being reported empty in between.
+        transport.feed(fieldUpdateFrame("a5", 0));
+        assertFalse(
+                "must not complete before the settle window has elapsed",
+                listener.guidanceComplete.await(300, TimeUnit.MILLISECONDS));
+        assertTrue(
+                "expected guidance to complete once the board stayed at rest",
+                listener.guidanceComplete.await(TIMEOUT_SECONDS, TimeUnit.SECONDS));
+    }
+
+    /**
+     * The other way out of the never-seen-empty case: the player simply plays on. Lifting a piece
+     * of the side to move from the resulting position proves the capture at once - no settle window
+     * - and that very event must then reach move detection as the start of the next move.
+     */
+    @Test
+    public void guideEngineCaptureMove_completesAtOnceWhenPlayContinuesFromTheResult()
+            throws InterruptedException {
+        FakeTransport transport = new FakeTransport();
+        RecordingListener listener = new RecordingListener();
+        PegasusGameBridge bridge = newBridgeOnMainThread(transport, listener);
+
+        InstrumentationRegistry.getInstrumentation()
+                .runOnMainSync(() -> bridge.connect(DEVICE_ADDRESS));
+        assertTrue(listener.connected.await(TIMEOUT_SECONDS, TimeUnit.SECONDS));
+
+        String captureFen = "7k/8/8/q7/N7/8/8/7K b - - 0 1";
+        InstrumentationRegistry.getInstrumentation()
+                .runOnMainSync(() -> bridge.syncBoardToPosition(captureFen));
+
+        byte[] payload = new byte[BoardState.SQUARE_COUNT];
+        payload[BoardState.squareIndex("h8")] = 1;
+        payload[BoardState.squareIndex("a5")] = 1;
+        payload[BoardState.squareIndex("a4")] = 1;
+        payload[BoardState.squareIndex("h1")] = 1;
+        transport.feed(frame(PegasusMessageType.BOARD_DUMP, payload));
+        assertTrue(listener.synced.await(TIMEOUT_SECONDS, TimeUnit.SECONDS));
+
+        InstrumentationRegistry.getInstrumentation()
+                .runOnMainSync(() -> bridge.guideEngineMove("a5a4"));
+
+        transport.feed(fieldUpdateFrame("a5", 0)); // a4 swapped without ever reading empty
+        transport.feed(fieldUpdateFrame("h1", 0)); // White already lifts the king
+        assertTrue(
+                "expected the lifted king to prove the capture without waiting for the settle window",
+                listener.guidanceComplete.await(300, TimeUnit.MILLISECONDS));
+
+        transport.feed(fieldUpdateFrame("g1", 1)); // ... and plays Kg1
+        assertTrue(listener.moveConfirmed.await(TIMEOUT_SECONDS, TimeUnit.SECONDS));
+        assertEquals("h1g1", listener.confirmedUci.get());
+    }
+
+    /**
+     * A piece already in hand when guidance is requested - typically the very piece about to be
+     * moved, picked up before the line was started (hardware, 2026-09-25) - must not make the guide
+     * refuse: the board is the current position minus a lifted piece, nothing stands anywhere it
+     * shouldn't, so the guide can indicate the remaining difference (here just e4) and complete
+     * once the piece lands there.
+     */
+    @Test
+    public void guideEngineMove_startsWithThePieceAlreadyInHand() throws InterruptedException {
+        FakeTransport transport = new FakeTransport();
+        RecordingListener listener = new RecordingListener();
+        PegasusGameBridge bridge = newBridgeOnMainThread(transport, listener);
+
+        InstrumentationRegistry.getInstrumentation()
+                .runOnMainSync(() -> bridge.connect(DEVICE_ADDRESS));
+        assertTrue(listener.connected.await(TIMEOUT_SECONDS, TimeUnit.SECONDS));
+        transport.feed(startingBoardDumpFrame());
+        assertTrue(listener.synced.await(TIMEOUT_SECONDS, TimeUnit.SECONDS));
+
+        transport.feed(fieldUpdateFrame("e2", 0)); // pawn picked up before the line starts
+        InstrumentationRegistry.getInstrumentation()
+                .runOnMainSync(() -> bridge.guideEngineMove("e2e4"));
+
+        transport.feed(fieldUpdateFrame("e4", 1));
+        assertTrue(
+                "expected guidance to start despite the lifted pawn and complete on e4",
+                listener.guidanceComplete.await(TIMEOUT_SECONDS, TimeUnit.SECONDS));
+    }
 }

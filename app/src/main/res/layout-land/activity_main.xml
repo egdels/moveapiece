@@ -52,6 +52,39 @@
             app:layout_constraintEnd_toEndOf="parent" />
 
         <TextView
+
+            android:id="@+id/pegasusMismatchText"
+
+            android:layout_width="0dp"
+
+            android:layout_height="wrap_content"
+
+            android:layout_marginStart="16dp"
+
+            android:layout_marginEnd="16dp"
+
+            android:gravity="center"
+
+            android:textAppearance="?attr/textAppearanceBodyMedium"
+
+            android:textColor="?attr/colorError"
+
+            android:textStyle="bold"
+
+            android:visibility="gone"
+
+            tools:text="@string/pegasus_board_mismatch"
+
+            tools:visibility="visible"
+
+            app:layout_constraintTop_toBottomOf="@id/statusText"
+
+            app:layout_constraintStart_toStartOf="parent"
+
+            app:layout_constraintEnd_toEndOf="parent" />
+
+
+        <TextView
             android:id="@+id/trainingProgressText"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
@@ -60,7 +93,7 @@
             android:visibility="gone"
             tools:text="Italienische Partie – Zug 3 von 10"
             tools:visibility="visible"
-            app:layout_constraintTop_toBottomOf="@id/statusText"
+            app:layout_constraintTop_toBottomOf="@id/pegasusMismatchText"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent" />
 

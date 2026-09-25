@@ -18,8 +18,11 @@ import com.github.bhlangonijr.chesslib.Piece;
 import com.github.bhlangonijr.chesslib.Square;
 import de.schliweb.moveapiece.R;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Renders an 8x8 chess board and turns taps into move requests. Holds no chess rules itself: it
@@ -48,6 +51,8 @@ public class BoardView extends View {
     private final Paint lastMovePaint = new Paint();
     private final Paint checkPaint = new Paint();
     private final Paint trainingHintPaint = new Paint();
+    private final Paint mismatchPaint = new Paint();
+    private final Paint mismatchStrokePaint = new Paint();
     private final Paint piecePaint = new Paint();
 
     /** File/rank labels drawn in a light square's corner - dark, for contrast. */
@@ -70,6 +75,7 @@ public class BoardView extends View {
     private Square checkedKingSquare = null;
     private Square trainingHintFrom = null;
     private Square trainingHintTo = null;
+    private Set<Square> mismatchSquares = EnumSet.noneOf(Square.class);
 
     private MoveSource moveSource;
     private OnMoveListener onMoveListener;
@@ -94,6 +100,10 @@ public class BoardView extends View {
         lastMovePaint.setColor(getResources().getColor(R.color.board_last_move, null));
         checkPaint.setColor(getResources().getColor(R.color.board_check, null));
         trainingHintPaint.setColor(getResources().getColor(R.color.board_training_hint, null));
+        mismatchPaint.setColor(getResources().getColor(R.color.board_mismatch, null));
+        mismatchStrokePaint.setColor(getResources().getColor(R.color.board_mismatch, null));
+        mismatchStrokePaint.setStyle(Paint.Style.STROKE);
+        mismatchStrokePaint.setAntiAlias(true);
         // Reuses the board's own two colors swapped, rather than a fixed gray, so the
         // labels always read clearly against whichever square they sit on.
         coordOnLightPaint.setColor(getResources().getColor(R.color.board_dark, null));
@@ -154,6 +164,20 @@ public class BoardView extends View {
 
     public void setCheckedKingSquare(Square square) {
         this.checkedKingSquare = square;
+        invalidate();
+    }
+
+    /**
+     * Squares on which the connected physical board disagrees with this position - the same ones
+     * its LEDs show; an empty collection clears the highlight.
+     */
+    public void setMismatchSquares(Collection<Square> squares) {
+        Set<Square> next = EnumSet.noneOf(Square.class);
+        next.addAll(squares);
+        if (next.equals(mismatchSquares)) {
+            return;
+        }
+        this.mismatchSquares = next;
         invalidate();
     }
 
@@ -227,6 +251,17 @@ public class BoardView extends View {
                 }
                 if (square == checkedKingSquare) {
                     canvas.drawRect(left, top, left + squareSize, top + squareSize, checkPaint);
+                }
+                if (mismatchSquares.contains(square)) {
+                    canvas.drawRect(left, top, left + squareSize, top + squareSize, mismatchPaint);
+                    float inset = squareSize * 0.04f;
+                    mismatchStrokePaint.setStrokeWidth(squareSize * 0.08f);
+                    canvas.drawRect(
+                            left + inset,
+                            top + inset,
+                            left + squareSize - inset,
+                            top + squareSize - inset,
+                            mismatchStrokePaint);
                 }
                 if (square == selected) {
                     canvas.drawRect(left, top, left + squareSize, top + squareSize, selectedPaint);

@@ -201,6 +201,11 @@
     -fx-text-fill: -primary-dark;
 }
 
+.mismatch-label {
+    -fx-text-fill: -danger;
+    -fx-font-weight: bold;
+}
+
 .training-progress-label {
     -fx-text-fill: -secondary;
     -fx-font-style: italic;

@@ -8,8 +8,11 @@ package de.schliweb.moveapiece.desktop;
 import com.github.bhlangonijr.chesslib.Piece;
 import com.github.bhlangonijr.chesslib.Square;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.image.Image;
@@ -46,6 +49,7 @@ public class BoardCanvas extends Canvas {
     private static final Color LAST_MOVE = Color.web("#CCCC33A6");
     private static final Color CHECK = Color.web("#553030E0");
     private static final Color TRAINING_HINT = Color.web("#3399CCA6");
+    private static final Color MISMATCH = Color.web("#E0303090");
 
     private static final EnumMap<Piece, Image> PIECE_IMAGES = loadPieceImages();
 
@@ -58,6 +62,7 @@ public class BoardCanvas extends Canvas {
     private Square checkedKingSquare = null;
     private Square trainingHintFrom = null;
     private Square trainingHintTo = null;
+    private Set<Square> mismatchSquares = EnumSet.noneOf(Square.class);
 
     private MoveSource moveSource;
     private OnMoveListener onMoveListener;
@@ -119,6 +124,20 @@ public class BoardCanvas extends Canvas {
 
     public void setCheckedKingSquare(Square square) {
         this.checkedKingSquare = square;
+        draw();
+    }
+
+    /**
+     * Squares on which the connected physical board disagrees with this position - the same ones
+     * its LEDs show; an empty collection clears the highlight.
+     */
+    public void setMismatchSquares(Collection<Square> squares) {
+        Set<Square> next = EnumSet.noneOf(Square.class);
+        next.addAll(squares);
+        if (next.equals(mismatchSquares)) {
+            return;
+        }
+        this.mismatchSquares = next;
         draw();
     }
 
@@ -186,6 +205,18 @@ public class BoardCanvas extends Canvas {
                 if (square == checkedKingSquare) {
                     gc.setFill(CHECK);
                     gc.fillRect(left, top, squareSize, squareSize);
+                }
+                if (mismatchSquares.contains(square)) {
+                    gc.setFill(MISMATCH);
+                    gc.fillRect(left, top, squareSize, squareSize);
+                    gc.setStroke(MISMATCH);
+                    gc.setLineWidth(squareSize * 0.08);
+                    double inset = squareSize * 0.04;
+                    gc.strokeRect(
+                            left + inset,
+                            top + inset,
+                            squareSize - 2 * inset,
+                            squareSize - 2 * inset);
                 }
                 if (square == selected) {
                     gc.setFill(SELECTED);

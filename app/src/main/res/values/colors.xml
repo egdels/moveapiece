@@ -7,6 +7,7 @@
     <color name="board_last_move">#A6CCCC33</color>
     <color name="board_check">#E0553030</color>
     <color name="board_training_hint">#A63399CC</color>
+    <color name="board_mismatch">#90E03030</color>
 
     <color name="brand_primary">#2E7D32</color>
     <color name="brand_primary_dark">#1B5E20</color>

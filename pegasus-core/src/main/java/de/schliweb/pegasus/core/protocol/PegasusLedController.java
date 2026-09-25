@@ -105,6 +105,11 @@ public final class PegasusLedController {
         forceOff();
     }
 
+    /** Whether this controller currently believes a pattern is lit (see {@link #resend()}). */
+    public boolean isAnyLit() {
+        return anyLit;
+    }
+
     /** Forgets the tracked LED state without sending (e.g. after reconnect). */
     public void resetTracking() {
         anyLit = false;

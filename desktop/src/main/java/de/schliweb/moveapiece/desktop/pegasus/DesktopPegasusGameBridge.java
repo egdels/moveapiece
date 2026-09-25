@@ -11,6 +11,7 @@ import de.schliweb.pegasus.core.chess.OccupancyProjection;
 import de.schliweb.pegasus.core.chess.Piece;
 import de.schliweb.pegasus.core.chess.PieceColor;
 import de.schliweb.pegasus.core.chess.PieceType;
+import de.schliweb.pegasus.core.movedetect.BoardMismatch;
 import de.schliweb.pegasus.core.movedetect.BoardSyncGuide;
 import de.schliweb.pegasus.core.movedetect.MoveDetectionResult;
 import de.schliweb.pegasus.core.movedetect.MoveDetectionState;
@@ -88,6 +89,16 @@ public class DesktopPegasusGameBridge {
 
         void onEngineMoveGuidanceComplete();
 
+        /**
+         * While a {@link #guideEngineMove} is in progress, the board has (or no longer has) pieces
+         * standing or missing on squares other than the guided move's own - the same thing a
+         * BOARD_MISMATCH means outside a guide, which {@link #onBoardMismatch} cannot report then
+         * because physical events are routed to the guide. Fired on every guide indication while
+         * deviating and once when the deviation clears; see {@link #isBoardMismatched()} and {@link
+         * #mismatchSquares()} for the current state.
+         */
+        default void onGuideDeviation(boolean deviating) {}
+
         void onTransportError(TransportError error, String detail);
 
         /**
@@ -106,7 +117,29 @@ public class DesktopPegasusGameBridge {
     private static final long INIT_COMMAND_SPACING_MS = 1500;
     private static final long KEEPALIVE_POLL_INTERVAL_MS = 2000;
     private static final byte[] KEEPALIVE_POLL_COMMAND = {0x45};
+
+    /**
+     * Re-send interval for the check indicator (pulse speed, which fades after ~1-2 s on real
+     * hardware - CONFIRMED_ON_HARDWARE 2026-08-28). Only that pattern is refreshed on a timer: the
+     * default speed 0x02 alternate-blinks the listed squares, and re-sending such a pattern
+     * restarts the alternation at its first square - a periodic refresh of a two-square move
+     * indication left only one of the squares ever visible (observed on hardware 2026-09-25).
+     */
     private static final long CHECK_INDICATOR_REFRESH_MS = 900;
+
+    /**
+     * How long a guided capture may sit "unproven" - the physical board already matches the guide's
+     * target occupancy, but the destination square was never observed going empty - with no further
+     * physical events before the guide is completed anyway. Swapping the captured piece for the
+     * attacker on the destination can be quicker than the board's scan, so the square is never
+     * reported empty in between; without this window the guide would then wait forever for a proof
+     * that can no longer arrive, silently blocking every subsequent move (observed on hardware
+     * 2026-09-25, LEDs showing only the destination). Completing early is safe here, unlike for a
+     * detected move: a guided move is forced, and whatever physical steps are still outstanding at
+     * that point (removing the captured piece, setting the attacker down) are all lift/replace
+     * events on the destination that the detector resolves as POSITION_RESTORED.
+     */
+    private static final long GUIDED_CAPTURE_SETTLE_MS = 1000;
 
     private final PegasusTransport transport;
     private final ScheduledExecutorService scheduler =
@@ -125,10 +158,15 @@ public class DesktopPegasusGameBridge {
                     new BoardSyncGuide.Listener() {
                         @Override
                         public void onIndicate(List<Integer> squares) {
+                            LOG.log(
+                                    Level.INFO,
+                                    "guide: board differs from target of {0} on {1}",
+                                    new Object[] {guideMoveUci, squareNames(squares)});
                             ledController.showSquares(
                                     shouldRevealGuideLeds(squares)
                                             ? squares
                                             : Collections.emptyList());
+                            notifyGuideDeviation();
                         }
 
                         @Override
@@ -162,11 +200,13 @@ public class DesktopPegasusGameBridge {
     private String guideMoveUci;
     private ChessPosition guideTargetPosition;
     private Integer guideCaptureSquare;
+    private boolean guideDeviating;
     private volatile Listener listener;
     private final java.util.Set<Integer> squaresSeenEmpty = new java.util.HashSet<>();
     private SessionRecorder sessionRecorder;
     private ScheduledFuture<?> keepaliveFuture;
     private ScheduledFuture<?> checkIndicatorFuture;
+    private ScheduledFuture<?> guidedCaptureSettleFuture;
 
     /**
      * Pending, not-yet-fired writes of {@link #sendOfficialInitSequence()}. The sequence spans 12 s
@@ -359,6 +399,15 @@ public class DesktopPegasusGameBridge {
                             },
                             INIT_COMMAND_SPACING_MS * i));
         }
+        // The first board dump (answer to the board-state request above) arrives
+        // while the burst is still going, and a mismatch found in it lights LEDs
+        // right away - i.e. in between the remaining init commands. Observed on
+        // hardware 2026-09-25: that pattern was logged as sent but never showed
+        // on the board (init still in progress, or wiped by the update-mode
+        // command). Re-assert whatever is currently lit once the burst is over;
+        // a no-op when nothing is (or no longer) lit.
+        initSequenceFutures.add(
+                postDelayed(this::reassertLedsAfterInit, INIT_COMMAND_SPACING_MS * seq.length));
         keepaliveFuture =
                 postDelayed(this::sendKeepalivePoll, INIT_COMMAND_SPACING_MS * seq.length);
     }
@@ -377,6 +426,14 @@ public class DesktopPegasusGameBridge {
      * Self-rescheduling keepalive: stops on its own once the connection is no longer CONNECTED
      * (e.g. after disconnect()/shutdown()), matching the reference implementation's design.
      */
+    private void reassertLedsAfterInit() {
+        LOG.log(
+                Level.INFO,
+                "init sequence done - re-asserting LEDs (anything lit: {0})",
+                ledController.isAnyLit());
+        ledController.resend();
+    }
+
     private void sendKeepalivePoll() {
         if (transport.getConnectionState() != ConnectionState.CONNECTED) {
             LOG.log(Level.FINE, "keepalive: skipped, state={0}", transport.getConnectionState());
@@ -463,17 +520,39 @@ public class DesktopPegasusGameBridge {
 
     private void feedDetector() {
         if (syncGuide.isActive()) {
+            cancel(guidedCaptureSettleFuture);
             if (isGuidedCaptureUnproven()) {
+                LOG.log(
+                        Level.INFO,
+                        "guide: board matches target of {0}, but capture square {1} was never seen"
+                                + " empty - settling in {2,number,#} ms unless the board changes",
+                        new Object[] {
+                            guideMoveUci,
+                            BoardState.squareName(guideCaptureSquare),
+                            GUIDED_CAPTURE_SETTLE_MS
+                        });
                 List<Integer> captureSquareOnly = Collections.singletonList(guideCaptureSquare);
                 ledController.showSquares(
                         shouldRevealGuideLeds(captureSquareOnly)
                                 ? captureSquareOnly
                                 : Collections.emptyList());
-            } else {
-                syncGuide.onPhysicalBoard(physicalBoard);
+                guidedCaptureSettleFuture =
+                        postDelayed(this::settleUnprovenGuidedCapture, GUIDED_CAPTURE_SETTLE_MS);
+                ledController.resend();
+                return;
             }
-            ledController.resend();
-            return;
+            if (!isGuidedCaptureProvenByFollowUp()) {
+                syncGuide.onPhysicalBoard(physicalBoard);
+                ledController.resend();
+                return;
+            }
+            LOG.log(
+                    Level.INFO,
+                    "guide: board explained as play continuing after {0} - treating it as executed",
+                    guideMoveUci);
+            completeGuideProvenByFollowUp();
+            // Fall through: the event that proved the capture is itself the
+            // first physical event of the next move, so the detector must see it.
         }
         List<Move> priorPending = moveDetector.pendingCandidates();
         MoveDetectionResult result = moveDetector.onPhysicalBoard(physicalBoard);
@@ -495,6 +574,90 @@ public class DesktopPegasusGameBridge {
                 && physicalBoard != null
                 && OccupancyProjection.normalize(physicalBoard)
                         .equals(OccupancyProjection.occupancyOf(guideTargetPosition));
+    }
+
+    /**
+     * Fires {@link #GUIDED_CAPTURE_SETTLE_MS} after the last physical event left the guide in the
+     * "capture unproven" state (see {@link #isGuidedCaptureUnproven}): treats the capture as
+     * executed and lets the guide complete. Every physical event in between cancels and reschedules
+     * it ({@link #feedDetector}), so it only ever fires on a board at rest.
+     */
+    private void settleUnprovenGuidedCapture() {
+        if (!syncGuide.isActive() || !isGuidedCaptureUnproven()) {
+            return;
+        }
+        LOG.log(
+                Level.INFO,
+                "guide: capture square {0} still unproven after {1,number,#} ms of silence"
+                        + " - treating {2} as executed",
+                new Object[] {
+                    BoardState.squareName(guideCaptureSquare),
+                    GUIDED_CAPTURE_SETTLE_MS,
+                    guideMoveUci
+                });
+        squaresSeenEmpty.add(guideCaptureSquare);
+        syncGuide.onPhysicalBoard(physicalBoard);
+        ledController.resend();
+    }
+
+    /**
+     * The other way out of an unproven guided capture (see {@link #isGuidedCaptureUnproven}),
+     * without waiting for {@link #GUIDED_CAPTURE_SETTLE_MS}: the player has already gone on to play
+     * from the resulting position. The guided move's own squares are in their post-move state
+     * (origin empty, destination occupied), the board differs from the target elsewhere, and a
+     * fresh detector on the target position explains that difference as a legal move in progress or
+     * completed rather than a BOARD_MISMATCH. Same reasoning as {@link
+     * MoveDetector#wouldResolveIfCommitted} for detected captures: a continuation that only makes
+     * sense once the capture is treated as finished is itself proof of it. Deliberately excludes
+     * the capture's own intermediate states (captured piece removed, attacker still in hand) -
+     * those only touch the guided move's squares and stay with the guide until proven.
+     */
+    private boolean isGuidedCaptureProvenByFollowUp() {
+        if (guideCaptureSquare == null || physicalBoard == null) {
+            return false;
+        }
+        BoardState physical = OccupancyProjection.normalize(physicalBoard);
+        BoardState target = OccupancyProjection.occupancyOf(guideTargetPosition);
+        if (physical.equals(target)
+                || physical.isOccupied(guideExpectedFrom)
+                || !physical.isOccupied(guideCaptureSquare)) {
+            return false;
+        }
+        MoveDetector trial = new MoveDetector(guideTargetPosition, null);
+        trial.onPhysicalBoard(target);
+        return trial.onPhysicalBoard(physical).kind() != MoveDetectionResult.Kind.BOARD_MISMATCH;
+    }
+
+    /**
+     * Completes the guide per {@link #isGuidedCaptureProvenByFollowUp}. Unlike {@link
+     * #onGuideTargetReached}, the detector is resynchronized to the target <em>occupancy</em>
+     * rather than the current physical board: the board is already mid-move, and a detector reset
+     * against it would only report BOARD_MISMATCH (no detection before the first exact match) - the
+     * caller feeds the real physical state through the normal detection path right after.
+     */
+    private void completeGuideProvenByFollowUp() {
+        clearGuideDeviation();
+        ChessPosition newPosition = guideTargetPosition;
+        cancel(guidedCaptureSettleFuture);
+        syncGuide.cancel();
+        guideMoveUci = null;
+        guideTargetPosition = null;
+        guideCaptureSquare = null;
+        squaresSeenEmpty.clear();
+        moveDetector.reset(newPosition, OccupancyProjection.occupancyOf(newPosition));
+        updateCheckIndicator();
+        Listener l = listener();
+        if (l != null) {
+            l.onEngineMoveGuidanceComplete();
+        }
+    }
+
+    private static List<String> squareNames(List<Integer> squares) {
+        List<String> names = new ArrayList<>(squares.size());
+        for (int square : squares) {
+            names.add(BoardState.squareName(square));
+        }
+        return names;
     }
 
     private void dispatchDetectionResult(MoveDetectionResult result) {
@@ -598,6 +761,113 @@ public class DesktopPegasusGameBridge {
         }
     }
 
+    /**
+     * FEN of the bridge's own tracked position (see the class javadoc on why it keeps one). Lets a
+     * host compare it with its authoritative game position, e.g. to tell whether a pending guided
+     * move has already been executed on the board.
+     */
+    public String trackedFen() {
+        return moveDetector.position().toFen();
+    }
+
+    /**
+     * Whether the physical board is known to match the tracked position closely enough for play to
+     * continue from it: synchronized, or merely with pieces lifted / a move pending resolution.
+     * False before the first board dump of a connection and while the board is mismatched - the
+     * host holds any automatic move (engine reply, book move) back until this is true again.
+     */
+    public boolean isBoardInSync() {
+        MoveDetectionState state = moveDetector.state();
+        return state != MoveDetectionState.AWAITING_BOARD
+                && state != MoveDetectionState.BOARD_MISMATCH;
+    }
+
+    /**
+     * Whether the board currently disagrees with the tracked position (LEDs show the squares) -
+     * outside a guide per the detector, during a guide per {@link #guideDeviationSquares()}.
+     */
+    public boolean isBoardMismatched() {
+        return moveDetector.state() == MoveDetectionState.BOARD_MISMATCH
+                || !guideDeviationSquares().isEmpty();
+    }
+
+    /**
+     * The squares the board currently disagrees on while {@link #isBoardMismatched()}: those that
+     * should be occupied but are empty, followed by those occupied although they should be empty -
+     * the same set the LEDs show, as DGT square indices ({@link BoardState#squareName}). Empty when
+     * not mismatched.
+     */
+    public List<Integer> mismatchSquares() {
+        if (syncGuide.isActive()) {
+            return guideDeviationSquares();
+        }
+        BoardState physical = moveDetector.lastPhysical();
+        if (moveDetector.state() != MoveDetectionState.BOARD_MISMATCH || physical == null) {
+            return Collections.emptyList();
+        }
+        BoardMismatch diff = BoardMismatch.between(moveDetector.expectedOccupancy(), physical);
+        List<Integer> squares = new ArrayList<>(diff.missingOccupied());
+        squares.addAll(diff.unexpectedOccupied());
+        return squares;
+    }
+
+    /**
+     * Squares on which the board deviates from an active guide's target beyond the guided move's
+     * own origin/destination (which are expected to differ until the move is played): pieces lifted
+     * or set down elsewhere meanwhile. Empty when no guide is active.
+     */
+    private List<Integer> guideDeviationSquares() {
+        if (!syncGuide.isActive() || physicalBoard == null) {
+            return Collections.emptyList();
+        }
+        BoardMismatch diff =
+                BoardMismatch.between(
+                        OccupancyProjection.occupancyOf(guideTargetPosition),
+                        OccupancyProjection.normalize(physicalBoard));
+        List<Integer> squares = new ArrayList<>();
+        for (int square : diff.missingOccupied()) {
+            if (square != guideExpectedFrom && square != guideExpectedTo) {
+                squares.add(square);
+            }
+        }
+        for (int square : diff.unexpectedOccupied()) {
+            if (square != guideExpectedFrom && square != guideExpectedTo) {
+                squares.add(square);
+            }
+        }
+        return squares;
+    }
+
+    private void clearGuideDeviation() {
+        if (guideDeviating) {
+            guideDeviating = false;
+            Listener l = listener();
+            if (l != null) {
+                l.onGuideDeviation(false);
+            }
+        }
+    }
+
+    /**
+     * Reports the current guide deviation state to the listener (see Listener#onGuideDeviation).
+     */
+    private void notifyGuideDeviation() {
+        boolean deviating = !guideDeviationSquares().isEmpty();
+        boolean changed = deviating != guideDeviating;
+        guideDeviating = deviating;
+        if (deviating || changed) {
+            Listener l = listener();
+            if (l != null) {
+                l.onGuideDeviation(deviating);
+            }
+        }
+    }
+
+    /** Whether a {@link #guideEngineMove} is currently in progress. */
+    public boolean isGuideActive() {
+        return syncGuide.isActive();
+    }
+
     private void refreshCheckIndicator() {
         if (syncGuide.isActive()
                 || moveDetector.state() == MoveDetectionState.BOARD_MISMATCH
@@ -624,12 +894,37 @@ public class DesktopPegasusGameBridge {
             Move move = Move.fromUci(uciMove == null ? null : uciMove.trim());
             ChessPosition current = moveDetector.position();
             if (!current.legalMoves().contains(move)) {
+                LOG.log(
+                        Level.INFO,
+                        "guide: ignoring {0} - not legal in the tracked position",
+                        move);
                 return;
             }
-            if (physicalBoard == null
-                    || !OccupancyProjection.normalize(physicalBoard)
-                            .equals(OccupancyProjection.occupancyOf(current))) {
+            if (physicalBoard == null) {
+                LOG.log(Level.INFO, "guide: ignoring {0} - no board state received yet", move);
                 return;
+            }
+            // The board must show the current position - or that position with some pieces
+            // merely lifted off it (typically the very piece about to be moved, picked up before
+            // the line was started; observed on hardware 2026-09-25). Anything standing on a
+            // square it shouldn't means a genuinely different position: leave that to the
+            // mismatch LEDs, the host retries once the board is restored.
+            BoardMismatch diff =
+                    BoardMismatch.between(
+                            OccupancyProjection.occupancyOf(current),
+                            OccupancyProjection.normalize(physicalBoard));
+            if (!diff.unexpectedOccupied().isEmpty()) {
+                LOG.log(
+                        Level.INFO,
+                        "guide: ignoring {0} - unexpected pieces on {1}",
+                        new Object[] {move, squareNames(diff.unexpectedOccupied())});
+                return;
+            }
+            if (!diff.missingOccupied().isEmpty()) {
+                LOG.log(
+                        Level.INFO,
+                        "guide: {0} requested with pieces in hand from {1} - guiding anyway",
+                        new Object[] {move, squareNames(diff.missingOccupied())});
             }
             cancel(checkIndicatorFuture);
             guideShowLed = showLed;
@@ -639,8 +934,24 @@ public class DesktopPegasusGameBridge {
             guideTargetPosition = current.apply(move);
             guideCaptureSquare = current.pieceAt(move.to()) != null ? move.to() : null;
             squaresSeenEmpty.clear();
-            syncGuide.start(OccupancyProjection.occupancyOf(guideTargetPosition), physicalBoard);
-            if (guideCaptureSquare != null && showLed) {
+            LOG.log(
+                    Level.INFO,
+                    "guide: started for {0} (capture square {1}, leds {2})",
+                    new Object[] {
+                        guideMoveUci,
+                        guideCaptureSquare == null
+                                ? "none"
+                                : BoardState.squareName(guideCaptureSquare),
+                        showLed
+                    });
+            // Route the current board through feedDetector() rather than handing it to
+            // start() directly: with the attacker of a capture already in hand, the board
+            // matches the target occupancy from the outset, and only feedDetector() knows
+            // that this is the unproven-capture state (LED on the destination, settle window)
+            // rather than "target reached".
+            syncGuide.start(OccupancyProjection.occupancyOf(guideTargetPosition), null);
+            feedDetector();
+            if (guideCaptureSquare != null && showLed && syncGuide.isActive()) {
                 ledController.showMove(move.from(), move.to());
             }
         } catch (IllegalArgumentException ignored) {
@@ -661,6 +972,9 @@ public class DesktopPegasusGameBridge {
     }
 
     private void onGuideTargetReached() {
+        clearGuideDeviation();
+        LOG.log(Level.INFO, "guide: target reached, {0} executed on the board", guideMoveUci);
+        cancel(guidedCaptureSettleFuture);
         ChessPosition newPosition = guideTargetPosition;
         guideMoveUci = null;
         guideTargetPosition = null;
@@ -675,6 +989,8 @@ public class DesktopPegasusGameBridge {
     }
 
     private void abortGuide() {
+        clearGuideDeviation();
+        cancel(guidedCaptureSettleFuture);
         syncGuide.cancel();
         guideMoveUci = null;
         guideTargetPosition = null;
@@ -684,13 +1000,22 @@ public class DesktopPegasusGameBridge {
         guideExpectedTo = -1;
     }
 
-    /** Resynchronizes Pegasus' own parallel position tracking for a new game. */
+    /**
+     * Resynchronizes Pegasus' own parallel position tracking for a new game. A board that does not
+     * match the starting position is lit up as a mismatch right away - {@code off()} above cleared
+     * whatever the previous game showed, and until 2026-09-25 the reset's own result was simply
+     * dropped, so a mismatch that already existed (e.g. a piece in hand while the line was started)
+     * went dark and stayed dark: nothing lights it again until the next physical event.
+     */
     public void resetForNewGame() {
         cancel(checkIndicatorFuture);
         abortGuide();
         ledController.off();
         squaresSeenEmpty.clear();
-        moveDetector.reset(ChessPosition.starting(), physicalBoard);
+        MoveDetectionResult result = moveDetector.reset(ChessPosition.starting(), physicalBoard);
+        if (result.kind() == MoveDetectionResult.Kind.BOARD_MISMATCH) {
+            updateMismatchLeds(result);
+        }
     }
 
     /**

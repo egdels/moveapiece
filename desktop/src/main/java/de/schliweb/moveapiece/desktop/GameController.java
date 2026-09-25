@@ -23,6 +23,7 @@ import de.schliweb.moveapiece.logic.ChessGame;
 import de.schliweb.moveapiece.logic.PgnGames;
 import de.schliweb.moveapiece.training.OpeningLine;
 import de.schliweb.moveapiece.training.TrainingSession;
+import de.schliweb.pegasus.core.protocol.BoardState;
 import de.schliweb.pegasus.core.transport.ConnectionState;
 import de.schliweb.pegasus.core.transport.TransportError;
 import java.io.FileNotFoundException;
@@ -134,6 +135,7 @@ final class GameController
     private final ChessGame game = new ChessGame();
     private final BoardCanvas boardCanvas = new BoardCanvas();
     private final Label statusLabel = new Label();
+    private final Label pegasusMismatchLabel = new Label();
     private final TextFlow moveListFlow = new TextFlow();
     private final ScrollPane moveListScroll = new ScrollPane(moveListFlow);
     private final Slider strengthSlider = new Slider(1320, 3190, Settings.getEngineElo());
@@ -313,6 +315,15 @@ final class GameController
      */
     private boolean trainingBookMovePending = false;
 
+    /**
+     * An engine reply that arrived while the physical board was out of sync (mismatched, or no
+     * board dump received yet). Automatic moves are never applied onto a board that cannot follow
+     * them; the reply is applied and guided as soon as {@link #onBoardMismatch} reports the board
+     * back in sync, and dropped whenever the game is reset/undone ({@link
+     * #abandonPendingSearches}).
+     */
+    private String heldEngineMoveUci;
+
     /** Outlined, circular icon-only button (Material "icon button" look) from raw SVG path data. */
     private static Button iconButton(String svgPathData, String tooltipText) {
         SVGPath icon = new SVGPath();
@@ -470,6 +481,10 @@ final class GameController
         VBox.setVgrow(moveListScroll, Priority.ALWAYS);
 
         statusLabel.getStyleClass().add("status-label");
+        pegasusMismatchLabel.getStyleClass().add("mismatch-label");
+        pegasusMismatchLabel.setWrapText(true);
+        pegasusMismatchLabel.setVisible(false);
+        pegasusMismatchLabel.managedProperty().bind(pegasusMismatchLabel.visibleProperty());
         trainingProgressLabel.getStyleClass().add("training-progress-label");
 
         newGameButton.setOnAction(e -> openGameSetupDialog());
@@ -528,6 +543,7 @@ final class GameController
                         evalBox,
                         moveQualityLabel,
                         statusLabel,
+                        pegasusMismatchLabel,
                         trainingProgressLabel,
                         movesHeading,
                         moveListScroll,
@@ -781,6 +797,7 @@ final class GameController
     @Override
     public void onConnectionStateChanged(ConnectionState state) {
         updatePegasusButtonState(state);
+        updatePegasusMismatchLabel();
         if (state == ConnectionState.CONNECTED) {
             // The bridge only replays moves it actually observed (physical moves,
             // guided engine moves); on-screen play while the board was disconnected
@@ -797,10 +814,7 @@ final class GameController
     @Override
     public void onPhysicalMoveConfirmed(String uci) {
         if (mode == Mode.TRAINING) {
-            // Training mode only ever applies moves via the guided-LED path
-            // (see maybeAdvanceTraining/onEngineMoveGuidanceComplete below) -
-            // while a guide is active, pegasus-core routes physical events to
-            // it exclusively, so this callback cannot fire during training.
+            onTrainingMoveConfirmedByDetection(uci);
             return;
         }
         if (!applyUciToGame(uci)) {
@@ -813,20 +827,129 @@ final class GameController
 
     @Override
     public void onBoardMismatch(boolean mismatched) {
-        // The board itself already shows the mismatched squares via LEDs; no
-        // additional on-screen indicator, matching the Android app.
-        if (!mismatched
-                && mode == Mode.TRAINING
-                && trainingSession != null
-                && !trainingSession.isComplete()
-                && trainingSession.isHumanTurnNow()) {
+        updatePegasusMismatchLabel();
+        if (mismatched) {
+            // The board shows the squares via LEDs, the sidebar shows the banner; any automatic
+            // move due meanwhile is held back (see pegasusBlocksAutoMoves) until resolved.
+            return;
+        }
+        if (heldEngineMoveUci != null && isPairedEngineMode()) {
+            String uci = heldEngineMoveUci;
+            heldEngineMoveUci = null;
+            applyEngineReply(uci);
+            return;
+        }
+        if (mode != Mode.TRAINING || trainingSession == null || trainingSession.isComplete()) {
+            return;
+        }
+        if (trainingSession.isHumanTurnNow()) {
             // Retries a guideEngineMove() that silently no-op'd because the
             // physical board wasn't synced yet when maybeAdvanceTraining()
             // first tried it. Safe unconditionally: while a guide is active,
             // physical events are routed to it exclusively, so this callback
             // cannot fire at all unless no guide is currently running.
             maybeAdvanceTraining();
+            return;
         }
+        if (!trainingBookMovePending) {
+            // The book side's move was held back because the board was out of sync when its
+            // turn came (pegasusBlocksAutoMoves); play it now.
+            maybeAdvanceTraining();
+            return;
+        }
+        // Same for a book move that was applied but whose guide was skipped because the board
+        // wasn't in sync at that moment (e.g. a piece still in hand when the line was restarted).
+        // Two ways the board can have come back in sync: with the position BEFORE the book move
+        // (the bridge still tracks it) - guide it now - or already WITH it (the bridge was pulled
+        // onto the game's position by onTrainingMoveConfirmedByDetection and the player set the
+        // board up accordingly) - nothing left to guide.
+        if (samePosition(pegasusBridge.trackedFen(), game.toFen())) {
+            guidingTrainingHumanMove = false;
+            onEngineMoveGuidanceComplete();
+        } else {
+            maybeAdvanceTraining();
+        }
+    }
+
+    /**
+     * Whether an automatic move (engine reply, book move) must currently be held back: the Pegasus
+     * board is connected but not in sync with the game, so it could not be guided and the player
+     * would be left with a screen that ran ahead of the board.
+     */
+    private boolean pegasusBlocksAutoMoves() {
+        return pegasusBridge != null
+                && pegasusBridge.getConnectionState() == ConnectionState.CONNECTED
+                && !pegasusBridge.isBoardInSync();
+    }
+
+    /**
+     * Applies an engine reply to the game and guides it on the physical board - or, while the board
+     * is out of sync, holds it back in {@link #heldEngineMoveUci} until {@link #onBoardMismatch}
+     * reports the board restored.
+     */
+    private void applyEngineReply(String uci) {
+        if (pegasusBlocksAutoMoves()) {
+            LOG.log(Level.INFO, "holding engine move {0}: physical board not in sync", uci);
+            heldEngineMoveUci = uci;
+            refresh();
+            return;
+        }
+        applyUciToGame(uci);
+        if (pegasusBridge != null
+                && pegasusBridge.getConnectionState() == ConnectionState.CONNECTED) {
+            pegasusBridge.guideEngineMove(uci);
+        }
+        refresh();
+    }
+
+    /** Sidebar banner while the physical board disagrees with the position on screen. */
+    private void updatePegasusMismatchLabel() {
+        boolean mismatched =
+                pegasusBridge != null
+                        && pegasusBridge.getConnectionState() == ConnectionState.CONNECTED
+                        && pegasusBridge.isBoardMismatched();
+        if (!mismatched) {
+            pegasusMismatchLabel.setVisible(false);
+            boardCanvas.setMismatchSquares(List.of());
+            return;
+        }
+        List<Square> squares = new ArrayList<>();
+        List<String> names = new ArrayList<>();
+        for (int index : pegasusBridge.mismatchSquares()) {
+            String name = BoardState.squareName(index);
+            names.add(name);
+            squares.add(Square.fromValue(name.toUpperCase(Locale.ROOT)));
+        }
+        boardCanvas.setMismatchSquares(squares);
+        boolean autoMoveHeld =
+                heldEngineMoveUci != null
+                        || (mode == Mode.TRAINING
+                                && trainingSession != null
+                                && !trainingSession.isComplete()
+                                && !trainingSession.isHumanTurnNow()
+                                && !trainingBookMovePending);
+        String text = Messages.get("pegasus_board_mismatch");
+        if (!names.isEmpty()) {
+            text +=
+                    "\n"
+                            + Messages.get(
+                                    "pegasus_mismatch_squares_format", String.join(", ", names));
+        }
+        if (autoMoveHeld) {
+            text += "\n" + Messages.get("pegasus_auto_move_held");
+        }
+        pegasusMismatchLabel.setText(text);
+        pegasusMismatchLabel.setVisible(true);
+    }
+
+    /**
+     * Whether two FENs describe the same position for guidance purposes: piece placement and side
+     * to move only. The bridge's own FEN and chesslib's may differ in en-passant/clock fields.
+     */
+    private static boolean samePosition(String fenA, String fenB) {
+        String[] a = fenA.split(" ");
+        String[] b = fenB.split(" ");
+        return a.length >= 2 && b.length >= 2 && a[0].equals(b[0]) && a[1].equals(b[1]);
     }
 
     @Override
@@ -837,6 +960,11 @@ final class GameController
     @Override
     public void onAmbiguousMove(List<String> candidateUcis) {
         showAmbiguousMoveDialog(candidateUcis);
+    }
+
+    @Override
+    public void onGuideDeviation(boolean deviating) {
+        updatePegasusMismatchLabel();
     }
 
     @Override
@@ -1306,6 +1434,7 @@ final class GameController
         }
         searchGeneration++;
         waitingForEngineMove = false;
+        heldEngineMoveUci = null;
         stopPendingMaiaMove();
         waitingForHint = false;
         if (multiPvSearchActive) {
@@ -1573,12 +1702,7 @@ final class GameController
             return;
         }
         waitingForEngineMove = false;
-        applyUciToGame(bestMoveUci);
-        if (pegasusBridge != null
-                && pegasusBridge.getConnectionState() == ConnectionState.CONNECTED) {
-            pegasusBridge.guideEngineMove(bestMoveUci);
-        }
-        refresh();
+        applyEngineReply(bestMoveUci);
     }
 
     /**
@@ -1678,6 +1802,7 @@ final class GameController
             statusLabel.getStyleClass().add("check");
         }
         updateTrainingProgressLabel();
+        updatePegasusMismatchLabel();
         updateTrainingHint();
         maybeTriggerAnalysis();
         updateHintButtonState();
@@ -1921,6 +2046,29 @@ final class GameController
         }
     }
 
+    /**
+     * A move confirmed by plain move detection during training. Normally impossible: while a guide
+     * is active, the bridge routes physical events to it exclusively, and the trainee's own move is
+     * always guided. The one exception is a book-side capture completed by follow-up proof (the
+     * trainee already lifted a piece before the capture was proven, see the bridge's {@code
+     * isGuidedCaptureProvenByFollowUp}): the board was mid-move when the trainee's guide would have
+     * started, so {@code guideEngineMove} no-op'd and the move arrives here instead. Accept it if
+     * it is the line's expected move; otherwise pull the bridge's position back to the game's so
+     * the wrong move lights up as a mismatch until undone, after which the retry in {@link
+     * #onBoardMismatch} starts the guide as usual.
+     */
+    private void onTrainingMoveConfirmedByDetection(String uci) {
+        guidingTrainingHumanMove = false;
+        if (trainingSession != null
+                && !trainingSession.isComplete()
+                && trainingSession.isHumanTurnNow()
+                && uci.equals(trainingSession.currentExpectedUci())) {
+            applyTrainingMove(uci);
+            return;
+        }
+        syncPegasusPosition();
+    }
+
     /** Applies a training move confirmed by disconnected auto-play or an on-screen tap. */
     private void applyTrainingMove(String uci) {
         if (!applyUciToGame(uci)) {
@@ -1957,7 +2105,7 @@ final class GameController
                 pegasusBridge != null
                         && pegasusBridge.getConnectionState() == ConnectionState.CONNECTED;
         if (trainingSession.isHumanTurnNow()) {
-            if (connected) {
+            if (connected && !pegasusBridge.isGuideActive()) {
                 guidingTrainingHumanMove = true;
                 pegasusBridge.guideEngineMove(
                         trainingSession.currentExpectedUci(), trainingSession.hintsEnabled());
@@ -1968,6 +2116,19 @@ final class GameController
             return;
         }
         if (connected) {
+            if (trainingBookMovePending && pegasusBridge.isGuideActive()) {
+                return; // already applied and being guided
+            }
+            if (pegasusBlocksAutoMoves()) {
+                // Never run ahead of a board that can't follow: onBoardMismatch(false) calls
+                // back here once the board is in sync.
+                LOG.log(
+                        Level.INFO,
+                        "holding book move {0}: physical board not in sync",
+                        trainingSession.currentExpectedUci());
+                refresh();
+                return;
+            }
             String uci = trainingSession.currentExpectedUci();
             applyUciToGame(uci);
             refresh();
@@ -2434,12 +2595,7 @@ final class GameController
             refresh();
             return;
         }
-        applyUciToGame(bestMoveUci);
-        if (pegasusBridge != null
-                && pegasusBridge.getConnectionState() == ConnectionState.CONNECTED) {
-            pegasusBridge.guideEngineMove(bestMoveUci);
-        }
-        refresh();
+        applyEngineReply(bestMoveUci);
     }
 
     @Override
