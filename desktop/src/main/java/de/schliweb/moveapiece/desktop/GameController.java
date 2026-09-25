@@ -22,6 +22,7 @@ import de.schliweb.moveapiece.engine.UciInfoParser;
 import de.schliweb.moveapiece.logic.ChessGame;
 import de.schliweb.moveapiece.logic.PgnGames;
 import de.schliweb.moveapiece.training.OpeningLine;
+import de.schliweb.moveapiece.training.TrainingFlow;
 import de.schliweb.moveapiece.training.TrainingSession;
 import de.schliweb.pegasus.core.protocol.BoardState;
 import de.schliweb.pegasus.core.transport.ConnectionState;
@@ -122,7 +123,6 @@ final class GameController
     private static final int HINT_MOVETIME_MS = 1500;
     private static final int HINT_MULTI_PV_LINES = 3;
     private static final int POST_GAME_MOVETIME_MS = 400;
-    private static final int TRAINING_AUTO_MOVE_DELAY_MS = 600;
     // Maia's own forward pass is near-instant (no search - see MaiaEngine's Javadoc), which reads
     // as inhumanly fast next to Stockfish's fixed MOVETIME_MS think time. #scheduleMaiaMove fills
     // the gap up to a randomized target somewhere in this range (never adds it on top of whatever
@@ -291,45 +291,24 @@ final class GameController
     private Mode mode = Mode.HUMAN_VS_STOCKFISH;
     private Side humanSide = Side.WHITE;
     private TrainingSession trainingSession;
-    private PauseTransition pendingBookMove;
+
+    /**
+     * The opening trainer's move flow (shared with Android, tested in core's TrainingFlowTest);
+     * {@link #trainingSession} mirrors {@link TrainingFlow#session()} for the many read-only uses
+     * below.
+     */
+    private final TrainingFlow trainingFlow =
+            new TrainingFlow(game, new TrainingBoardAdapter(), new TrainingHostAdapter());
 
     // ---- Pegasus board (macOS only for now - see MacosPegasusBleTransport) ------
     /** Null on platforms without a transport implementation yet (Windows/Linux). */
     private final DesktopPegasusGameBridge pegasusBridge;
 
     /**
-     * True while a guided move currently in flight on the physical board is the trainee's own
-     * expected move (as opposed to the book side's) - mirrors the Android app's {@code
-     * MainActivity.guidingTrainingHumanMove}: once {@link #onEngineMoveGuidanceComplete} fires, the
-     * trainee's move still needs to be applied to {@link #game} here (the physical board only
-     * proved it was played correctly, it doesn't drive {@link #game} on its own the way {@link
-     * #onPhysicalMoveConfirmed} does for a non-guided move).
-     */
-    private boolean guidingTrainingHumanMove = false;
-
-    /**
-     * True while the book side's move has been applied to {@link #game} optimistically (so the
-     * screen updates immediately) but the physical board hasn't yet confirmed the piece was moved -
-     * mirrors {@code MainActivity.trainingBookMovePending}. {@link TrainingSession#advance()} is
-     * deferred until {@link #onEngineMoveGuidanceComplete} confirms it physically.
-     */
-    private boolean trainingBookMovePending = false;
-
-    /**
-     * Whether the book move currently pending physical confirmation ({@link
-     * #trainingBookMovePending}) was a capture - remembered for its move sound, which is played
-     * when the board confirms the move rather than when it is applied to the game: applying happens
-     * in the same instant the trainee's own move is confirmed, so both sounds would collapse into
-     * one (heard on hardware 2026-09-25); without a board the book move follows after a short pause
-     * and sounds on its own anyway.
-     */
-    private boolean trainingBookMoveWasCapture;
-
-    /**
      * Whether an engine reply applied to the game still owes its move sound: with a Pegasus board
      * connected the reply is applied silently and sounds once the guide reports it executed on the
-     * board (same reasoning as {@link #trainingBookMoveWasCapture}); {@code engineMoveWasCapture}
-     * remembers which sound. Cleared when the game is reset/undone.
+     * board (same reasoning as the trainer's deferred book-move sound); {@code
+     * engineMoveWasCapture} remembers which sound. Cleared when the game is reset/undone.
      */
     private boolean engineMoveSoundPending;
 
@@ -859,35 +838,8 @@ final class GameController
             applyEngineReply(uci);
             return;
         }
-        if (mode != Mode.TRAINING || trainingSession == null || trainingSession.isComplete()) {
-            return;
-        }
-        if (trainingSession.isHumanTurnNow()) {
-            // Retries a guideEngineMove() that silently no-op'd because the
-            // physical board wasn't synced yet when maybeAdvanceTraining()
-            // first tried it. Safe unconditionally: while a guide is active,
-            // physical events are routed to it exclusively, so this callback
-            // cannot fire at all unless no guide is currently running.
-            maybeAdvanceTraining();
-            return;
-        }
-        if (!trainingBookMovePending) {
-            // The book side's move was held back because the board was out of sync when its
-            // turn came (pegasusBlocksAutoMoves); play it now.
-            maybeAdvanceTraining();
-            return;
-        }
-        // Same for a book move that was applied but whose guide was skipped because the board
-        // wasn't in sync at that moment (e.g. a piece still in hand when the line was restarted).
-        // Two ways the board can have come back in sync: with the position BEFORE the book move
-        // (the bridge still tracks it) - guide it now - or already WITH it (the bridge was pulled
-        // onto the game's position by onTrainingMoveConfirmedByDetection and the player set the
-        // board up accordingly) - nothing left to guide.
-        if (samePosition(pegasusBridge.trackedFen(), game.toFen())) {
-            guidingTrainingHumanMove = false;
-            onEngineMoveGuidanceComplete();
-        } else {
-            maybeAdvanceTraining();
+        if (mode == Mode.TRAINING) {
+            trainingFlow.onBoardInSync();
         }
     }
 
@@ -956,11 +908,7 @@ final class GameController
         boardCanvas.setMismatchSquares(squares);
         boolean autoMoveHeld =
                 heldEngineMoveUci != null
-                        || (mode == Mode.TRAINING
-                                && trainingSession != null
-                                && !trainingSession.isComplete()
-                                && !trainingSession.isHumanTurnNow()
-                                && !trainingBookMovePending);
+                        || (mode == Mode.TRAINING && trainingFlow.isAutoMoveHeld());
         String text = Messages.get("pegasus_board_mismatch");
         if (!names.isEmpty()) {
             text +=
@@ -973,16 +921,6 @@ final class GameController
         }
         pegasusMismatchLabel.setText(text);
         pegasusMismatchLabel.setVisible(true);
-    }
-
-    /**
-     * Whether two FENs describe the same position for guidance purposes: piece placement and side
-     * to move only. The bridge's own FEN and chesslib's may differ in en-passant/clock fields.
-     */
-    private static boolean samePosition(String fenA, String fenB) {
-        String[] a = fenA.split(" ");
-        String[] b = fenB.split(" ");
-        return a.length >= 2 && b.length >= 2 && a[0].equals(b[0]) && a[1].equals(b[1]);
     }
 
     @Override
@@ -1002,19 +940,7 @@ final class GameController
 
     @Override
     public void onEngineMoveGuidanceComplete() {
-        if (mode == Mode.TRAINING && trainingSession != null) {
-            if (guidingTrainingHumanMove) {
-                // The trainee's own move was only guided (not yet applied) -
-                // the physical board just confirmed it was played correctly.
-                guidingTrainingHumanMove = false;
-                applyUciToGame(trainingSession.currentExpectedUci());
-            } else if (trainingBookMovePending) {
-                playMoveSound(trainingBookMoveWasCapture);
-            }
-            trainingBookMovePending = false;
-            trainingSession.advance();
-            refresh();
-            maybeAdvanceTraining();
+        if (mode == Mode.TRAINING && trainingFlow.onGuidanceComplete()) {
             return;
         }
         // GameController's own state was already updated when the engine move
@@ -1566,7 +1492,7 @@ final class GameController
     private void startHumanVsHuman() {
         mode = Mode.HUMAN_VS_HUMAN;
         trainingSession = null;
-        stopPendingBookMove();
+        trainingFlow.stop();
         humanSide = Side.WHITE;
         boardFlipped = false;
         boardCanvas.setFlipped(false);
@@ -1580,7 +1506,7 @@ final class GameController
     private void startStockfishGame(Side side) {
         mode = Mode.HUMAN_VS_STOCKFISH;
         trainingSession = null;
-        stopPendingBookMove();
+        trainingFlow.stop();
         humanSide = side;
         boardFlipped = side == Side.BLACK;
         boardCanvas.setFlipped(boardFlipped);
@@ -1602,7 +1528,7 @@ final class GameController
     void startMaiaGame(Side side, int rating) {
         mode = Mode.HUMAN_VS_MAIA;
         trainingSession = null;
-        stopPendingBookMove();
+        trainingFlow.stop();
         humanSide = side;
         boardFlipped = side == Side.BLACK;
         boardCanvas.setFlipped(boardFlipped);
@@ -2044,14 +1970,11 @@ final class GameController
     // ---- opening trainer ------------------------------------------------------
 
     private void startTraining(OpeningLine opening, Side side, boolean hintsEnabled) {
-        stopPendingBookMove();
         abandonPendingSearches();
-        trainingSession = new TrainingSession(opening, side, hintsEnabled);
+        trainingFlow.start(opening, side, hintsEnabled);
+        trainingSession = trainingFlow.session();
         mode = Mode.TRAINING;
         humanSide = side;
-        game.reset();
-        guidingTrainingHumanMove = false;
-        trainingBookMovePending = false;
         boardFlipped = side == Side.BLACK;
         boardCanvas.setFlipped(boardFlipped);
         boardCanvas.setLastMove(null, null);
@@ -2063,7 +1986,7 @@ final class GameController
             pegasusBridge.resetForNewGame();
         }
         refresh();
-        maybeAdvanceTraining();
+        trainingFlow.advance();
     }
 
     /**
@@ -2081,9 +2004,7 @@ final class GameController
         }
         String tapped =
                 from.toString().toLowerCase(Locale.ROOT) + to.toString().toLowerCase(Locale.ROOT);
-        if (tapped.equals(trainingSession.currentExpectedUci())) {
-            applyTrainingMove(tapped);
-        }
+        trainingFlow.onUserMove(tapped);
     }
 
     /**
@@ -2098,27 +2019,7 @@ final class GameController
      * #onBoardMismatch} starts the guide as usual.
      */
     private void onTrainingMoveConfirmedByDetection(String uci) {
-        guidingTrainingHumanMove = false;
-        if (trainingSession != null
-                && !trainingSession.isComplete()
-                && trainingSession.isHumanTurnNow()
-                && uci.equals(trainingSession.currentExpectedUci())) {
-            applyTrainingMove(uci);
-            return;
-        }
-        syncPegasusPosition();
-    }
-
-    /** Applies a training move confirmed by disconnected auto-play or an on-screen tap. */
-    private void applyTrainingMove(String uci) {
-        if (!applyUciToGame(uci)) {
-            refresh();
-            return;
-        }
-        trainingSession.advance();
-        refresh();
-        syncPegasusPosition();
-        maybeAdvanceTraining();
+        trainingFlow.onPhysicalMoveConfirmed(uci);
     }
 
     /**
@@ -2128,101 +2029,21 @@ final class GameController
      * otherwise so it doesn't feel instantaneous.
      */
     private void maybeAdvanceTraining() {
-        if (mode != Mode.TRAINING || trainingSession == null || game.isGameOver()) {
-            return;
-        }
-        if (trainingSession.isComplete()) {
-            // Deferred: reaching completion on the book side's own (auto-played) last move means
-            // this runs from a PauseTransition's onFinished handler, i.e. while JavaFX is still
-            // processing that animation - showAndWait() (inside showTrainingCompleteDialog) throws
-            // IllegalStateException ("not allowed during animation or layout processing") if called
-            // synchronously there, silently killing the dialog. Platform.runLater pushes it to a
-            // fresh pulse, after the animation has finished processing.
-            Platform.runLater(this::showTrainingCompleteDialog);
-            return;
-        }
-        boolean connected =
-                pegasusBridge != null
-                        && pegasusBridge.getConnectionState() == ConnectionState.CONNECTED;
-        if (trainingSession.isHumanTurnNow()) {
-            if (connected && !pegasusBridge.isGuideActive()) {
-                guidingTrainingHumanMove = true;
-                pegasusBridge.guideEngineMove(
-                        trainingSession.currentExpectedUci(), trainingSession.hintsEnabled());
-            }
-            // Disconnected (or no transport on this platform): the board is
-            // already interactive and waits for a matching click.
-            refresh();
-            return;
-        }
-        if (connected) {
-            if (trainingBookMovePending && pegasusBridge.isGuideActive()) {
-                return; // already applied and being guided
-            }
-            if (pegasusBlocksAutoMoves()) {
-                // Never run ahead of a board that can't follow: onBoardMismatch(false) calls
-                // back here once the board is in sync.
-                LOG.log(
-                        Level.INFO,
-                        "holding book move {0}: physical board not in sync",
-                        trainingSession.currentExpectedUci());
-                refresh();
-                return;
-            }
-            String uci = trainingSession.currentExpectedUci();
-            Square to = Square.fromValue(uci.substring(2, 4).toUpperCase(Locale.ROOT));
-            trainingBookMoveWasCapture = game.pieceAt(to) != Piece.NONE;
-            applyUciToGame(uci, false); // sound follows on physical confirmation
-            refresh();
-            trainingBookMovePending = true;
-            pegasusBridge.guideEngineMove(uci);
-            // trainingSession.advance() happens in onEngineMoveGuidanceComplete,
-            // once physically confirmed.
-            return;
-        }
-        refresh();
-        pendingBookMove = new PauseTransition(Duration.millis(TRAINING_AUTO_MOVE_DELAY_MS));
-        pendingBookMove.setOnFinished(e -> applyTrainingMove(trainingSession.currentExpectedUci()));
-        pendingBookMove.play();
-    }
-
-    private void stopPendingBookMove() {
-        if (pendingBookMove != null) {
-            pendingBookMove.stop();
-            pendingBookMove = null;
+        if (mode == Mode.TRAINING) {
+            trainingFlow.advance();
         }
     }
 
     /**
      * Steps the training line back to the trainee's own previous move so they can retry it. Rolls
-     * back an unconfirmed optimistic book-move apply first (see {@link #trainingBookMovePending})
-     * so {@link #game} and {@link #trainingSession} never disagree, then resyncs the physical board
-     * - any active guide is cancelled there too, and mismatch LEDs light up until the pieces are
+     * back an unconfirmed optimistic book-move apply first (see {@link TrainingFlow#undo()}) so
+     * {@link #game} and {@link #trainingSession} never disagree, then resyncs the physical board -
+     * any active guide is cancelled there too, and mismatch LEDs light up until the pieces are
      * moved back; once they match, {@link #onBoardMismatch} re-issues the hint for the retried move
      * on its own.
      */
     private void undoTrainingMove() {
-        if (trainingSession == null
-                || (!trainingBookMovePending && trainingSession.plyIndex() == 0)) {
-            return;
-        }
-        stopPendingBookMove();
-        guidingTrainingHumanMove = false;
-        if (trainingBookMovePending) {
-            game.undoLastMove();
-            trainingBookMovePending = false;
-        }
-        if (trainingSession.plyIndex() > 0) {
-            game.undoLastMove();
-            trainingSession.retreat();
-            if (trainingSession.plyIndex() > 0 && !trainingSession.isHumanTurnNow()) {
-                game.undoLastMove();
-                trainingSession.retreat();
-            }
-        }
-        boardCanvas.setLastMove(null, null);
-        refresh();
-        syncPegasusPosition();
+        trainingFlow.undo();
     }
 
     /**
@@ -2233,25 +2054,7 @@ final class GameController
      * pairing. No-op if there is nothing to redo.
      */
     private void redoTrainingMove() {
-        if (trainingSession == null || trainingBookMovePending || trainingSession.isComplete()) {
-            return;
-        }
-        stopPendingBookMove();
-        guidingTrainingHumanMove = false;
-        String humanUci = trainingSession.currentExpectedUci();
-        if (humanUci == null || !game.applyUciMove(humanUci)) {
-            return;
-        }
-        trainingSession.advance();
-        if (!trainingSession.isComplete() && !trainingSession.isHumanTurnNow()) {
-            String replyUci = trainingSession.currentExpectedUci();
-            if (replyUci != null && game.applyUciMove(replyUci)) {
-                trainingSession.advance();
-            }
-        }
-        boardCanvas.setLastMove(null, null);
-        refresh();
-        syncPegasusPosition();
+        trainingFlow.redo();
     }
 
     private void updateTrainingProgressLabel() {
@@ -2357,7 +2160,7 @@ final class GameController
         if (choice.isEmpty()) {
             return;
         }
-        stopPendingBookMove();
+        trainingFlow.stop();
         trainingSession = null;
         humanSide = trainedSide;
         boardCanvas.setTrainingHint(null, null);
@@ -2490,7 +2293,7 @@ final class GameController
             showError(Messages.get("pgn_import_failed"));
             return;
         }
-        stopPendingBookMove();
+        trainingFlow.stop();
         trainingSession = null;
         mode = Mode.HUMAN_VS_HUMAN;
         humanSide = Side.WHITE;
@@ -2711,5 +2514,108 @@ final class GameController
         updateHintButtonState();
         updateAnalyzeGameButtonState();
         statusLabel.setText(Messages.get("error_engine_generic") + ": " + error.getMessage());
+    }
+
+    // ---- Opening trainer adapters ---------------------------------------------------------
+
+    /** The Pegasus bridge as {@link TrainingFlow.Board}; every method null-guards the bridge. */
+    private final class TrainingBoardAdapter implements TrainingFlow.Board {
+        @Override
+        public boolean isConnected() {
+            return pegasusBridge != null
+                    && pegasusBridge.getConnectionState() == ConnectionState.CONNECTED;
+        }
+
+        @Override
+        public boolean isInSync() {
+            return pegasusBridge != null && pegasusBridge.isBoardInSync();
+        }
+
+        @Override
+        public boolean isGuideActive() {
+            return pegasusBridge != null && pegasusBridge.isGuideActive();
+        }
+
+        @Override
+        public String trackedFen() {
+            return pegasusBridge == null ? "" : pegasusBridge.trackedFen();
+        }
+
+        @Override
+        public void guideMove(String uci, boolean showLeds) {
+            if (pegasusBridge != null) {
+                pegasusBridge.guideEngineMove(uci, showLeds);
+            }
+        }
+
+        @Override
+        public void syncToPosition(String fen) {
+            if (pegasusBridge != null) {
+                pegasusBridge.syncBoardToPosition(fen);
+            }
+        }
+    }
+
+    /** Screen effects for {@link TrainingFlow}. */
+    private final class TrainingHostAdapter implements TrainingFlow.Host {
+        private PauseTransition pendingBookMove;
+
+        @Override
+        public void moveApplied(String uci, boolean wasCapture, boolean withSound) {
+            Square from = Square.fromValue(uci.substring(0, 2).toUpperCase(Locale.ROOT));
+            Square to = Square.fromValue(uci.substring(2, 4).toUpperCase(Locale.ROOT));
+            boardCanvas.setLastMove(from, to);
+            if (withSound) {
+                GameController.this.playMoveSound(wasCapture);
+            }
+            scrollMoveHistoryToEnd = true;
+        }
+
+        @Override
+        public void playMoveSound(boolean wasCapture) {
+            GameController.this.playMoveSound(wasCapture);
+        }
+
+        @Override
+        public void historyRewritten() {
+            boardCanvas.setLastMove(null, null);
+        }
+
+        @Override
+        public void refresh() {
+            GameController.this.refresh();
+        }
+
+        @Override
+        public void showTrainingComplete() {
+            // Deferred: reaching completion on the book side's own (auto-played) last move means
+            // this runs from a PauseTransition's onFinished handler, i.e. while JavaFX is still
+            // processing that animation - showAndWait() (inside showTrainingCompleteDialog) throws
+            // IllegalStateException ("not allowed during animation or layout processing") if called
+            // synchronously there, silently killing the dialog. Platform.runLater pushes it to a
+            // fresh pulse, after the animation has finished processing.
+            Platform.runLater(GameController.this::showTrainingCompleteDialog);
+        }
+
+        @Override
+        public void scheduleBookMove(Runnable action, long delayMs) {
+            cancelScheduledBookMove();
+            pendingBookMove = new PauseTransition(Duration.millis(delayMs));
+            pendingBookMove.setOnFinished(e -> action.run());
+            pendingBookMove.play();
+        }
+
+        @Override
+        public void cancelScheduledBookMove() {
+            if (pendingBookMove != null) {
+                pendingBookMove.stop();
+                pendingBookMove = null;
+            }
+        }
+
+        @Override
+        public void log(String message) {
+            LOG.log(Level.INFO, message);
+        }
     }
 }
