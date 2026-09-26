@@ -120,6 +120,25 @@ public final class ChessnutBoardAdapter implements PhysicalBoardBridge {
         bridge.syncBoardToPosition(fen);
     }
 
+    /**
+     * Tones on the board's piezo standing in for move.mp3, capture.mp3 and check.mp3: a short click
+     * for a move, a lower and longer one for a capture, a high and long one for check.
+     */
+    @Override
+    public boolean playMoveSound(boolean capture, boolean check) {
+        if (bridge.getConnectionState() != ConnectionState.CONNECTED) {
+            return false;
+        }
+        if (check) {
+            bridge.beep(1800, 250);
+        } else if (capture) {
+            bridge.beep(800, 140);
+        } else {
+            bridge.beep(1200, 70);
+        }
+        return true;
+    }
+
     @Override
     public void selectPromotion(PieceType promotion) {
         // The Chessnut reads the promotion piece off the board; nothing is ever pending.

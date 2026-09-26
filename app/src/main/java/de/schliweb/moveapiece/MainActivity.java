@@ -2436,6 +2436,11 @@ public class MainActivity extends AppCompatActivity
 
     /** Check sound takes priority over move/capture, matching common chess-app UX. */
     private void playMoveSound(boolean wasCapture) {
+        // A connected board with a speaker (Chessnut Air) plays the sound itself, so the
+        // player hears it where the pieces are rather than from the phone.
+        if (board.playMoveSound(wasCapture, game.isCheck())) {
+            return;
+        }
         if (game.isCheck()) {
             soundPlayer.playCheck();
         } else if (wasCapture) {

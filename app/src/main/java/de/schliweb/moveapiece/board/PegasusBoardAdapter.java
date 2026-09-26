@@ -118,6 +118,11 @@ public final class PegasusBoardAdapter implements PhysicalBoardBridge {
     }
 
     @Override
+    public boolean playMoveSound(boolean capture, boolean check) {
+        return false; // no speaker
+    }
+
+    @Override
     public void selectPromotion(PieceType promotion) {
         bridge.selectPromotion(promotion);
     }

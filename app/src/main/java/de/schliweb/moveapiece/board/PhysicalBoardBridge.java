@@ -58,6 +58,13 @@ public interface PhysicalBoardBridge {
 
     void syncBoardToPosition(String fen);
 
+    /**
+     * Plays the move sound on the board instead of the phone, if the board has a speaker and is
+     * connected. Returns {@code true} when the board took care of it, {@code false} when the caller
+     * should play the phone sound.
+     */
+    boolean playMoveSound(boolean capture, boolean check);
+
     /** Resolves a pending promotion prompt; a no-op on boards that identify pieces themselves. */
     void selectPromotion(PieceType promotion);
 
