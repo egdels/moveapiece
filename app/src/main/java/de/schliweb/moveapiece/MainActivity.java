@@ -836,8 +836,15 @@ public class MainActivity extends AppCompatActivity
         boolean autoMoveHeld =
                 heldEngineMoveUci != null
                         || (mode == GameMode.TRAINING && trainingFlow.isAutoMoveHeld());
-        StringBuilder text = new StringBuilder(getString(R.string.pegasus_board_mismatch));
-        if (!names.isEmpty()) {
+        int promotionSquare = board.promotionSquareAwaitingPiece();
+        StringBuilder text =
+                new StringBuilder(
+                        promotionSquare >= 0
+                                ? getString(
+                                        R.string.board_promotion_piece_needed_format,
+                                        BoardState.squareName(promotionSquare))
+                                : getString(R.string.pegasus_board_mismatch));
+        if (!names.isEmpty() && promotionSquare < 0) {
             text.append('\n')
                     .append(
                             getString(

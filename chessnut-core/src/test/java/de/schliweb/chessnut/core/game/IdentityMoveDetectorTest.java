@@ -48,20 +48,43 @@ public class IdentityMoveDetectorTest {
     }
 
     @Test
-    public void firstBoardOffIsMismatchUntilRestoredAndNoDetectionMeanwhile() {
+    public void firstBoardOffIsMismatchUntilRestored() {
         BoardState off = move(Boards.start(), "e2", "e4");
 
         IdentityDetectionResult first = detector.onPhysicalBoard(off);
         assertEquals(Kind.BOARD_MISMATCH, first.kind());
         assertEquals(Arrays.asList(sq("e2"), sq("e4")), first.diff().squares());
 
-        // A board equal to a legal move's result must not be detected while mismatched.
-        assertEquals(
-                Kind.BOARD_MISMATCH,
-                detector.onPhysicalBoard(move(Boards.start(), "d2", "d4")).kind());
+        assertEquals(Kind.BOARD_MISMATCH, detector.onPhysicalBoard(lift(off, "a2")).kind());
         assertEquals(Kind.POSITION_RESTORED, detector.onPhysicalBoard(Boards.start()).kind());
         assertEquals(
                 Kind.CONFIRMED, detector.onPhysicalBoard(move(Boards.start(), "d2", "d4")).kind());
+    }
+
+    @Test
+    public void mismatchAfterSyncIsLeftByAnExactLegalMove() {
+        synced();
+        assertEquals(
+                Kind.BOARD_MISMATCH,
+                detector.onPhysicalBoard(move(Boards.start(), "e2", "e5")).kind());
+        // Straight from the mismatch to the board after d2-d4: unambiguous, confirmed.
+        IdentityDetectionResult result = detector.onPhysicalBoard(move(Boards.start(), "d2", "d4"));
+        assertEquals(Kind.CONFIRMED, result.kind());
+        assertEquals("d2d4", result.move().uci());
+        assertEquals(MoveDetectionState.SYNCHRONIZED, detector.state());
+    }
+
+    @Test
+    public void promotionPawnOnBackRankIsAMismatchUntilThePieceReplacesIt() {
+        String fen = "4k3/P7/8/8/8/8/8/4K3 w - - 0 1";
+        IdentityMoveDetector d = syncedAt(fen);
+        BoardState board = Boards.of(fen);
+
+        assertEquals(Kind.BOARD_MISMATCH, d.onPhysicalBoard(move(board, "a7", "a8")).kind());
+        IdentityDetectionResult result =
+                d.onPhysicalBoard(put(lift(board, "a7"), "a8", PieceCodes.WROOK));
+        assertEquals(Kind.CONFIRMED, result.kind());
+        assertEquals("a7a8r", result.move().uci());
     }
 
     @Test

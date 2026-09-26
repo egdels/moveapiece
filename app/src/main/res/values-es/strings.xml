@@ -100,6 +100,7 @@
     <string name="pegasus_board_mismatch">El tablero no coincide con la posición: corrige las piezas según los LED</string>
     <string name="pegasus_auto_move_held">La jugada de la aplicación espera a que el tablero coincida</string>
     <string name="pegasus_mismatch_squares_format">Casillas: %1$s</string>
+    <string name="board_promotion_piece_needed_format">Peón en %1$s: sustitúyelo por la pieza de promoción</string>
     <string name="pegasus_ambiguous_title">Jugada ambigua – elige una opción</string>
 
     <string name="opening_ruy_lopez">Apertura española (Ruy López)</string>

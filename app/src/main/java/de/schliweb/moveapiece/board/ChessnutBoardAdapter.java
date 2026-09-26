@@ -111,6 +111,11 @@ public final class ChessnutBoardAdapter implements PhysicalBoardBridge {
     }
 
     @Override
+    public int promotionSquareAwaitingPiece() {
+        return bridge.promotionSquareAwaitingPiece();
+    }
+
+    @Override
     public void resetForNewGame() {
         bridge.resetForNewGame();
     }

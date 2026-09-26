@@ -108,6 +108,11 @@ public final class PegasusBoardAdapter implements PhysicalBoardBridge {
     }
 
     @Override
+    public int promotionSquareAwaitingPiece() {
+        return -1; // the Pegasus asks via a dialog instead
+    }
+
+    @Override
     public void resetForNewGame() {
         bridge.resetForNewGame();
     }

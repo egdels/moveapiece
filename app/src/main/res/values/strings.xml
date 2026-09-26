@@ -102,6 +102,7 @@
     <string name="pegasus_board_mismatch">Board does not match the position — fix the pieces as shown by the LEDs</string>
     <string name="pegasus_auto_move_held">The app\'s move is waiting until the board matches</string>
     <string name="pegasus_mismatch_squares_format">Squares: %1$s</string>
+    <string name="board_promotion_piece_needed_format">Pawn reached %1$s – replace it with the promotion piece</string>
     <string name="pegasus_ambiguous_title">Ambiguous move – please choose</string>
 
     <string name="opening_ruy_lopez">Ruy Lopez (Spanish Opening)</string>

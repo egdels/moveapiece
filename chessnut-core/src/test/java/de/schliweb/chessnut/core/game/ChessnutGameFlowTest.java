@@ -257,6 +257,49 @@ public class ChessnutGameFlowTest {
     }
 
     @Test
+    public void pawnOnBackRankAsksForThePromotionPiece() {
+        String fen = "4k3/P7/8/8/8/8/8/4K3 w - - 0 1";
+        flow.syncBoardToPosition(fen);
+        flow.onPhysicalBoard(Boards.of(fen));
+        assertEquals(-1, flow.promotionSquareAwaitingPiece());
+
+        flow.onPhysicalBoard(move(Boards.of(fen), "a7", "a8"));
+        assertEquals("mismatch:true", events.get(events.size() - 1));
+        assertEquals(sq("a8"), flow.promotionSquareAwaitingPiece());
+        assertEquals(Arrays.asList(sq("a7"), sq("a8")), flow.mismatchSquares());
+
+        flow.onPhysicalBoard(put(lift(Boards.of(fen), "a7"), "a8", PieceCodes.WQUEEN));
+        assertEquals("move:a7a8q", events.get(events.size() - 2));
+        assertEquals(-1, flow.promotionSquareAwaitingPiece());
+    }
+
+    @Test
+    public void capturePromotionAndGuidedPromotionAlsoAskForThePiece() {
+        String fen = "1n2k3/P7/8/8/8/8/8/4K3 w - - 0 1";
+        flow.syncBoardToPosition(fen);
+        flow.onPhysicalBoard(Boards.of(fen));
+        flow.onPhysicalBoard(move(Boards.of(fen), "a7", "b8"));
+        assertEquals(sq("b8"), flow.promotionSquareAwaitingPiece());
+
+        flow.onPhysicalBoard(Boards.of(fen));
+        flow.guideEngineMove("a7a8q");
+        assertTrue(flow.isGuideActive());
+        assertEquals(-1, flow.promotionSquareAwaitingPiece());
+        flow.onPhysicalBoard(move(Boards.of(fen), "a7", "a8"));
+        assertTrue(flow.isGuideActive());
+        assertEquals(sq("a8"), flow.promotionSquareAwaitingPiece());
+        flow.onPhysicalBoard(put(lift(Boards.of(fen), "a7"), "a8", PieceCodes.WQUEEN));
+        assertEquals("guided", events.get(events.size() - 1));
+    }
+
+    @Test
+    public void ordinaryMismatchIsNotAPromotionHint() {
+        flow.onPhysicalBoard(Boards.start());
+        flow.onPhysicalBoard(move(Boards.start(), "e2", "e5"));
+        assertEquals(-1, flow.promotionSquareAwaitingPiece());
+    }
+
+    @Test
     public void promotionNeedsNoDialog() {
         String fen = "4k3/P7/8/8/8/8/8/4K3 w - - 0 1";
         flow.syncBoardToPosition(fen);

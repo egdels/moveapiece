@@ -26,6 +26,10 @@ import java.util.List;
  * progress towards some legal move with at most a few unrelated pieces lifted; anything else is a
  * {@link IdentityDetectionResult.Kind#BOARD_MISMATCH}.
  *
+ * <p>A mismatch is left either by restoring the position or by an exact legal-move match, which
+ * with piece identities is unambiguous (a pawn pushed to the back rank is a mismatch until the
+ * promotion piece replaces it). Before the first sync of a connection only a restore counts.
+ *
  * <p>Only the {@link MoveDetectionState} values AWAITING_BOARD, SYNCHRONIZED, MOVE_IN_PROGRESS and
  * BOARD_MISMATCH occur. Deterministic and single-threaded by design; repeated identical inputs are
  * idempotent.
@@ -106,17 +110,23 @@ public final class IdentityMoveDetector {
                     : IdentityDetectionResult.positionRestored();
         }
         IdentityDiff diff = IdentityDiff.between(expected, physical);
-        // No detection before the board matched the position once (first report, reconnect)
-        // or while mismatched: require a full restore first.
-        if (state == MoveDetectionState.AWAITING_BOARD
-                || state == MoveDetectionState.BOARD_MISMATCH) {
+        // No detection before the board matched the position once (first report, reconnect):
+        // require a full sync first.
+        if (state == MoveDetectionState.AWAITING_BOARD) {
             state = MoveDetectionState.BOARD_MISMATCH;
             return IdentityDetectionResult.boardMismatch(diff);
         }
+        // An exact match of a legal move's resulting board (all 64 squares, identities included)
+        // is unambiguous, so it also resolves a mismatch without restoring the position first.
+        // That matters for promotions: a pawn pushed to the back rank is a mismatch until the
+        // pawn is swapped for the promotion piece, which must then confirm the move directly.
         for (int i = 0; i < legalMoves.size(); i++) {
             if (legalBoards.get(i).equals(physical)) {
                 return confirm(legalMoves.get(i));
             }
+        }
+        if (state == MoveDetectionState.BOARD_MISMATCH) {
+            return IdentityDetectionResult.boardMismatch(diff);
         }
         if (isPlausibleIntermediate(diff, physical)) {
             state = MoveDetectionState.MOVE_IN_PROGRESS;

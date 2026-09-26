@@ -100,6 +100,7 @@
     <string name="pegasus_board_mismatch">Brett stimmt nicht mit der Stellung überein – Figuren gemäß LEDs korrigieren</string>
     <string name="pegasus_auto_move_held">Der Zug der App wartet, bis das Brett stimmt</string>
     <string name="pegasus_mismatch_squares_format">Felder: %1$s</string>
+    <string name="board_promotion_piece_needed_format">Bauer auf %1$s – durch die Umwandlungsfigur ersetzen</string>
     <string name="pegasus_ambiguous_title">Mehrdeutiger Zug – bitte wählen</string>
 
     <string name="opening_ruy_lopez">Spanische Partie (Ruy Lopez)</string>

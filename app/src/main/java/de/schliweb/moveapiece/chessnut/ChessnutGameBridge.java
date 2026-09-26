@@ -346,6 +346,11 @@ public class ChessnutGameBridge {
         flow.resetForNewGame();
     }
 
+    /** See {@link ChessnutGameFlow#promotionSquareAwaitingPiece()}. */
+    public int promotionSquareAwaitingPiece() {
+        return flow.promotionSquareAwaitingPiece();
+    }
+
     public void syncBoardToPosition(String fen) {
         flow.syncBoardToPosition(fen);
     }

@@ -54,6 +54,12 @@ public interface PhysicalBoardBridge {
 
     List<Integer> mismatchSquares();
 
+    /**
+     * Square on which a pawn stands that should be replaced by the promotion piece, or -1. Only
+     * boards that identify pieces can need this; the others always return -1.
+     */
+    int promotionSquareAwaitingPiece();
+
     void resetForNewGame();
 
     void syncBoardToPosition(String fen);

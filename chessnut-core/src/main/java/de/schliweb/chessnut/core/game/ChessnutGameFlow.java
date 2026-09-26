@@ -283,6 +283,51 @@ public final class ChessnutGameFlow {
         return IdentityDiff.between(detector.expected(), physical).squares();
     }
 
+    /**
+     * The back-rank square on which a pawn is standing that should be the promotion piece, or -1.
+     * The board identifies pieces, so a promotion is only recognised once the promoted piece is set
+     * down; a pawn pushed to the last rank (or capturing onto it) looks like a plain mismatch to
+     * the detector. This spots exactly that shape, outside a guide (missing pawn on the seventh
+     * rank, same-coloured pawn on the eighth, promotion legal between them) and during a guide of a
+     * promotion move (pawn on the guided destination), so the host can say "replace the pawn"
+     * instead of "board does not match".
+     */
+    public int promotionSquareAwaitingPiece() {
+        if (physicalBoard == null) {
+            return -1;
+        }
+        ChessPosition position = detector.position();
+        int pawn =
+                position.sideToMove() == PieceColor.WHITE
+                        ? IdentityProjection.codeOf(Piece.WHITE_PAWN)
+                        : IdentityProjection.codeOf(Piece.BLACK_PAWN);
+        if (isGuideActive()) {
+            return guideMove.promotion() != null
+                            && physicalBoard.pieceCodeAt(guideMove.to()) == pawn
+                    ? guideMove.to()
+                    : -1;
+        }
+        if (detector.state() != MoveDetectionState.BOARD_MISMATCH) {
+            return -1;
+        }
+        IdentityDiff diff = IdentityDiff.between(detector.expected(), physicalBoard);
+        if (diff.missing().size() != 1 || diff.placed().size() != 1) {
+            return -1;
+        }
+        int from = diff.missing().get(0);
+        int to = diff.placed().get(0);
+        if (detector.expected().pieceCodeAt(from) != pawn
+                || physicalBoard.pieceCodeAt(to) != pawn) {
+            return -1;
+        }
+        for (Move move : position.legalMoves()) {
+            if (move.from() == from && move.to() == to && move.promotion() != null) {
+                return to;
+            }
+        }
+        return -1;
+    }
+
     // ------------------------------------------------------------ resync
 
     /** Tracks the starting position; a board that does not show it lights up right away. */

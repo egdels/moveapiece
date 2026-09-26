@@ -100,6 +100,7 @@
     <string name="pegasus_board_mismatch">L\'échiquier ne correspond pas à la position — corrigez les pièces selon les LED</string>
     <string name="pegasus_auto_move_held">Le coup de l\'application attend que l\'échiquier corresponde</string>
     <string name="pegasus_mismatch_squares_format">Cases : %1$s</string>
+    <string name="board_promotion_piece_needed_format">Pion en %1$s : remplacez-le par la pièce de promotion</string>
     <string name="pegasus_ambiguous_title">Coup ambigu – veuillez choisir</string>
 
     <string name="opening_ruy_lopez">Partie espagnole (Ruy Lopez)</string>

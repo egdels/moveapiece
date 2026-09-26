@@ -100,6 +100,7 @@
     <string name="pegasus_board_mismatch">Bord komt niet overeen met de stelling — corrigeer de stukken volgens de leds</string>
     <string name="pegasus_auto_move_held">De zet van de app wacht tot het bord klopt</string>
     <string name="pegasus_mismatch_squares_format">Velden: %1$s</string>
+    <string name="board_promotion_piece_needed_format">Pion op %1$s – vervang hem door het promotiestuk</string>
     <string name="pegasus_ambiguous_title">Onduidelijke zet – kies een optie</string>
 
     <string name="opening_ruy_lopez">Spaans (Ruy Lopez)</string>

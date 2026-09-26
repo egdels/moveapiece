@@ -100,6 +100,7 @@
     <string name="pegasus_board_mismatch">La scacchiera non corrisponde alla posizione: sistema i pezzi come indicato dai LED</string>
     <string name="pegasus_auto_move_held">La mossa dell\'app attende che la scacchiera corrisponda</string>
     <string name="pegasus_mismatch_squares_format">Case: %1$s</string>
+    <string name="board_promotion_piece_needed_format">Pedone in %1$s: sostituiscilo con il pezzo di promozione</string>
     <string name="pegasus_ambiguous_title">Mossa ambigua – seleziona</string>
 
     <string name="opening_ruy_lopez">Apertura spagnola (Ruy López)</string>
