@@ -7,6 +7,7 @@ package de.schliweb.moveapiece.board;
 
 import de.schliweb.chessnut.core.game.InvalidPositionException;
 import de.schliweb.moveapiece.chessnut.ChessnutGameBridge;
+import de.schliweb.moveapiece.logic.BoardType;
 import de.schliweb.pegasus.core.chess.PieceColor;
 import de.schliweb.pegasus.core.chess.PieceType;
 import de.schliweb.pegasus.core.transport.ConnectionState;

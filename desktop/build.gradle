@@ -37,6 +37,8 @@ tasks.named('run', JavaExec) {
 dependencies {
     implementation project(':core')
     implementation project(':pegasus-core')
+    // Chessnut Air support; protocol and game flow live in :chessnut-core.
+    implementation project(':chessnut-core')
     implementation 'com.github.bhlangonijr:chesslib:1.3.7'
     // MaiaEngine (in :core) only compiles against the ai.onnxruntime.* API there (compileOnly,
     // see core/build.gradle) - this module supplies the actual desktop JVM runtime. Version is

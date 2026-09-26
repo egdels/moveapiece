@@ -3,11 +3,11 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-package de.schliweb.moveapiece.board;
+package de.schliweb.moveapiece.desktop.board;
 
 import de.schliweb.chessnut.core.game.InvalidPositionException;
+import de.schliweb.moveapiece.desktop.pegasus.DesktopPegasusGameBridge;
 import de.schliweb.moveapiece.logic.BoardType;
-import de.schliweb.moveapiece.pegasus.PegasusGameBridge;
 import de.schliweb.pegasus.core.chess.PieceType;
 import de.schliweb.pegasus.core.transport.ConnectionState;
 import de.schliweb.pegasus.core.transport.ScanListener;
@@ -15,12 +15,12 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 
-/** {@link PhysicalBoardBridge} over the unchanged {@link PegasusGameBridge}. */
+/** {@link PhysicalBoardBridge} over the unchanged {@link DesktopPegasusGameBridge}. */
 public final class PegasusBoardAdapter implements PhysicalBoardBridge {
 
-    private final PegasusGameBridge bridge;
+    private final DesktopPegasusGameBridge bridge;
 
-    public PegasusBoardAdapter(PegasusGameBridge bridge) {
+    public PegasusBoardAdapter(DesktopPegasusGameBridge bridge) {
         this.bridge = bridge;
     }
 

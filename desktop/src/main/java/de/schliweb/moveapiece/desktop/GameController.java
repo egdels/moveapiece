@@ -8,6 +8,12 @@ package de.schliweb.moveapiece.desktop;
 import com.github.bhlangonijr.chesslib.Piece;
 import com.github.bhlangonijr.chesslib.Side;
 import com.github.bhlangonijr.chesslib.Square;
+import de.schliweb.chessnut.core.game.InvalidPositionException;
+import de.schliweb.chessnut.core.protocol.ChessnutUuids;
+import de.schliweb.moveapiece.desktop.board.ChessnutBoardAdapter;
+import de.schliweb.moveapiece.desktop.board.PegasusBoardAdapter;
+import de.schliweb.moveapiece.desktop.board.PhysicalBoardBridge;
+import de.schliweb.moveapiece.desktop.chessnut.DesktopChessnutGameBridge;
 import de.schliweb.moveapiece.desktop.pegasus.DesktopPegasusGameBridge;
 import de.schliweb.moveapiece.desktop.pegasus.LinuxPegasusBleTransport;
 import de.schliweb.moveapiece.desktop.pegasus.MacosPegasusBleTransport;
@@ -19,13 +25,16 @@ import de.schliweb.moveapiece.engine.MaiaRatings;
 import de.schliweb.moveapiece.engine.NnueAssets;
 import de.schliweb.moveapiece.engine.StockfishEngine;
 import de.schliweb.moveapiece.engine.UciInfoParser;
+import de.schliweb.moveapiece.logic.BoardType;
 import de.schliweb.moveapiece.logic.ChessGame;
 import de.schliweb.moveapiece.logic.PgnGames;
 import de.schliweb.moveapiece.training.OpeningLine;
 import de.schliweb.moveapiece.training.TrainingFlow;
 import de.schliweb.moveapiece.training.TrainingSession;
 import de.schliweb.pegasus.core.protocol.BoardState;
+import de.schliweb.pegasus.core.transport.BleProfile;
 import de.schliweb.pegasus.core.transport.ConnectionState;
+import de.schliweb.pegasus.core.transport.PegasusTransport;
 import de.schliweb.pegasus.core.transport.TransportError;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -53,6 +62,7 @@ import javafx.scene.Cursor;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ChoiceDialog;
@@ -93,7 +103,10 @@ import javafx.util.Duration;
  * #maybeTriggerAnalysis}).
  */
 final class GameController
-        implements BoardCanvas.MoveSource, EngineListener, DesktopPegasusGameBridge.Listener {
+        implements BoardCanvas.MoveSource,
+                EngineListener,
+                DesktopPegasusGameBridge.Listener,
+                DesktopChessnutGameBridge.Listener {
 
     private static final Logger LOG = Logger.getLogger(GameController.class.getName());
 
@@ -199,7 +212,7 @@ final class GameController
             iconButton(FLIP_BOARD_ICON_PATH, Messages.get("menu_flip_board"));
     private final Button hintButton = iconButton(HINT_ICON_PATH, Messages.get("menu_hint"));
     private final Button pegasusButton =
-            iconButton(PEGASUS_ICON_PATH, Messages.get("menu_pegasus_connect"));
+            iconButton(PEGASUS_ICON_PATH, Messages.get("menu_board_connect"));
     private final CheckBox evaluationCheckbox =
             new CheckBox(Messages.get("evaluation_toggle_label"));
     private final Label evaluationLabel = new Label();
@@ -300,9 +313,11 @@ final class GameController
     private final TrainingFlow trainingFlow =
             new TrainingFlow(game, new TrainingBoardAdapter(), new TrainingHostAdapter());
 
-    // ---- Pegasus board (macOS only for now - see MacosPegasusBleTransport) ------
-    /** Null on platforms without a transport implementation yet (Windows/Linux). */
-    private final DesktopPegasusGameBridge pegasusBridge;
+    // ---- Physical board (DGT Pegasus or Chessnut Air) ----------------------------
+    /** The selected board's bridge; null on hosts without a transport (see createBoardBridge). */
+    private PhysicalBoardBridge pegasusBridge;
+
+    private BoardType boardType;
 
     /**
      * Whether an engine reply applied to the game still owes its move sound: with a Pegasus board
@@ -337,7 +352,8 @@ final class GameController
 
     GameController(Stage stage) {
         this.stage = stage;
-        pegasusBridge = createPegasusBridgeIfSupported();
+        boardType = Settings.getBoardType();
+        pegasusBridge = createBoardBridge(boardType);
         startEngine();
     }
 
@@ -350,18 +366,50 @@ final class GameController
      * transport's own constructor ever need to signal "not actually usable on this host" by some
      * other means later (e.g. no D-Bus session reachable), not just by OS name.
      */
-    private DesktopPegasusGameBridge createPegasusBridgeIfSupported() {
+    private PhysicalBoardBridge createBoardBridge(BoardType type) {
+        BleProfile profile =
+                type == BoardType.CHESSNUT ? ChessnutUuids.PROFILE : BleProfile.PEGASUS;
+        PegasusTransport transport;
         String osName = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
         if (osName.contains("mac")) {
-            return new DesktopPegasusGameBridge(new MacosPegasusBleTransport(), this);
+            transport = new MacosPegasusBleTransport(profile);
+        } else if (osName.contains("win")) {
+            transport = new WindowsPegasusBleTransport(profile);
+        } else if (osName.contains("nux")) {
+            transport = new LinuxPegasusBleTransport(profile);
+        } else {
+            return null;
         }
-        if (osName.contains("win")) {
-            return new DesktopPegasusGameBridge(new WindowsPegasusBleTransport(), this);
+        if (type == BoardType.CHESSNUT) {
+            return new ChessnutBoardAdapter(new DesktopChessnutGameBridge(transport, this));
         }
-        if (osName.contains("nux")) {
-            return new DesktopPegasusGameBridge(new LinuxPegasusBleTransport(), this);
+        return new PegasusBoardAdapter(new DesktopPegasusGameBridge(transport, this));
+    }
+
+    /**
+     * Swaps the bridge for {@code type} (called by {@link BoardConnectDialog} when the choice box
+     * changes): the old one is detached and shut down, the choice persisted. Returns the bridge now
+     * in use, which may be the unchanged current one.
+     */
+    private PhysicalBoardBridge switchBoardType(BoardType type) {
+        if (type == boardType) {
+            return pegasusBridge;
         }
-        return null;
+        if (pegasusBridge != null) {
+            // Detach first: a late callback from the old bridge must not be attributed to the
+            // new board (tooltips and messages use boardType).
+            pegasusBridge.detachListener();
+            pegasusBridge.shutdown();
+        }
+        boardType = type;
+        Settings.setBoardType(type);
+        pegasusBridge = createBoardBridge(type);
+        updatePegasusButtonState(
+                pegasusBridge == null
+                        ? ConnectionState.DISCONNECTED
+                        : pegasusBridge.getConnectionState());
+        updatePegasusMismatchLabel();
+        return pegasusBridge;
     }
 
     private static final double BOARD_HOLDER_PADDING = 14;
@@ -484,6 +532,7 @@ final class GameController
         pegasusMismatchLabel.setWrapText(true);
         pegasusMismatchLabel.setVisible(false);
         pegasusMismatchLabel.managedProperty().bind(pegasusMismatchLabel.visibleProperty());
+        pegasusMismatchLabel.setOnMouseClicked(e -> onMismatchLabelClicked());
         trainingProgressLabel.getStyleClass().add("training-progress-label");
 
         newGameButton.setOnAction(e -> openGameSetupDialog());
@@ -597,6 +646,10 @@ final class GameController
 
     /** Check sound takes priority over move/capture, matching common chess-app UX. */
     private void playMoveSound(boolean wasCapture) {
+        // A connected board with a speaker (Chessnut Air) plays the sound itself.
+        if (pegasusBridge != null && pegasusBridge.playMoveSound(wasCapture, game.isCheck())) {
+            return;
+        }
         if (game.isCheck()) {
             soundPlayer.playCheck();
         } else if (wasCapture) {
@@ -704,7 +757,7 @@ final class GameController
             maiaRatingSlider.setDisable(true);
             maiaSearchGeneration = searchGeneration;
             maiaRequestStartNanos = System.nanoTime();
-            maiaEngine.setPosition(game.toUciMoveList());
+            maiaEngine.setPosition(game.startFen(), game.toUciMoveList());
             maiaEngine.go();
             return;
         }
@@ -723,7 +776,13 @@ final class GameController
             pegasusBridge.disconnect();
             return;
         }
-        PegasusConnectDialog.show(stage, pegasusBridge).ifPresent(pegasusBridge::connect);
+        BoardConnectDialog.show(stage, boardType, this::switchBoardType)
+                .ifPresent(
+                        address -> {
+                            if (pegasusBridge != null) {
+                                pegasusBridge.connect(address);
+                            }
+                        });
     }
 
     /**
@@ -739,7 +798,10 @@ final class GameController
         pegasusButton.setTooltip(
                 new Tooltip(
                         Messages.get(
-                                connected ? "menu_pegasus_disconnect" : "menu_pegasus_connect")));
+                                connected
+                                        ? "menu_board_disconnect_format"
+                                        : "menu_board_connect_format",
+                                boardType.displayName())));
     }
 
     /**
@@ -791,7 +853,7 @@ final class GameController
         dialog.showAndWait().ifPresent(pegasusBridge::selectCandidate);
     }
 
-    // ---- DesktopPegasusGameBridge.Listener -----------------------------------------
+    // ---- DesktopPegasusGameBridge.Listener / DesktopChessnutGameBridge.Listener --------
 
     @Override
     public void onConnectionStateChanged(ConnectionState state) {
@@ -909,8 +971,14 @@ final class GameController
         boolean autoMoveHeld =
                 heldEngineMoveUci != null
                         || (mode == Mode.TRAINING && trainingFlow.isAutoMoveHeld());
-        String text = Messages.get("pegasus_board_mismatch");
-        if (!names.isEmpty()) {
+        int promotionSquare = pegasusBridge.promotionSquareAwaitingPiece();
+        String text =
+                promotionSquare >= 0
+                        ? Messages.get(
+                                "board_promotion_piece_needed_format",
+                                BoardState.squareName(promotionSquare))
+                        : Messages.get("pegasus_board_mismatch");
+        if (!names.isEmpty() && promotionSquare < 0) {
             text +=
                     "\n"
                             + Messages.get(
@@ -919,8 +987,81 @@ final class GameController
         if (autoMoveHeld) {
             text += "\n" + Messages.get("pegasus_auto_move_held");
         }
+        if (canLoadPositionFromBoard()) {
+            text += "\n" + Messages.get("board_load_position_hint");
+        }
         pegasusMismatchLabel.setText(text);
         pegasusMismatchLabel.setVisible(true);
+    }
+
+    /**
+     * Taking the board's position over is offered while a piece-identifying board (Chessnut) is
+     * connected and disagrees with the screen, outside the opening trainer.
+     */
+    private boolean canLoadPositionFromBoard() {
+        return pegasusBridge != null
+                && pegasusBridge.canLoadPhysicalPosition()
+                && pegasusBridge.getConnectionState() == ConnectionState.CONNECTED
+                && mode != Mode.TRAINING;
+    }
+
+    /** Click on the mismatch banner: ask who is to move, then load the board's position. */
+    private void onMismatchLabelClicked() {
+        if (!canLoadPositionFromBoard()) {
+            return;
+        }
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.initOwner(stage);
+        alert.setTitle(Messages.get("dialog_load_position_title"));
+        alert.setHeaderText(null);
+        alert.setContentText(Messages.get("dialog_load_position_side"));
+        ButtonType white = new ButtonType(Messages.get("color_white"), ButtonBar.ButtonData.YES);
+        ButtonType black = new ButtonType(Messages.get("color_black"), ButtonBar.ButtonData.NO);
+        alert.getButtonTypes().setAll(white, black, ButtonType.CANCEL);
+        Styles.apply(alert.getDialogPane());
+        alert.showAndWait()
+                .ifPresent(
+                        choice -> {
+                            if (choice == white) {
+                                loadPositionFromBoard(true);
+                            } else if (choice == black) {
+                                loadPositionFromBoard(false);
+                            }
+                        });
+    }
+
+    /**
+     * Replaces the game with whatever stands on the board, keeping mode, opponent and colours; the
+     * opponent moves right away if it is its turn.
+     */
+    private void loadPositionFromBoard(boolean whiteToMove) {
+        String fen;
+        try {
+            fen = pegasusBridge.physicalPositionFen(whiteToMove);
+        } catch (InvalidPositionException e) {
+            String key =
+                    switch (e.reason()) {
+                        case KINGS -> "board_position_invalid_kings";
+                        case PAWN_ON_BACK_RANK -> "board_position_invalid_pawns";
+                        case OPPONENT_IN_CHECK -> "board_position_invalid_check";
+                        default -> "board_position_invalid";
+                    };
+            showError(Messages.get(key));
+            return;
+        }
+        abandonPendingSearches();
+        game.loadFen(fen);
+        boardCanvas.setLastMove(null, null);
+        boardCanvas.setTrainingHint(null, null);
+        boardCanvas.clearSelection();
+        if (engineReady) {
+            engine.newGame();
+            engine.setStrength((int) strengthSlider.getValue());
+        }
+        scrollMoveHistoryToEnd = true;
+        refresh();
+        syncPegasusPosition();
+        maybeStartEngineMove();
     }
 
     @Override
@@ -953,22 +1094,32 @@ final class GameController
 
     @Override
     public void onTransportError(TransportError error, String detail) {
-        LOG.log(Level.WARNING, "Pegasus transport error {0}: {1}", new Object[] {error, detail});
-        showError(Messages.get("pegasus_error_format", error));
+        LOG.log(Level.WARNING, "Board transport error {0}: {1}", new Object[] {error, detail});
+        showError(Messages.get("board_error_format", boardType.displayName(), error));
     }
 
+    /**
+     * Shared by both listener interfaces. For the Pegasus {@code low} means critically low (the
+     * board shuts down within minutes, per DGT); for the Chessnut it is a plain low-battery hint.
+     */
     @Override
-    public void onBatteryStatus(int percent, boolean criticallyLow) {
-        LOG.log(
-                Level.INFO,
-                "Pegasus battery: {0}% (criticallyLow={1})",
-                new Object[] {percent, criticallyLow});
-        showToast(
-                Messages.get(
-                        criticallyLow
-                                ? "pegasus_battery_critical_format"
-                                : "pegasus_battery_format",
-                        percent));
+    public void onBatteryStatus(int percent, boolean low) {
+        LOG.log(Level.INFO, "Board battery: {0}% (low={1})", new Object[] {percent, low});
+        String message;
+        if (low && boardType == BoardType.PEGASUS) {
+            message = Messages.get("pegasus_battery_critical_format", percent);
+        } else if (low) {
+            message = Messages.get("board_battery_low_format", boardType.displayName(), percent);
+        } else {
+            message = Messages.get("board_battery_format", boardType.displayName(), percent);
+        }
+        showToast(message);
+    }
+
+    /** Chessnut only: the board's NEW GAME button opens the same setup dialog as the button. */
+    @Override
+    public void onNewGameButton() {
+        openGameSetupDialog();
     }
 
     /**
@@ -1008,7 +1159,7 @@ final class GameController
                         isRealMove ? SearchPurpose.REAL_MOVE : SearchPurpose.ANALYSIS,
                         searchGeneration));
         analysisSideToMove = game.sideToMove();
-        engine.setPosition(game.toUciMoveList());
+        engine.setPosition(game.startFen(), game.toUciMoveList());
         engine.go(movetimeMs);
     }
 
@@ -1035,7 +1186,7 @@ final class GameController
         java.util.Arrays.fill(multiPvMoveByRank, null);
         engine.setFullStrength();
         engine.setMultiPv(HINT_MULTI_PV_LINES);
-        engine.setPosition(game.toUciMoveList());
+        engine.setPosition(game.startFen(), game.toUciMoveList());
         engine.go(HINT_MOVETIME_MS);
     }
 
@@ -1235,7 +1386,8 @@ final class GameController
             return;
         }
         pendingSearches.add(new PendingSearch(SearchPurpose.POST_GAME, searchGeneration));
-        engine.setPosition(String.join(" ", postGameUciMoves.subList(0, positionIndex)));
+        engine.setPosition(
+                game.startFen(), String.join(" ", postGameUciMoves.subList(0, positionIndex)));
         engine.go(POST_GAME_MOVETIME_MS);
     }
 

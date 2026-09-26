@@ -7,8 +7,8 @@ package de.schliweb.moveapiece;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-import de.schliweb.moveapiece.board.BoardType;
 import de.schliweb.moveapiece.engine.MaiaRatings;
+import de.schliweb.moveapiece.logic.BoardType;
 
 /**
  * Persists user-adjustable settings (engine strength, Maia rating, evaluation display, physical

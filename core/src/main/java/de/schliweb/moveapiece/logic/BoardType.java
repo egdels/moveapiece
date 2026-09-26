@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-package de.schliweb.moveapiece.board;
+package de.schliweb.moveapiece.logic;
 
 /** The physical boards MoveAPiece can talk to. Product names are not translated. */
 public enum BoardType {

@@ -44,6 +44,8 @@
 @property(nonatomic, strong) NSArray<CBUUID *> *notifyCharUuids;
 @property(nonatomic, assign) NSUInteger pendingCharacteristicDiscoveries;
 @property(nonatomic, assign) NSUInteger subscribedCount;
+/* startScan was called before CoreBluetooth reported its power state; run it once it does. */
+@property(nonatomic, assign) BOOL scanPending;
 @property(nonatomic, assign) JavaVM *jvm;
 @property(nonatomic, assign) jobject javaTransport;
 
@@ -254,6 +256,13 @@ static void reportDataSent(PegasusBleBridge *bridge, NSData *data) {
 }
 
 - (void)startScan {
+    if (self.central.state == CBManagerStateUnknown || self.central.state == CBManagerStateResetting) {
+        // A freshly created CBCentralManager reports its state asynchronously; a scan
+        // requested before that (e.g. right after switching the board type) must wait
+        // for centralManagerDidUpdateState: rather than being refused as "powered off".
+        self.scanPending = YES;
+        return;
+    }
     if (self.central.state != CBManagerStatePoweredOn) {
         reportScanFailed(self, @"BLUETOOTH_DISABLED", @"Bluetooth is not powered on");
         return;
@@ -268,6 +277,7 @@ static void reportDataSent(PegasusBleBridge *bridge, NSData *data) {
 }
 
 - (void)stopScan {
+    self.scanPending = NO;
     [self.central stopScan];
 }
 
@@ -317,8 +327,12 @@ static void reportDataSent(PegasusBleBridge *bridge, NSData *data) {
 #pragma mark - CBCentralManagerDelegate
 
 - (void)centralManagerDidUpdateState:(CBCentralManager *)central {
-    // No action needed here: startScan/connectToDeviceId check
-    // central.state synchronously and report BLUETOOTH_DISABLED themselves.
+    // startScan/connectToDeviceId check central.state synchronously themselves;
+    // only a scan requested before the first state report is deferred to here.
+    if (self.scanPending && central.state != CBManagerStateUnknown && central.state != CBManagerStateResetting) {
+        self.scanPending = NO;
+        [self startScan];
+    }
 }
 
 - (void)centralManager:(CBCentralManager *)central

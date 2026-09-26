@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-package de.schliweb.moveapiece.board;
+package de.schliweb.moveapiece.desktop.board;
 
 import de.schliweb.chessnut.core.game.InvalidPositionException;
 import de.schliweb.moveapiece.logic.BoardType;
@@ -15,8 +15,8 @@ import java.io.IOException;
 import java.util.List;
 
 /**
- * What {@code MainActivity} needs from a physical board, whichever one is selected. Implemented by
- * thin adapters around the board-specific bridges so those stay untouched; see {@link
+ * What {@code GameController} needs from a physical board, whichever one is selected. Implemented
+ * by thin adapters around the board-specific bridges so those stay untouched; see {@link
  * PegasusBoardAdapter} and {@link ChessnutBoardAdapter}.
  */
 public interface PhysicalBoardBridge {

@@ -6,6 +6,7 @@
 package de.schliweb.moveapiece.desktop;
 
 import de.schliweb.moveapiece.engine.MaiaRatings;
+import de.schliweb.moveapiece.logic.BoardType;
 import java.util.prefs.Preferences;
 
 /** Persists user-adjustable settings (engine strength, evaluation display) across app restarts. */
@@ -15,6 +16,7 @@ final class Settings {
     private static final String KEY_ENGINE_ELO = "engineElo";
     private static final String KEY_EVALUATION_ENABLED = "evaluationEnabled";
     private static final String KEY_MAIA_RATING = "maiaRating";
+    private static final String KEY_BOARD_TYPE = "boardType";
     private static final int DEFAULT_ENGINE_ELO = 2200;
     private static final boolean DEFAULT_EVALUATION_ENABLED = true;
     private static final int DEFAULT_MAIA_RATING = 1500;
@@ -49,5 +51,14 @@ final class Settings {
 
     static void setEvaluationDisplayEnabled(boolean enabled) {
         PREFS.putBoolean(KEY_EVALUATION_ENABLED, enabled);
+    }
+
+    /** Which physical board the connect button talks to; {@link BoardType#PEGASUS} until chosen. */
+    static BoardType getBoardType() {
+        return BoardType.fromKey(PREFS.get(KEY_BOARD_TYPE, null));
+    }
+
+    static void setBoardType(BoardType type) {
+        PREFS.put(KEY_BOARD_TYPE, type.key());
     }
 }

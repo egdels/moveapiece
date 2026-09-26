@@ -3,11 +3,12 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-package de.schliweb.moveapiece.board;
+package de.schliweb.moveapiece.desktop.board;
 
 import de.schliweb.chessnut.core.game.InvalidPositionException;
+import de.schliweb.moveapiece.desktop.chessnut.DesktopChessnutGameBridge;
 import de.schliweb.moveapiece.logic.BoardType;
-import de.schliweb.moveapiece.pegasus.PegasusGameBridge;
+import de.schliweb.pegasus.core.chess.PieceColor;
 import de.schliweb.pegasus.core.chess.PieceType;
 import de.schliweb.pegasus.core.transport.ConnectionState;
 import de.schliweb.pegasus.core.transport.ScanListener;
@@ -15,18 +16,21 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 
-/** {@link PhysicalBoardBridge} over the unchanged {@link PegasusGameBridge}. */
-public final class PegasusBoardAdapter implements PhysicalBoardBridge {
+/**
+ * {@link PhysicalBoardBridge} over {@link DesktopChessnutGameBridge}; promotion and ambiguity never
+ * arise there, so those two resolvers are no-ops.
+ */
+public final class ChessnutBoardAdapter implements PhysicalBoardBridge {
 
-    private final PegasusGameBridge bridge;
+    private final DesktopChessnutGameBridge bridge;
 
-    public PegasusBoardAdapter(PegasusGameBridge bridge) {
+    public ChessnutBoardAdapter(DesktopChessnutGameBridge bridge) {
         this.bridge = bridge;
     }
 
     @Override
     public BoardType type() {
-        return BoardType.PEGASUS;
+        return BoardType.CHESSNUT;
     }
 
     @Override
@@ -111,7 +115,7 @@ public final class PegasusBoardAdapter implements PhysicalBoardBridge {
 
     @Override
     public int promotionSquareAwaitingPiece() {
-        return -1; // the Pegasus asks via a dialog instead
+        return bridge.promotionSquareAwaitingPiece();
     }
 
     @Override
@@ -124,28 +128,42 @@ public final class PegasusBoardAdapter implements PhysicalBoardBridge {
         bridge.syncBoardToPosition(fen);
     }
 
+    /**
+     * Tones on the board's piezo standing in for move.mp3, capture.mp3 and check.mp3: a short click
+     * for a move, a lower and longer one for a capture, a high and long one for check.
+     */
     @Override
     public boolean playMoveSound(boolean capture, boolean check) {
-        return false; // no speaker
+        if (bridge.getConnectionState() != ConnectionState.CONNECTED) {
+            return false;
+        }
+        if (check) {
+            bridge.beep(1800, 250);
+        } else if (capture) {
+            bridge.beep(800, 140);
+        } else {
+            bridge.beep(1200, 70);
+        }
+        return true;
     }
 
     @Override
     public boolean canLoadPhysicalPosition() {
-        return false; // occupancy only, no piece identity
+        return true;
     }
 
     @Override
     public String physicalPositionFen(boolean whiteToMove) throws InvalidPositionException {
-        throw new InvalidPositionException(InvalidPositionException.Reason.NO_BOARD);
+        return bridge.physicalPositionFen(whiteToMove ? PieceColor.WHITE : PieceColor.BLACK);
     }
 
     @Override
     public void selectPromotion(PieceType promotion) {
-        bridge.selectPromotion(promotion);
+        // The Chessnut reads the promotion piece off the board; nothing is ever pending.
     }
 
     @Override
     public void selectCandidate(String uci) {
-        bridge.selectCandidate(uci);
+        // Piece identity makes every completed move unique; nothing is ever pending.
     }
 }
