@@ -184,7 +184,9 @@ async def scan(seconds: float):
     return rows
 
 
-def pick_chessnut(rows):
+def pick_chessnut(rows, name_prefix=None):
+    if name_prefix:
+        return next((r for r in rows if r[2].lower().startswith(name_prefix.lower())), None)
     candidates = [r for r in rows if "chessnut" in r[2].lower()]
     if not candidates:
         candidates = [r for r in rows if ASSUMED_SERVICE in [u.lower() for u in r[3]]]
@@ -219,7 +221,7 @@ async def read_stdin(queue: asyncio.Queue):
         await queue.put(line.strip())
 
 
-async def session(address: str, cap: Capture, listen_seconds: float | None = None, extra_sends: list[bytes] = (), send_delay: float = 0.5):
+async def session(address: str, cap: Capture, listen_seconds: float | None = None, extra_sends: list[bytes] = (), send_delay: float = 0.5, init: bool = True):
     tracker = BoardTracker(cap)
     write_uuid = None
     disconnected = asyncio.Event()
@@ -289,7 +291,8 @@ async def session(address: str, cap: Capture, listen_seconds: float | None = Non
             cap.log("->", str(write_uuid), data, note)
             await client.write_gatt_char(write_uuid, data, response=False)
 
-        await send(CMD_ENABLE_REALTIME, "enable real-time board reports")
+        if init:
+            await send(CMD_ENABLE_REALTIME, "enable real-time board reports")
         for extra in extra_sends:
             await asyncio.sleep(send_delay)
             await send(extra, "extra --send")
@@ -371,6 +374,10 @@ async def main():
     ap.add_argument("--scan-seconds", type=float, default=8.0)
     ap.add_argument("--listen", type=float, metavar="SECONDS",
                     help="non-interactive: connect, init, log for SECONDS, exit")
+    ap.add_argument("--no-init", action="store_true",
+                    help="do not send the Chessnut enable-reports command after connecting")
+    ap.add_argument("--name", metavar="PREFIX",
+                    help="auto-pick the device whose name starts with PREFIX instead of a Chessnut")
     ap.add_argument("--send-delay", type=float, default=0.5, metavar="SECONDS",
                     help="pause before each --send (default 0.5)")
     ap.add_argument("--send", action="append", default=[], metavar="HEX",
@@ -382,7 +389,7 @@ async def main():
         rows = await scan(args.scan_seconds)
         if args.list:
             return
-        pick = pick_chessnut(rows)
+        pick = pick_chessnut(rows, args.name)
         if pick is None:
             print("no Chessnut found (by name or service uuid); use --address")
             return
@@ -392,7 +399,7 @@ async def main():
     cap = Capture()
     cap.text(f"capture file: {cap.path}")
     try:
-        await session(address, cap, args.listen, [bytes.fromhex(h) for h in args.send], args.send_delay)
+        await session(address, cap, args.listen, [bytes.fromhex(h) for h in args.send], args.send_delay, not args.no_init)
     finally:
         cap.close()
         print(f"capture written to {cap.path}")
