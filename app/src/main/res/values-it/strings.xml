@@ -108,6 +108,10 @@
     <string name="board_position_invalid_pawns">I pedoni non possono stare sulla prima o sull\'ultima traversa</string>
     <string name="board_position_invalid_check">Il colore che non muove è sotto scacco</string>
     <string name="board_position_invalid">La scacchiera non mostra una posizione giocabile</string>
+    <string name="board_pending_capture_hint_format">Cattura in %1$s? Solleva brevemente il pezzo su quella casa perché la scacchiera la riconosca</string>
+    <string name="board_lifted_piece_no_moves_format">Il pezzo in %1$s non ha mosse legali (inchiodato, o il re è sotto scacco)</string>
+    <string name="board_lifted_piece_moves_format">Pezzo in %1$s sollevato: mosse possibili: %2$s</string>
+    <string name="board_lifted_opponent_piece_format">Il pezzo in %1$s è dell\'avversario: tocca a te</string>
     <string name="pegasus_ambiguous_title">Mossa ambigua – seleziona</string>
 
     <string name="opening_ruy_lopez">Apertura spagnola (Ruy López)</string>

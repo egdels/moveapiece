@@ -62,6 +62,24 @@ public interface PhysicalBoardBridge {
      */
     int promotionSquareAwaitingPiece();
 
+    /**
+     * Destination of a capture the board may have executed but cannot prove (occupancy-only
+     * boards), or -1. Boards that identify pieces always return -1.
+     */
+    int pendingCaptureSquare();
+
+    /**
+     * Square a single piece is currently lifted from, or -1. Only occupancy-only boards need the
+     * hint built from this and the two methods below; others always return -1.
+     */
+    int liftedPieceSquare();
+
+    /** Legal destinations of the lifted piece, empty if none (pinned, check, wrong side). */
+    List<Integer> liftedPieceDestinations();
+
+    /** Whether the lifted piece belongs to the side not to move. */
+    boolean liftedPieceBelongsToOpponent();
+
     void resetForNewGame();
 
     void syncBoardToPosition(String fen);

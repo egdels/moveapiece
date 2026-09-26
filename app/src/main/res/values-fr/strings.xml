@@ -108,6 +108,10 @@
     <string name="board_position_invalid_pawns">Les pions ne peuvent pas être sur la première ou la dernière rangée</string>
     <string name="board_position_invalid_check">Le camp qui n\'a pas le trait est en échec</string>
     <string name="board_position_invalid">L\'échiquier ne montre pas une position jouable</string>
+    <string name="board_pending_capture_hint_format">Prise en %1$s ? Soulevez brièvement la pièce sur cette case pour que l\'échiquier la détecte</string>
+    <string name="board_lifted_piece_no_moves_format">La pièce en %1$s n\'a aucun coup légal (clouée, ou le roi est en échec)</string>
+    <string name="board_lifted_piece_moves_format">Pièce en %1$s soulevée : coups possibles : %2$s</string>
+    <string name="board_lifted_opponent_piece_format">La pièce en %1$s appartient à l\'adversaire : c\'est à vous de jouer</string>
     <string name="pegasus_ambiguous_title">Coup ambigu – veuillez choisir</string>
 
     <string name="opening_ruy_lopez">Partie espagnole (Ruy Lopez)</string>

@@ -110,6 +110,10 @@
     <string name="board_position_invalid_pawns">Pawns cannot stand on the first or last rank</string>
     <string name="board_position_invalid_check">The side not to move is in check</string>
     <string name="board_position_invalid">The board does not show a playable position</string>
+    <string name="board_pending_capture_hint_format">Capture on %1$s? Lift the piece on that square briefly so the board can tell</string>
+    <string name="board_lifted_piece_no_moves_format">The piece on %1$s has no legal move (pinned, or the king is in check)</string>
+    <string name="board_lifted_piece_moves_format">Piece on %1$s lifted – legal moves: %2$s</string>
+    <string name="board_lifted_opponent_piece_format">The piece on %1$s belongs to your opponent – it is your move</string>
     <string name="pegasus_ambiguous_title">Ambiguous move – please choose</string>
 
     <string name="opening_ruy_lopez">Ruy Lopez (Spanish Opening)</string>

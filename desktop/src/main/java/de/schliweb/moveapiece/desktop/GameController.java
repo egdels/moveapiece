@@ -380,10 +380,37 @@ final class GameController
         } else {
             return null;
         }
-        if (type == BoardType.CHESSNUT) {
-            return new ChessnutBoardAdapter(new DesktopChessnutGameBridge(transport, this));
+        PhysicalBoardBridge bridge =
+                type == BoardType.CHESSNUT
+                        ? new ChessnutBoardAdapter(new DesktopChessnutGameBridge(transport, this))
+                        : new PegasusBoardAdapter(new DesktopPegasusGameBridge(transport, this));
+        maybeStartBoardRecording(bridge, type);
+        return bridge;
+    }
+
+    /**
+     * Raw BLE traffic recording for hardware-verification sessions, the desktop counterpart of the
+     * Android debug build's automatic recording: set the environment variable {@code
+     * MOVEAPIECE_BOARD_RECORDING} to a directory and every bridge writes its session there as
+     * NDJSON. Non-critical if it fails.
+     */
+    private static void maybeStartBoardRecording(PhysicalBoardBridge bridge, BoardType type) {
+        String dir = System.getenv("MOVEAPIECE_BOARD_RECORDING");
+        if (dir == null || dir.isBlank()) {
+            return;
         }
-        return new PegasusBoardAdapter(new DesktopPegasusGameBridge(transport, this));
+        java.io.File folder = new java.io.File(dir);
+        if (!folder.isDirectory() && !folder.mkdirs()) {
+            return;
+        }
+        try {
+            bridge.startRecording(
+                    new java.io.File(
+                            folder,
+                            type.key() + "-session-" + System.currentTimeMillis() + ".ndjson"));
+        } catch (java.io.IOException e) {
+            LOG.log(Level.WARNING, "board recording could not be started", e);
+        }
     }
 
     /**
@@ -956,8 +983,31 @@ final class GameController
                         && pegasusBridge.getConnectionState() == ConnectionState.CONNECTED
                         && pegasusBridge.isBoardMismatched();
         if (!mismatched) {
-            pegasusMismatchLabel.setVisible(false);
             boardCanvas.setMismatchSquares(List.of());
+            int pendingCapture =
+                    pegasusBridge != null
+                                    && pegasusBridge.getConnectionState()
+                                            == ConnectionState.CONNECTED
+                            ? pegasusBridge.pendingCaptureSquare()
+                            : -1;
+            int liftedPiece =
+                    pegasusBridge != null
+                                    && pegasusBridge.getConnectionState()
+                                            == ConnectionState.CONNECTED
+                            ? pegasusBridge.liftedPieceSquare()
+                            : -1;
+            if (pendingCapture >= 0) {
+                pegasusMismatchLabel.setText(
+                        Messages.get(
+                                "board_pending_capture_hint_format",
+                                BoardState.squareName(pendingCapture)));
+                pegasusMismatchLabel.setVisible(true);
+            } else if (liftedPiece >= 0) {
+                pegasusMismatchLabel.setText(liftedPieceHint(liftedPiece));
+                pegasusMismatchLabel.setVisible(true);
+            } else {
+                pegasusMismatchLabel.setVisible(false);
+            }
             return;
         }
         List<Square> squares = new ArrayList<>();
@@ -1114,6 +1164,29 @@ final class GameController
             message = Messages.get("board_battery_format", boardType.displayName(), percent);
         }
         showToast(message);
+    }
+
+    /** What to say about a piece held in the air for a while: whose it is and where it may go. */
+    private String liftedPieceHint(int square) {
+        String name = BoardState.squareName(square);
+        if (pegasusBridge.liftedPieceBelongsToOpponent()) {
+            return Messages.get("board_lifted_opponent_piece_format", name);
+        }
+        List<Integer> destinations = pegasusBridge.liftedPieceDestinations();
+        if (destinations.isEmpty()) {
+            return Messages.get("board_lifted_piece_no_moves_format", name);
+        }
+        List<String> names = new ArrayList<>();
+        for (int to : destinations) {
+            names.add(BoardState.squareName(to));
+        }
+        return Messages.get("board_lifted_piece_moves_format", name, String.join(", ", names));
+    }
+
+    /** Pegasus only: the board sat in a state worth a hint, or left it. */
+    @Override
+    public void onBoardHint() {
+        updatePegasusMismatchLabel();
     }
 
     /** Chessnut only: the board's NEW GAME button opens the same setup dialog as the button. */

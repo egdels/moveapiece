@@ -110,6 +110,26 @@ public final class PegasusBoardAdapter implements PhysicalBoardBridge {
     }
 
     @Override
+    public int liftedPieceSquare() {
+        return bridge.liftedPieceSquare();
+    }
+
+    @Override
+    public List<Integer> liftedPieceDestinations() {
+        return bridge.liftedPieceDestinations();
+    }
+
+    @Override
+    public boolean liftedPieceBelongsToOpponent() {
+        return bridge.liftedPieceBelongsToOpponent();
+    }
+
+    @Override
+    public int pendingCaptureSquare() {
+        return bridge.pendingCaptureSquare();
+    }
+
+    @Override
     public int promotionSquareAwaitingPiece() {
         return -1; // the Pegasus asks via a dialog instead
     }

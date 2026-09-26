@@ -108,6 +108,10 @@
     <string name="board_position_invalid_pawns">Pionnen mogen niet op de eerste of laatste rij staan</string>
     <string name="board_position_invalid_check">De kant die niet aan zet is staat schaak</string>
     <string name="board_position_invalid">Het bord toont geen speelbare stelling</string>
+    <string name="board_pending_capture_hint_format">Slag op %1$s? Til het stuk op dat veld even op zodat het bord het herkent</string>
+    <string name="board_lifted_piece_no_moves_format">Het stuk op %1$s heeft geen geldige zet (gepend, of de koning staat schaak)</string>
+    <string name="board_lifted_piece_moves_format">Stuk op %1$s opgetild – mogelijke zetten: %2$s</string>
+    <string name="board_lifted_opponent_piece_format">Het stuk op %1$s is van je tegenstander – jij bent aan zet</string>
     <string name="pegasus_ambiguous_title">Onduidelijke zet – kies een optie</string>
 
     <string name="opening_ruy_lopez">Spaans (Ruy Lopez)</string>

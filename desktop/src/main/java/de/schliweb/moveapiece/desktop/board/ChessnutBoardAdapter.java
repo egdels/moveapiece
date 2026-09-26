@@ -114,6 +114,26 @@ public final class ChessnutBoardAdapter implements PhysicalBoardBridge {
     }
 
     @Override
+    public int liftedPieceSquare() {
+        return -1; // an illegal placement shows up as a mismatch right away
+    }
+
+    @Override
+    public List<Integer> liftedPieceDestinations() {
+        return List.of();
+    }
+
+    @Override
+    public boolean liftedPieceBelongsToOpponent() {
+        return false;
+    }
+
+    @Override
+    public int pendingCaptureSquare() {
+        return -1; // piece identity proves every capture
+    }
+
+    @Override
     public int promotionSquareAwaitingPiece() {
         return bridge.promotionSquareAwaitingPiece();
     }

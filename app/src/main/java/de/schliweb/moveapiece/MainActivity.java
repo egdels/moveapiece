@@ -822,8 +822,27 @@ public class MainActivity extends AppCompatActivity
                 board.getConnectionState() == ConnectionState.CONNECTED
                         && board.isBoardMismatched();
         if (!mismatched) {
-            binding.pegasusMismatchText.setVisibility(View.GONE);
             binding.boardView.setMismatchSquares(java.util.Collections.emptyList());
+            int pendingCapture =
+                    board.getConnectionState() == ConnectionState.CONNECTED
+                            ? board.pendingCaptureSquare()
+                            : -1;
+            int liftedPiece =
+                    board.getConnectionState() == ConnectionState.CONNECTED
+                            ? board.liftedPieceSquare()
+                            : -1;
+            if (pendingCapture >= 0) {
+                binding.pegasusMismatchText.setText(
+                        getString(
+                                R.string.board_pending_capture_hint_format,
+                                BoardState.squareName(pendingCapture)));
+                binding.pegasusMismatchText.setVisibility(View.VISIBLE);
+            } else if (liftedPiece >= 0) {
+                binding.pegasusMismatchText.setText(liftedPieceHint(liftedPiece));
+                binding.pegasusMismatchText.setVisibility(View.VISIBLE);
+            } else {
+                binding.pegasusMismatchText.setVisibility(View.GONE);
+            }
             return;
         }
         List<Square> squares = new ArrayList<>();
@@ -980,6 +999,29 @@ public class MainActivity extends AppCompatActivity
             message = getString(R.string.board_battery_format, boardType.displayName(), percent);
         }
         Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+    }
+
+    /** What to say about a piece held in the air for a while: whose it is and where it may go. */
+    private String liftedPieceHint(int square) {
+        String name = BoardState.squareName(square);
+        if (board.liftedPieceBelongsToOpponent()) {
+            return getString(R.string.board_lifted_opponent_piece_format, name);
+        }
+        List<Integer> destinations = board.liftedPieceDestinations();
+        if (destinations.isEmpty()) {
+            return getString(R.string.board_lifted_piece_no_moves_format, name);
+        }
+        List<String> names = new ArrayList<>();
+        for (int to : destinations) {
+            names.add(BoardState.squareName(to));
+        }
+        return getString(R.string.board_lifted_piece_moves_format, name, String.join(", ", names));
+    }
+
+    /** Pegasus only: the board sat in a state worth a hint, or left it. */
+    @Override
+    public void onBoardHint() {
+        updatePegasusMismatchText();
     }
 
     /** Chessnut only: the board's NEW GAME button opens the same dialog as the on-screen one. */

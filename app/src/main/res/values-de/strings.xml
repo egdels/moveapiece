@@ -108,6 +108,10 @@
     <string name="board_position_invalid_pawns">Bauern dürfen nicht auf der ersten oder letzten Reihe stehen</string>
     <string name="board_position_invalid_check">Die Seite, die nicht am Zug ist, steht im Schach</string>
     <string name="board_position_invalid">Das Brett zeigt keine spielbare Stellung</string>
+    <string name="board_pending_capture_hint_format">Schlagzug auf %1$s? Figur dort kurz anheben, damit das Brett ihn erkennt</string>
+    <string name="board_lifted_piece_no_moves_format">Die Figur auf %1$s hat keinen legalen Zug – gefesselt oder Schach?</string>
+    <string name="board_lifted_piece_moves_format">Figur auf %1$s angehoben – mögliche Züge: %2$s</string>
+    <string name="board_lifted_opponent_piece_format">Die Figur auf %1$s gehört dem Gegner – du bist am Zug</string>
     <string name="pegasus_ambiguous_title">Mehrdeutiger Zug – bitte wählen</string>
 
     <string name="opening_ruy_lopez">Spanische Partie (Ruy Lopez)</string>

@@ -96,6 +96,13 @@ public class PegasusGameBridge {
         void onTransportError(TransportError error, String detail);
 
         /**
+         * The board has sat for a while in a state the player probably needs a hint about (see
+         * {@link #pendingCaptureSquare()} and {@link #liftedPieceSquare()}), or such a state just
+         * ended. The host re-reads both either way and shows or clears its hint.
+         */
+        default void onBoardHint() {}
+
+        /**
          * Reported once per connect (from the init sequence's battery request), and again on any
          * later transition into a critically low battery. Real Pegasus hardware also pushes a fresh
          * reading spontaneously whenever the percentage changes by 1% (CONFIRMED_ON_HARDWARE
@@ -156,6 +163,7 @@ public class PegasusGameBridge {
     private final Runnable checkIndicatorRefreshRunnable = this::refreshCheckIndicator;
     private final Runnable guidedCaptureSettleRunnable = this::settleUnprovenGuidedCapture;
     private final Runnable guideLedReassertRunnable = this::reassertGuideLeds;
+    private final Runnable boardHintRunnable = this::fireBoardHint;
     private final MoveDetector moveDetector = new MoveDetector(ChessPosition.starting(), null);
 
     private final BoardSyncGuide syncGuide =
@@ -714,6 +722,12 @@ public class PegasusGameBridge {
     }
 
     private void dispatchDetectionResult(MoveDetectionResult result) {
+        if (result.kind() != MoveDetectionResult.Kind.NO_CHANGE) {
+            clearBoardHint();
+        }
+        if (result.kind() == MoveDetectionResult.Kind.IN_PROGRESS) {
+            scheduleBoardHint();
+        }
         Log.i(TAG, "detection result: " + result.kind());
         if (result.kind() == MoveDetectionResult.Kind.CONFIRMED) {
             squaresSeenEmpty.clear();
@@ -816,6 +830,113 @@ public class PegasusGameBridge {
      * either way - so "was the destination seen vacated" is exactly as valid a positive-proof
      * signal for either shape.
      */
+    /**
+     * How long a single capture candidate may stay unproven before the host is told to show a hint.
+     * A capture executed as a quick swap on the destination (captured piece off, attacker on,
+     * within one sensor scan) never shows the square empty, and occupancy alone then cannot tell it
+     * from the attacker merely being lifted; lifting the piece on that square once provides the
+     * proof (see the IN_PROGRESS branch of dispatchDetectionResult).
+     */
+    private static final long BOARD_HINT_MS = 2000;
+
+    private boolean boardHintShown;
+
+    /**
+     * Destination of the one capture the board may have executed but cannot prove yet (all pending
+     * candidates share it and it is occupied in the tracked position), or -1.
+     */
+    public int pendingCaptureSquare() {
+        if (moveDetector.state() != MoveDetectionState.MOVE_IN_PROGRESS) {
+            return -1;
+        }
+        List<Move> pending = moveDetector.pendingCandidates();
+        if (pending.isEmpty() || !shareDestination(pending)) {
+            return -1;
+        }
+        int to = pending.get(0).to();
+        return moveDetector.position().pieceAt(to) != null ? to : -1;
+    }
+
+    private void scheduleBoardHint() {
+        mainHandler.removeCallbacks(boardHintRunnable);
+        mainHandler.postDelayed(boardHintRunnable, BOARD_HINT_MS);
+    }
+
+    /**
+     * The one square a piece is currently lifted from (a single piece missing, nothing else
+     * changed, no capture candidate pending), or -1. With the piece in hand the host can show where
+     * it may go: an occupancy-only board cannot see an illegal placement onto an occupied square,
+     * so without that an attempted illegal capture leaves the app silently waiting (observed on
+     * hardware 2026-09-26, a pinned bishop and a protected knight).
+     */
+    public int liftedPieceSquare() {
+        if (moveDetector.state() != MoveDetectionState.MOVE_IN_PROGRESS
+                || !moveDetector.pendingCandidates().isEmpty()) {
+            return -1;
+        }
+        BoardState physical = moveDetector.lastPhysical();
+        if (physical == null) {
+            return -1;
+        }
+        BoardMismatch diff = BoardMismatch.between(moveDetector.expectedOccupancy(), physical);
+        if (diff.missingOccupied().size() != 1 || !diff.unexpectedOccupied().isEmpty()) {
+            return -1;
+        }
+        return diff.missingOccupied().get(0);
+    }
+
+    /** Legal destinations of the lifted piece ({@link #liftedPieceSquare()}), empty if none. */
+    public List<Integer> liftedPieceDestinations() {
+        int square = liftedPieceSquare();
+        List<Integer> destinations = new ArrayList<>();
+        if (square < 0) {
+            return destinations;
+        }
+        for (Move move : moveDetector.position().legalMoves()) {
+            if (move.from() == square && !destinations.contains(move.to())) {
+                destinations.add(move.to());
+            }
+        }
+        return destinations;
+    }
+
+    /** Whether the lifted piece belongs to the side not to move. */
+    public boolean liftedPieceBelongsToOpponent() {
+        int square = liftedPieceSquare();
+        if (square < 0) {
+            return false;
+        }
+        Piece piece = moveDetector.position().pieceAt(square);
+        return piece != null && piece.color() != moveDetector.position().sideToMove();
+    }
+
+    private void fireBoardHint() {
+        int square = pendingCaptureSquare();
+        if (square < 0) {
+            square = liftedPieceSquare();
+        }
+        if (square < 0) {
+            return;
+        }
+        Log.i(TAG, "board hint for " + BoardState.squareName(square));
+        boardHintShown = true;
+        Listener l = listener();
+        if (l != null) {
+            l.onBoardHint();
+        }
+    }
+
+    private void clearBoardHint() {
+        mainHandler.removeCallbacks(boardHintRunnable);
+        if (boardHintShown) {
+            boardHintShown = false;
+            Listener l = listener();
+            if (l != null) {
+                l.onBoardHint();
+            }
+        }
+    }
+
     private static boolean shareDestination(List<Move> candidates) {
         if (candidates.isEmpty()) {
             return false;
@@ -1201,6 +1322,7 @@ public class PegasusGameBridge {
      * went dark and stayed dark: nothing lights it again until the next physical event.
      */
     public void resetForNewGame() {
+        clearBoardHint();
         mainHandler.removeCallbacks(checkIndicatorRefreshRunnable);
         abortGuide();
         ledController.off();
@@ -1226,6 +1348,7 @@ public class PegasusGameBridge {
      * matches.
      */
     public void syncBoardToPosition(String fen) {
+        clearBoardHint();
         try {
             ChessPosition target = ChessPosition.fromFen(fen);
             abortGuide();
