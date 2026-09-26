@@ -18,6 +18,13 @@ def hasReleaseSigning = releaseKeystorePath && releaseKeyAlias && releaseKeyPass
 // for this project's versioning.
 def (major, minor, patch) = (project.appVersion as String).tokenize('.').collect { it as int } + [0, 0, 0]
 def baseVersionCode = major * 10000 + minor * 100 + patch
+// gradle.properties also spells the derived value out as appVersionCode for
+// tools that only grep that file (F-Droid's checkupdates). Fail loudly if
+// the two drift apart, so the literal can never silently go stale.
+if ((project.appVersionCode as String) != baseVersionCode.toString()) {
+    throw new GradleException("appVersionCode=${project.appVersionCode} in gradle.properties " +
+            "does not match ${baseVersionCode} derived from appVersion=${project.appVersion}")
+}
 
 android {
     namespace 'de.schliweb.moveapiece'

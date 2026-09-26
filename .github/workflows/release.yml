@@ -56,12 +56,22 @@ jobs:
             echo "::error::tag $TAG does not match appVersion=$VERSION in gradle.properties"
             exit 1
           fi
+          # Same guard as app/build.gradle for the spelled-out versionCode,
+          # here so a stale value fails before any job builds.
+          IFS=. read -r MAJOR MINOR PATCH <<< "$VERSION"
+          DERIVED=$(( ${MAJOR:-0} * 10000 + ${MINOR:-0} * 100 + ${PATCH:-0} ))
+          VERSION_CODE=$(grep '^appVersionCode=' gradle.properties | cut -d= -f2)
+          if [[ "$VERSION_CODE" != "$DERIVED" ]]; then
+            echo "::error::appVersionCode=$VERSION_CODE in gradle.properties does not match $DERIVED derived from appVersion=$VERSION"
+            exit 1
+          fi
 
       # Release notes come from the Fastlane changelog for this versionCode
       # (the same file F-Droid shows as "What's new"), so the notes are
-      # written once. versionCode is derived exactly as app/build.gradle does:
-      # major*10000 + minor*100 + patch. Falls back to GitHub's generated
-      # commit list only if no changelog exists for this version (pre-releases).
+      # written once. versionCode is gradle.properties' appVersionCode,
+      # verified against appVersion by the step above. Falls back to GitHub's
+      # generated commit list only if no changelog exists for this version
+      # (pre-releases).
       #
       # Idempotent on purpose: if the release for this tag already exists
       # (the tag was moved and force-pushed to re-release), its notes are
@@ -72,9 +82,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="${{ github.ref_name }}"
-          VERSION=$(grep '^appVersion=' gradle.properties | cut -d= -f2)
-          IFS=. read -r MAJOR MINOR PATCH <<< "$VERSION"
-          VERSION_CODE=$(( ${MAJOR:-0} * 10000 + ${MINOR:-0} * 100 + ${PATCH:-0} ))
+          VERSION_CODE=$(grep '^appVersionCode=' gradle.properties | cut -d= -f2)
           NOTES="fastlane/metadata/android/en-US/changelogs/${VERSION_CODE}.txt"
           common_args=(--title "$TAG" --repo "${{ github.repository }}")
           if [[ "$TAG" == *-* ]]; then
