@@ -398,6 +398,7 @@ public class MainActivity extends AppCompatActivity
                 v -> startActivity(new Intent(this, OpeningLibraryActivity.class)));
         binding.hintButton.setOnClickListener(v -> requestHint());
         binding.pegasusButton.setOnClickListener(v -> onPegasusButtonClicked());
+        binding.pegasusMismatchText.setOnClickListener(v -> onMismatchBannerClicked());
         updatePegasusButtonLabel(board.getConnectionState());
         binding.exportPgnButton.setOnClickListener(v -> exportGamePgn());
         binding.importPgnButton.setOnClickListener(v -> pgnImportLauncher.launch("*/*"));
@@ -854,8 +855,91 @@ public class MainActivity extends AppCompatActivity
         if (autoMoveHeld) {
             text.append('\n').append(getString(R.string.pegasus_auto_move_held));
         }
+        if (canLoadPositionFromBoard()) {
+            text.append('\n').append(getString(R.string.board_load_position_hint));
+        }
         binding.pegasusMismatchText.setText(text.toString());
         binding.pegasusMismatchText.setVisibility(View.VISIBLE);
+    }
+
+    /**
+     * Taking the board's position over is offered while a piece-identifying board (Chessnut) is
+     * connected and disagrees with the screen, outside the opening trainer (its lines always start
+     * from the initial position).
+     */
+    private boolean canLoadPositionFromBoard() {
+        return board.canLoadPhysicalPosition()
+                && board.getConnectionState() == ConnectionState.CONNECTED
+                && mode != GameMode.TRAINING;
+    }
+
+    /** Tap on the mismatch banner: ask who is to move, then load the board's position. */
+    private void onMismatchBannerClicked() {
+        if (!canLoadPositionFromBoard()) {
+            return;
+        }
+        currentDialog =
+                new MaterialAlertDialogBuilder(this)
+                        .setTitle(R.string.dialog_load_position_title)
+                        .setMessage(R.string.dialog_load_position_side)
+                        .setPositiveButton(
+                                R.string.color_white,
+                                (dialog, which) -> loadPositionFromBoard(true))
+                        .setNegativeButton(
+                                R.string.color_black,
+                                (dialog, which) -> loadPositionFromBoard(false))
+                        .setNeutralButton(R.string.action_cancel, null)
+                        .show();
+    }
+
+    /**
+     * Replaces the game with whatever stands on the board, keeping mode, opponent and colours; the
+     * opponent moves right away if it is its turn. Mirrors {@link #startNewGame}'s resets.
+     */
+    private void loadPositionFromBoard(boolean whiteToMove) {
+        String fen;
+        try {
+            fen = board.physicalPositionFen(whiteToMove);
+        } catch (de.schliweb.chessnut.core.game.InvalidPositionException e) {
+            int messageRes;
+            switch (e.reason()) {
+                case KINGS:
+                    messageRes = R.string.board_position_invalid_kings;
+                    break;
+                case PAWN_ON_BACK_RANK:
+                    messageRes = R.string.board_position_invalid_pawns;
+                    break;
+                case OPPONENT_IN_CHECK:
+                    messageRes = R.string.board_position_invalid_check;
+                    break;
+                default:
+                    messageRes = R.string.board_position_invalid;
+                    break;
+            }
+            Toast.makeText(this, messageRes, Toast.LENGTH_LONG).show();
+            return;
+        }
+        abandonPendingSearches();
+        game.loadFen(fen);
+        setLastMove(null, null);
+        binding.boardView.setCheckedKingSquare(null);
+        binding.boardView.setTrainingHint(null, null);
+        binding.boardView.clearSelection();
+        binding.undoButton.setEnabled(true);
+        if (engineReady) {
+            engine.newGame();
+            if (mode == GameMode.ENGINE) {
+                engine.setStrength(engineElo);
+            } else {
+                engine.setFullStrength();
+            }
+        }
+        scrollMoveHistoryToEnd = true;
+        refreshBoard();
+        syncPegasusPosition();
+        if (isPairedEngineMode()) {
+            maybeTriggerEngineMove();
+        }
     }
 
     @Override
@@ -1666,7 +1750,7 @@ public class MainActivity extends AppCompatActivity
             updateStatusText();
             maiaSearchGeneration = searchGeneration;
             maiaRequestStartElapsedMs = SystemClock.elapsedRealtime();
-            maiaEngine.setPosition(game.toUciMoveList());
+            maiaEngine.setPosition(game.startFen(), game.toUciMoveList());
             maiaEngine.go();
             return;
         }
@@ -1692,7 +1776,7 @@ public class MainActivity extends AppCompatActivity
                         isRealMove ? SearchPurpose.REAL_MOVE : SearchPurpose.ANALYSIS,
                         searchGeneration));
         analysisSideToMove = game.sideToMove();
-        engine.setPosition(game.toUciMoveList());
+        engine.setPosition(game.startFen(), game.toUciMoveList());
         engine.go(movetimeMs);
     }
 
@@ -1719,7 +1803,7 @@ public class MainActivity extends AppCompatActivity
         java.util.Arrays.fill(multiPvMoveByRank, null);
         engine.setFullStrength();
         engine.setMultiPv(HINT_MULTI_PV_LINES);
-        engine.setPosition(game.toUciMoveList());
+        engine.setPosition(game.startFen(), game.toUciMoveList());
         engine.go(HINT_MOVETIME_MS);
     }
 
@@ -1924,7 +2008,8 @@ public class MainActivity extends AppCompatActivity
             return;
         }
         pendingSearches.add(new PendingSearch(SearchPurpose.POST_GAME, searchGeneration));
-        engine.setPosition(String.join(" ", postGameUciMoves.subList(0, positionIndex)));
+        engine.setPosition(
+                game.startFen(), String.join(" ", postGameUciMoves.subList(0, positionIndex)));
         engine.go(POST_GAME_MOVETIME_MS);
     }
 

@@ -101,6 +101,13 @@
     <string name="pegasus_auto_move_held">La mossa dell\'app attende che la scacchiera corrisponda</string>
     <string name="pegasus_mismatch_squares_format">Case: %1$s</string>
     <string name="board_promotion_piece_needed_format">Pedone in %1$s: sostituiscilo con il pezzo di promozione</string>
+    <string name="board_load_position_hint">Tocca per riprendere la posizione dalla scacchiera</string>
+    <string name="dialog_load_position_title">Riprendi la posizione dalla scacchiera</string>
+    <string name="dialog_load_position_side">Chi muove?</string>
+    <string name="board_position_invalid_kings">Ogni colore deve avere esattamente un re</string>
+    <string name="board_position_invalid_pawns">I pedoni non possono stare sulla prima o sull\'ultima traversa</string>
+    <string name="board_position_invalid_check">Il colore che non muove è sotto scacco</string>
+    <string name="board_position_invalid">La scacchiera non mostra una posizione giocabile</string>
     <string name="pegasus_ambiguous_title">Mossa ambigua – seleziona</string>
 
     <string name="opening_ruy_lopez">Apertura spagnola (Ruy López)</string>

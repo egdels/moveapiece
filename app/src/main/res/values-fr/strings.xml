@@ -101,6 +101,13 @@
     <string name="pegasus_auto_move_held">Le coup de l\'application attend que l\'échiquier corresponde</string>
     <string name="pegasus_mismatch_squares_format">Cases : %1$s</string>
     <string name="board_promotion_piece_needed_format">Pion en %1$s : remplacez-le par la pièce de promotion</string>
+    <string name="board_load_position_hint">Touchez pour reprendre la position de l\'échiquier</string>
+    <string name="dialog_load_position_title">Reprendre la position de l\'échiquier</string>
+    <string name="dialog_load_position_side">Qui a le trait ?</string>
+    <string name="board_position_invalid_kings">Chaque camp doit avoir exactement un roi</string>
+    <string name="board_position_invalid_pawns">Les pions ne peuvent pas être sur la première ou la dernière rangée</string>
+    <string name="board_position_invalid_check">Le camp qui n\'a pas le trait est en échec</string>
+    <string name="board_position_invalid">L\'échiquier ne montre pas une position jouable</string>
     <string name="pegasus_ambiguous_title">Coup ambigu – veuillez choisir</string>
 
     <string name="opening_ruy_lopez">Partie espagnole (Ruy Lopez)</string>

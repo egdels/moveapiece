@@ -9,11 +9,13 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 import de.schliweb.chessnut.core.game.ChessnutGameFlow;
+import de.schliweb.chessnut.core.game.InvalidPositionException;
 import de.schliweb.chessnut.core.protocol.ChessnutBatteryStatus;
 import de.schliweb.chessnut.core.protocol.ChessnutDevice;
 import de.schliweb.chessnut.core.protocol.ChessnutDeviceListener;
 import de.schliweb.chessnut.core.protocol.ChessnutFrame;
 import de.schliweb.chessnut.core.protocol.ChessnutLedController;
+import de.schliweb.pegasus.core.chess.PieceColor;
 import de.schliweb.pegasus.core.protocol.BoardState;
 import de.schliweb.pegasus.core.record.SessionRecorder;
 import de.schliweb.pegasus.core.transport.ConnectionState;
@@ -344,6 +346,11 @@ public class ChessnutGameBridge {
 
     public void resetForNewGame() {
         flow.resetForNewGame();
+    }
+
+    /** See {@link ChessnutGameFlow#physicalPositionFen}. */
+    public String physicalPositionFen(PieceColor sideToMove) throws InvalidPositionException {
+        return flow.physicalPositionFen(sideToMove);
     }
 
     /** See {@link ChessnutGameFlow#promotionSquareAwaitingPiece()}. */

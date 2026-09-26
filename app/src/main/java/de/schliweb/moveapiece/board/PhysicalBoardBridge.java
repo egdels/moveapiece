@@ -5,6 +5,7 @@
 
 package de.schliweb.moveapiece.board;
 
+import de.schliweb.chessnut.core.game.InvalidPositionException;
 import de.schliweb.pegasus.core.chess.PieceType;
 import de.schliweb.pegasus.core.transport.ConnectionState;
 import de.schliweb.pegasus.core.transport.ScanListener;
@@ -70,6 +71,16 @@ public interface PhysicalBoardBridge {
      * should play the phone sound.
      */
     boolean playMoveSound(boolean capture, boolean check);
+
+    /** Whether {@link #physicalPositionFen} can work at all: only boards that identify pieces. */
+    boolean canLoadPhysicalPosition();
+
+    /**
+     * FEN of the pieces currently on the board with the given side to move, for taking a position
+     * over from the board. Throws for boards that cannot ({@link #canLoadPhysicalPosition}) and for
+     * unplayable positions.
+     */
+    String physicalPositionFen(boolean whiteToMove) throws InvalidPositionException;
 
     /** Resolves a pending promotion prompt; a no-op on boards that identify pieces themselves. */
     void selectPromotion(PieceType promotion);

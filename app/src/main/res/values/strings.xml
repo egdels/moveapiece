@@ -103,6 +103,13 @@
     <string name="pegasus_auto_move_held">The app\'s move is waiting until the board matches</string>
     <string name="pegasus_mismatch_squares_format">Squares: %1$s</string>
     <string name="board_promotion_piece_needed_format">Pawn reached %1$s – replace it with the promotion piece</string>
+    <string name="board_load_position_hint">Tap to take the position from the board</string>
+    <string name="dialog_load_position_title">Take position from board</string>
+    <string name="dialog_load_position_side">Who is to move?</string>
+    <string name="board_position_invalid_kings">Each side needs exactly one king</string>
+    <string name="board_position_invalid_pawns">Pawns cannot stand on the first or last rank</string>
+    <string name="board_position_invalid_check">The side not to move is in check</string>
+    <string name="board_position_invalid">The board does not show a playable position</string>
     <string name="pegasus_ambiguous_title">Ambiguous move – please choose</string>
 
     <string name="opening_ruy_lopez">Ruy Lopez (Spanish Opening)</string>

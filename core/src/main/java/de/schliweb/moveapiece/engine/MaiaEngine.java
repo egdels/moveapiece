@@ -158,9 +158,19 @@ public class MaiaEngine {
      * @param movesUci space-separated UCI moves from the start position, may be empty or null
      */
     public void setPosition(String movesUci) {
+        setPosition(null, movesUci);
+    }
+
+    /**
+     * @param startFen position the moves start from, {@code null} for the standard start. The
+     *     network's history planes then begin at that position, exactly as lc0 handles a game set
+     *     up from a FEN (earlier history steps stay zero, see {@link MaiaPositionEncoder}).
+     * @param movesUci space-separated UCI moves from {@code startFen}, may be empty or null
+     */
+    public void setPosition(String startFen, String movesUci) {
         ioExecutor.execute(
                 () -> {
-                    resetReplayState();
+                    resetReplayState(startFen == null || startFen.isEmpty() ? START_FEN : startFen);
                     if (movesUci == null || movesUci.trim().isEmpty()) {
                         return;
                     }
@@ -212,7 +222,11 @@ public class MaiaEngine {
     }
 
     private void resetReplayState() {
-        board.loadFromFen(START_FEN);
+        resetReplayState(START_FEN);
+    }
+
+    private void resetReplayState(String fen) {
+        board.loadFromFen(fen);
         history.clear();
         repetitionCounts.clear();
         recordSnapshot();

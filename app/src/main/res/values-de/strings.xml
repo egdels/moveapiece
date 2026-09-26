@@ -101,6 +101,13 @@
     <string name="pegasus_auto_move_held">Der Zug der App wartet, bis das Brett stimmt</string>
     <string name="pegasus_mismatch_squares_format">Felder: %1$s</string>
     <string name="board_promotion_piece_needed_format">Bauer auf %1$s – durch die Umwandlungsfigur ersetzen</string>
+    <string name="board_load_position_hint">Tippen, um die Stellung vom Brett zu übernehmen</string>
+    <string name="dialog_load_position_title">Stellung vom Brett übernehmen</string>
+    <string name="dialog_load_position_side">Wer ist am Zug?</string>
+    <string name="board_position_invalid_kings">Jede Seite braucht genau einen König</string>
+    <string name="board_position_invalid_pawns">Bauern dürfen nicht auf der ersten oder letzten Reihe stehen</string>
+    <string name="board_position_invalid_check">Die Seite, die nicht am Zug ist, steht im Schach</string>
+    <string name="board_position_invalid">Das Brett zeigt keine spielbare Stellung</string>
     <string name="pegasus_ambiguous_title">Mehrdeutiger Zug – bitte wählen</string>
 
     <string name="opening_ruy_lopez">Spanische Partie (Ruy Lopez)</string>

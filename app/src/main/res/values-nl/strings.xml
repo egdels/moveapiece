@@ -101,6 +101,13 @@
     <string name="pegasus_auto_move_held">De zet van de app wacht tot het bord klopt</string>
     <string name="pegasus_mismatch_squares_format">Velden: %1$s</string>
     <string name="board_promotion_piece_needed_format">Pion op %1$s – vervang hem door het promotiestuk</string>
+    <string name="board_load_position_hint">Tik om de stelling van het bord over te nemen</string>
+    <string name="dialog_load_position_title">Stelling van het bord overnemen</string>
+    <string name="dialog_load_position_side">Wie is aan zet?</string>
+    <string name="board_position_invalid_kings">Elke kant heeft precies één koning nodig</string>
+    <string name="board_position_invalid_pawns">Pionnen mogen niet op de eerste of laatste rij staan</string>
+    <string name="board_position_invalid_check">De kant die niet aan zet is staat schaak</string>
+    <string name="board_position_invalid">Het bord toont geen speelbare stelling</string>
     <string name="pegasus_ambiguous_title">Onduidelijke zet – kies een optie</string>
 
     <string name="opening_ruy_lopez">Spaans (Ruy Lopez)</string>

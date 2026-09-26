@@ -5,7 +5,9 @@
 
 package de.schliweb.moveapiece.board;
 
+import de.schliweb.chessnut.core.game.InvalidPositionException;
 import de.schliweb.moveapiece.chessnut.ChessnutGameBridge;
+import de.schliweb.pegasus.core.chess.PieceColor;
 import de.schliweb.pegasus.core.chess.PieceType;
 import de.schliweb.pegasus.core.transport.ConnectionState;
 import de.schliweb.pegasus.core.transport.ScanListener;
@@ -142,6 +144,16 @@ public final class ChessnutBoardAdapter implements PhysicalBoardBridge {
             bridge.beep(1200, 70);
         }
         return true;
+    }
+
+    @Override
+    public boolean canLoadPhysicalPosition() {
+        return true;
+    }
+
+    @Override
+    public String physicalPositionFen(boolean whiteToMove) throws InvalidPositionException {
+        return bridge.physicalPositionFen(whiteToMove ? PieceColor.WHITE : PieceColor.BLACK);
     }
 
     @Override

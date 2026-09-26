@@ -328,6 +328,16 @@ public final class ChessnutGameFlow {
         return -1;
     }
 
+    /**
+     * FEN of whatever currently stands on the board, with {@code sideToMove} supplied by the host,
+     * for taking a position over from the board (see {@link PhysicalPosition#fenOf}). Does not
+     * change the tracked position; call {@link #syncBoardToPosition} with the result once the host
+     * has loaded it.
+     */
+    public String physicalPositionFen(PieceColor sideToMove) throws InvalidPositionException {
+        return PhysicalPosition.fenOf(physicalBoard, sideToMove);
+    }
+
     // ------------------------------------------------------------ resync
 
     /** Tracks the starting position; a board that does not show it lights up right away. */

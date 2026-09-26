@@ -205,7 +205,15 @@ public class ChessGame {
         loadFen(START_FEN);
     }
 
-    /** Sets up an arbitrary position, clearing move history. Mainly for tests. */
+    /**
+     * FEN the current move history starts from; {@link #START_FEN} unless {@link #loadFen} was
+     * used.
+     */
+    public String startFen() {
+        return startFen;
+    }
+
+    /** Sets up an arbitrary position, clearing move history. */
     public void loadFen(String fen) {
         board.loadFromFen(fen);
         startFen = fen;

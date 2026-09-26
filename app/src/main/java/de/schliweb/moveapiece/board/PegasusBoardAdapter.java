@@ -5,6 +5,7 @@
 
 package de.schliweb.moveapiece.board;
 
+import de.schliweb.chessnut.core.game.InvalidPositionException;
 import de.schliweb.moveapiece.pegasus.PegasusGameBridge;
 import de.schliweb.pegasus.core.chess.PieceType;
 import de.schliweb.pegasus.core.transport.ConnectionState;
@@ -125,6 +126,16 @@ public final class PegasusBoardAdapter implements PhysicalBoardBridge {
     @Override
     public boolean playMoveSound(boolean capture, boolean check) {
         return false; // no speaker
+    }
+
+    @Override
+    public boolean canLoadPhysicalPosition() {
+        return false; // occupancy only, no piece identity
+    }
+
+    @Override
+    public String physicalPositionFen(boolean whiteToMove) throws InvalidPositionException {
+        throw new InvalidPositionException(InvalidPositionException.Reason.NO_BOARD);
     }
 
     @Override

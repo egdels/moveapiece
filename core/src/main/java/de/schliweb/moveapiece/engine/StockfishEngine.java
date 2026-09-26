@@ -117,11 +117,28 @@ public class StockfishEngine {
      * @param movesUci space-separated UCI moves from the start position, may be empty
      */
     public void setPosition(String movesUci) {
+        setPosition(null, movesUci);
+    }
+
+    /**
+     * @param startFen position the moves start from; {@code null} or the standard start FEN means
+     *     {@code startpos}
+     * @param movesUci space-separated UCI moves from {@code startFen}, may be empty
+     */
+    public void setPosition(String startFen, String movesUci) {
+        String base =
+                startFen == null || startFen.isEmpty() || isStandardStart(startFen)
+                        ? "position startpos"
+                        : "position fen " + startFen;
         if (movesUci == null || movesUci.isEmpty()) {
-            writeLineAsync("position startpos");
+            writeLineAsync(base);
         } else {
-            writeLineAsync("position startpos moves " + movesUci);
+            writeLineAsync(base + " moves " + movesUci);
         }
+    }
+
+    private static boolean isStandardStart(String fen) {
+        return fen.startsWith("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -");
     }
 
     public void go(int movetimeMs) {
