@@ -17,5 +17,6 @@ dependencyResolutionManagement {
 rootProject.name = 'MoveAPiece'
 include ':app'
 include ':pegasus-core'
+include ':chessnut-core'
 include ':core'
 include ':desktop'

@@ -1,0 +1,16 @@
+plugins {
+    id 'java-library'
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+dependencies {
+    // Board-agnostic chess model and move detection (BoardState, MoveDetector, ChessPosition)
+    // live in :pegasus-core; the Chessnut decoder produces BoardState, hence api.
+    api project(':pegasus-core')
+
+    testImplementation 'junit:junit:4.13.2'
+}
