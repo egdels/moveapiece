@@ -53,6 +53,8 @@ import de.schliweb.moveapiece.engine.StockfishEngine;
 import de.schliweb.moveapiece.engine.UciInfoParser;
 import de.schliweb.moveapiece.logic.BoardType;
 import de.schliweb.moveapiece.logic.ChessGame;
+import de.schliweb.moveapiece.logic.GameSetup;
+import de.schliweb.moveapiece.logic.Opponent;
 import de.schliweb.moveapiece.logic.PgnGames;
 import de.schliweb.moveapiece.pegasus.PegasusGameBridge;
 import de.schliweb.moveapiece.training.OpeningLine;
@@ -165,6 +167,16 @@ public class MainActivity extends AppCompatActivity
 
     private GameMode mode = GameMode.ENGINE;
     private Side engineSide = Side.BLACK;
+
+    /**
+     * The setup the user last explicitly started - via the "New Game" dialog or the
+     * training-complete "Continue free play" choice - remembered across restarts (see {@link
+     * Settings#getLastGameSetup}). Pre-fills the dialog and is what {@link #restartLastActivity}
+     * repeats; it is deliberately never auto-started on launch, so right after start-up {@link
+     * #mode} (the default Human vs Stockfish) and this can differ until the first explicit start.
+     */
+    private GameSetup lastSetup = GameSetup.DEFAULT;
+
     private int engineElo = 1500;
     private boolean engineReady = false;
     private boolean waitingForEngineMove = false;
@@ -322,6 +334,7 @@ public class MainActivity extends AppCompatActivity
         currentMaiaRating = settings.getMaiaRating();
         evaluationEnabled = settings.isEvaluationDisplayEnabled(evaluationEnabled);
         boardType = settings.getBoardType();
+        lastSetup = settings.getLastGameSetup();
         board = createBoardBridge(boardType);
         maybeStartPegasusRecording();
         blePermissionLauncher =
@@ -1039,20 +1052,56 @@ public class MainActivity extends AppCompatActivity
         restartLastActivity();
     }
 
-    /** Same recipe as the training-complete dialog's "Repeat", generalised to every mode. */
+    /**
+     * Same recipe as the training-complete dialog's "Repeat", generalised to every mode: restarts
+     * {@link #lastSetup} rather than the live {@link #mode}, so it also works right after launch
+     * (when nothing has been started explicitly yet) and after a PGN import.
+     */
     private void restartLastActivity() {
-        if (mode == GameMode.TRAINING && trainingSession != null) {
-            startNewGame(
-                    GameMode.TRAINING,
-                    trainingSession.humanSide(),
-                    engineElo,
-                    currentMaiaRating,
-                    trainingSession.line(),
-                    trainingSession.hintsEnabled());
-        } else {
-            GameMode restartMode = mode == GameMode.TRAINING ? GameMode.HUMAN : mode;
-            startNewGame(restartMode, engineSide, engineElo, currentMaiaRating, null, false);
+        GameMode restartMode = modeFor(lastSetup.opponent());
+        // startNewGame takes the engine's side for ENGINE/MAIA, the human's otherwise.
+        Side side =
+                restartMode == GameMode.ENGINE || restartMode == GameMode.MAIA
+                        ? lastSetup.side().flip()
+                        : lastSetup.side();
+        startNewGame(
+                restartMode,
+                side,
+                engineElo,
+                currentMaiaRating,
+                lastSetup.opening(),
+                lastSetup.hintsEnabled());
+    }
+
+    private static GameMode modeFor(Opponent opponent) {
+        switch (opponent) {
+            case HUMAN:
+                return GameMode.HUMAN;
+            case MAIA:
+                return GameMode.MAIA;
+            case TRAINER:
+                return GameMode.TRAINING;
+            default:
+                return GameMode.ENGINE;
         }
+    }
+
+    private static Opponent opponentFor(GameMode gameMode) {
+        switch (gameMode) {
+            case HUMAN:
+                return Opponent.HUMAN;
+            case MAIA:
+                return Opponent.MAIA;
+            case TRAINING:
+                return Opponent.TRAINER;
+            default:
+                return Opponent.STOCKFISH;
+        }
+    }
+
+    private void rememberSetup(GameSetup setup) {
+        lastSetup = setup;
+        settings.setLastGameSetup(setup);
     }
 
     // ---- New game setup ----------------------------------------------------
@@ -1086,6 +1135,16 @@ public class MainActivity extends AppCompatActivity
                 new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, openingNames);
         openingAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         dialogBinding.openingSpinner.setAdapter(openingAdapter);
+
+        // Pre-fill with what was last started; nothing runs until the user confirms.
+        dialogBinding.opponentGroup.check(radioIdFor(dialogBinding, lastSetup.opponent()));
+        dialogBinding.colorGroup.check(
+                lastSetup.side() == Side.BLACK
+                        ? dialogBinding.colorBlack.getId()
+                        : dialogBinding.colorWhite.getId());
+        int openingIndex = OpeningRepository.ALL.indexOf(lastSetup.opening());
+        dialogBinding.openingSpinner.setSelection(Math.max(0, openingIndex));
+        dialogBinding.hintCheckBox.setChecked(lastSetup.hintsEnabled());
 
         dialogBinding.opponentGroup.setOnCheckedChangeListener(
                 (group, checkedId) ->
@@ -1146,6 +1205,19 @@ public class MainActivity extends AppCompatActivity
                                 })
                         .setNegativeButton(R.string.action_cancel, null)
                         .show();
+    }
+
+    private static int radioIdFor(DialogNewGameBinding dialogBinding, Opponent opponent) {
+        switch (opponent) {
+            case HUMAN:
+                return dialogBinding.opponentHuman.getId();
+            case MAIA:
+                return dialogBinding.opponentMaia.getId();
+            case TRAINER:
+                return dialogBinding.opponentTraining.getId();
+            default:
+                return dialogBinding.opponentEngine.getId();
+        }
     }
 
     private GameMode modeForCheckedId(DialogNewGameBinding dialogBinding, int checkedId) {
@@ -1221,6 +1293,16 @@ public class MainActivity extends AppCompatActivity
             boolean hintsEnabled) {
         abandonPendingSearches();
         trainingFlow.stop();
+
+        // chosenSide is the engine's side for ENGINE/MAIA and the human's otherwise; the
+        // remembered setup always holds the human's.
+        boolean pairedEngine = chosenMode == GameMode.ENGINE || chosenMode == GameMode.MAIA;
+        rememberSetup(
+                new GameSetup(
+                        opponentFor(chosenMode),
+                        pairedEngine ? chosenSide.flip() : chosenSide,
+                        chosenOpening,
+                        hintsEnabled));
 
         mode = chosenMode;
         engineSide =
@@ -2399,6 +2481,15 @@ public class MainActivity extends AppCompatActivity
                                 (dialog, which) -> {
                                     trainingFlow.stop();
                                     trainingSession = null;
+                                    Opponent chosen =
+                                            dialogBinding.opponentEngine.isChecked()
+                                                    ? Opponent.STOCKFISH
+                                                    : dialogBinding.opponentMaia.isChecked()
+                                                            ? Opponent.MAIA
+                                                            : Opponent.HUMAN;
+                                    // Explicitly chosen by the user, so it is what the board's
+                                    // NEW GAME button repeats next.
+                                    rememberSetup(GameSetup.of(chosen, trainedSide));
                                     if (dialogBinding.opponentEngine.isChecked()) {
                                         mode = GameMode.ENGINE;
                                         engineSide =

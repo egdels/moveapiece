@@ -27,6 +27,8 @@ import de.schliweb.moveapiece.engine.StockfishEngine;
 import de.schliweb.moveapiece.engine.UciInfoParser;
 import de.schliweb.moveapiece.logic.BoardType;
 import de.schliweb.moveapiece.logic.ChessGame;
+import de.schliweb.moveapiece.logic.GameSetup;
+import de.schliweb.moveapiece.logic.Opponent;
 import de.schliweb.moveapiece.logic.PgnGames;
 import de.schliweb.moveapiece.training.OpeningLine;
 import de.schliweb.moveapiece.training.TrainingFlow;
@@ -304,6 +306,16 @@ final class GameController
     private int searchGeneration = 0;
     private Mode mode = Mode.HUMAN_VS_STOCKFISH;
     private Side humanSide = Side.WHITE;
+
+    /**
+     * The setup the user last explicitly started - via the "New Game" dialog or the
+     * training-complete "Continue free play" choice - remembered across restarts (see {@link
+     * Settings#getLastGameSetup}). Pre-fills the dialog and is what {@link #restartLastActivity}
+     * repeats; it is deliberately never auto-started on launch, so right after start-up {@link
+     * #mode} (the default Human vs Stockfish) and this can differ until the first explicit start.
+     */
+    private GameSetup lastSetup = Settings.getLastGameSetup();
+
     private TrainingSession trainingSession;
     // Closes the modal dialog currently blocking in showAndWait (see #showTracked), so the
     // board's NEW GAME button can dismiss it - the desktop counterpart of the Android app's
@@ -1210,23 +1222,13 @@ final class GameController
         restartLastActivity();
     }
 
-    /** Same recipe as the training-complete dialog's "Repeat", generalised to every mode. */
+    /**
+     * Same recipe as the training-complete dialog's "Repeat", generalised to every mode: restarts
+     * {@link #lastSetup} rather than the live {@link #mode}, so it also works right after launch
+     * (when nothing has been started explicitly yet) and after a PGN import.
+     */
     private void restartLastActivity() {
-        switch (mode) {
-            case TRAINING -> {
-                if (trainingSession != null) {
-                    startTraining(
-                            trainingSession.line(),
-                            trainingSession.humanSide(),
-                            trainingSession.hintsEnabled());
-                } else {
-                    startHumanVsHuman();
-                }
-            }
-            case HUMAN_VS_STOCKFISH -> startStockfishGame(humanSide);
-            case HUMAN_VS_MAIA -> startMaiaGame(humanSide, currentMaiaRating);
-            case HUMAN_VS_HUMAN -> startHumanVsHuman();
-        }
+        applyGameSetup(lastSetup);
     }
 
     /**
@@ -1762,16 +1764,25 @@ final class GameController
      * stays out of it: it's a live sidebar slider on desktop, not a one-time setup choice.
      */
     private void openGameSetupDialog() {
-        showTracked(GameSetupDialog.create(stage)).ifPresent(this::applyGameSetupChoice);
+        showTracked(GameSetupDialog.create(stage, lastSetup)).ifPresent(this::applyGameSetup);
     }
 
-    private void applyGameSetupChoice(GameSetupDialog.Choice choice) {
-        switch (choice.opponent()) {
+    /**
+     * Starts {@code setup} and remembers it as {@link #lastSetup}, persisted for the next launch.
+     */
+    private void applyGameSetup(GameSetup setup) {
+        rememberSetup(setup);
+        switch (setup.opponent()) {
             case HUMAN -> startHumanVsHuman();
-            case STOCKFISH -> startStockfishGame(choice.side());
-            case MAIA -> startMaiaGame(choice.side(), Settings.getMaiaRating());
-            case TRAINER -> startTraining(choice.opening(), choice.side(), choice.hintsEnabled());
+            case STOCKFISH -> startStockfishGame(setup.side());
+            case MAIA -> startMaiaGame(setup.side(), Settings.getMaiaRating());
+            case TRAINER -> startTraining(setup.opening(), setup.side(), setup.hintsEnabled());
         }
+    }
+
+    private void rememberSetup(GameSetup setup) {
+        lastSetup = setup;
+        Settings.setLastGameSetup(setup);
     }
 
     private void startHumanVsHuman() {
@@ -2419,7 +2430,7 @@ final class GameController
      * training-complete option (Android has no Maia opponent yet, so its own version of this dialog
      * still offers only Stockfish/human).
      */
-    private record OpponentOption(GameSetupDialog.Opponent opponent, String label) {
+    private record OpponentOption(Opponent opponent, String label) {
         @Override
         public String toString() {
             return label;
@@ -2428,12 +2439,10 @@ final class GameController
 
     private void continueFreePlay(Side trainedSide) {
         OpponentOption stockfishOption =
-                new OpponentOption(
-                        GameSetupDialog.Opponent.STOCKFISH, Messages.get("choice_stockfish"));
-        OpponentOption maiaOption =
-                new OpponentOption(GameSetupDialog.Opponent.MAIA, Messages.get("choice_maia"));
+                new OpponentOption(Opponent.STOCKFISH, Messages.get("choice_stockfish"));
+        OpponentOption maiaOption = new OpponentOption(Opponent.MAIA, Messages.get("choice_maia"));
         OpponentOption humanOption =
-                new OpponentOption(GameSetupDialog.Opponent.HUMAN, Messages.get("choice_human"));
+                new OpponentOption(Opponent.HUMAN, Messages.get("choice_human"));
         ChoiceDialog<OpponentOption> dialog =
                 new ChoiceDialog<>(stockfishOption, stockfishOption, maiaOption, humanOption);
         dialog.initOwner(stage);
@@ -2449,6 +2458,8 @@ final class GameController
         trainingSession = null;
         humanSide = trainedSide;
         boardCanvas.setTrainingHint(null, null);
+        // Explicitly chosen by the user, so it is what the board's NEW GAME button repeats next.
+        rememberSetup(GameSetup.of(choice.get().opponent(), trainedSide));
         switch (choice.get().opponent()) {
             case STOCKFISH -> {
                 mode = Mode.HUMAN_VS_STOCKFISH;

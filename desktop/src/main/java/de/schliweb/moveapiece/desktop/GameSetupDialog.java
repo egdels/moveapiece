@@ -6,6 +6,8 @@
 package de.schliweb.moveapiece.desktop;
 
 import com.github.bhlangonijr.chesslib.Side;
+import de.schliweb.moveapiece.logic.GameSetup;
+import de.schliweb.moveapiece.logic.Opponent;
 import de.schliweb.moveapiece.training.OpeningLine;
 import de.schliweb.moveapiece.training.OpeningRepository;
 import de.schliweb.moveapiece.training.OpeningSearch;
@@ -39,17 +41,12 @@ import javafx.stage.Stage;
  * file (see {@link GameController#startMaiaGame}), not a UCI option on a running instance, but
  * adjustable all the same. A fresh Maia game simply starts at whichever rating was last used (see
  * {@link Settings#getMaiaRating}).
+ *
+ * <p>Opens pre-filled with {@code initial} - normally the last setup started (see {@link
+ * Settings#getLastGameSetup}) - so a regular Maia-as-Black player or someone drilling one line only
+ * has to confirm. Nothing is started until the user does.
  */
 final class GameSetupDialog {
-
-    enum Opponent {
-        HUMAN,
-        STOCKFISH,
-        MAIA,
-        TRAINER
-    }
-
-    record Choice(Opponent opponent, Side side, OpeningLine opening, boolean hintsEnabled) {}
 
     private GameSetupDialog() {}
 
@@ -57,7 +54,7 @@ final class GameSetupDialog {
      * Builds the dialog without showing it; the caller runs {@code showAndWait()} so it can keep
      * track of the open dialog (see {@code GameController#showTracked}).
      */
-    static Dialog<Choice> create(Stage owner) {
+    static Dialog<GameSetup> create(Stage owner, GameSetup initial) {
         List<OpeningLine> allLines = OpeningRepository.ALL;
         List<String> allDisplayNames = new ArrayList<>();
         for (OpeningLine line : allLines) {
@@ -73,14 +70,19 @@ final class GameSetupDialog {
         stockfishRadio.setToggleGroup(opponentGroup);
         maiaRadio.setToggleGroup(opponentGroup);
         trainerRadio.setToggleGroup(opponentGroup);
-        stockfishRadio.setSelected(true);
+        switch (initial.opponent()) {
+            case HUMAN -> humanRadio.setSelected(true);
+            case STOCKFISH -> stockfishRadio.setSelected(true);
+            case MAIA -> maiaRadio.setSelected(true);
+            case TRAINER -> trainerRadio.setSelected(true);
+        }
 
         ToggleGroup sideGroup = new ToggleGroup();
         RadioButton whiteRadio = new RadioButton(Messages.get("training_play_white"));
         RadioButton blackRadio = new RadioButton(Messages.get("training_play_black"));
         whiteRadio.setToggleGroup(sideGroup);
         blackRadio.setToggleGroup(sideGroup);
-        whiteRadio.setSelected(true);
+        (initial.side() == Side.BLACK ? blackRadio : whiteRadio).setSelected(true);
         HBox colorBox = new HBox(16, whiteRadio, blackRadio);
 
         TextField searchField = new TextField();
@@ -100,7 +102,12 @@ final class GameSetupDialog {
                                                 : OpeningNames.displayName(item));
                             }
                         });
-        listView.getSelectionModel().selectFirst();
+        if (initial.opening() != null && items.contains(initial.opening())) {
+            listView.getSelectionModel().select(initial.opening());
+            listView.scrollTo(initial.opening());
+        } else {
+            listView.getSelectionModel().selectFirst();
+        }
         // Fixed rather than grown to fill the dialog - unlike the old opening-trainer-only dialog
         // this content isn't given an explicit height (see below), so nothing forces the list to
         // be any taller than this on its own.
@@ -117,7 +124,7 @@ final class GameSetupDialog {
         VBox openingBox = new VBox(8, searchField, listView);
 
         CheckBox hintsBox = new CheckBox(Messages.get("dialog_training_hint_checkbox"));
-        hintsBox.setSelected(true);
+        hintsBox.setSelected(initial.hintsEnabled());
 
         VBox content =
                 new VBox(
@@ -157,7 +164,7 @@ final class GameSetupDialog {
                 .addListener((obs, old, val) -> updateVisibility.run());
         updateVisibility.run();
 
-        Dialog<Choice> dialog = new Dialog<>();
+        Dialog<GameSetup> dialog = new Dialog<>();
         dialog.initOwner(owner);
         dialog.setTitle(Messages.get("menu_new_game"));
         dialog.getDialogPane().setContent(content);
@@ -201,7 +208,7 @@ final class GameSetupDialog {
                     if (opponent == Opponent.TRAINER && opening == null) {
                         return null;
                     }
-                    return new Choice(opponent, side, opening, hintsBox.isSelected());
+                    return new GameSetup(opponent, side, opening, hintsBox.isSelected());
                 });
 
         return dialog;

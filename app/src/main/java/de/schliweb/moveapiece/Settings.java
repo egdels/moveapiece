@@ -9,10 +9,11 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import de.schliweb.moveapiece.engine.MaiaRatings;
 import de.schliweb.moveapiece.logic.BoardType;
+import de.schliweb.moveapiece.logic.GameSetup;
 
 /**
  * Persists user-adjustable settings (engine strength, Maia rating, evaluation display, physical
- * board type) across app restarts.
+ * board type, last game setup) across app restarts.
  */
 final class Settings {
 
@@ -21,6 +22,10 @@ final class Settings {
     private static final String KEY_MAIA_RATING = "maiaRating";
     private static final String KEY_EVALUATION_ENABLED = "evaluationEnabled";
     private static final String KEY_BOARD_TYPE = "boardType";
+    private static final String KEY_LAST_OPPONENT = "lastOpponent";
+    private static final String KEY_LAST_SIDE = "lastSide";
+    private static final String KEY_LAST_OPENING = "lastOpening";
+    private static final String KEY_LAST_TRAINING_HINTS = "lastTrainingHints";
     private static final int DEFAULT_MAIA_RATING = 1500;
 
     private final SharedPreferences prefs;
@@ -66,5 +71,27 @@ final class Settings {
 
     void setBoardType(BoardType type) {
         prefs.edit().putString(KEY_BOARD_TYPE, type.key()).apply();
+    }
+
+    /**
+     * What the "New Game" dialog last started (see {@link GameSetup}): pre-fills that dialog and is
+     * what a physical board's NEW GAME button repeats right after launch. Read defensively via
+     * {@link GameSetup#fromKeys}; {@link GameSetup#DEFAULT} until anything was chosen.
+     */
+    GameSetup getLastGameSetup() {
+        return GameSetup.fromKeys(
+                prefs.getString(KEY_LAST_OPPONENT, null),
+                prefs.getString(KEY_LAST_SIDE, null),
+                prefs.getString(KEY_LAST_OPENING, null),
+                prefs.getBoolean(KEY_LAST_TRAINING_HINTS, true));
+    }
+
+    void setLastGameSetup(GameSetup setup) {
+        prefs.edit()
+                .putString(KEY_LAST_OPPONENT, setup.opponent().key())
+                .putString(KEY_LAST_SIDE, setup.side().name())
+                .putString(KEY_LAST_OPENING, setup.openingId())
+                .putBoolean(KEY_LAST_TRAINING_HINTS, setup.hintsEnabled())
+                .apply();
     }
 }

@@ -7,9 +7,13 @@ package de.schliweb.moveapiece.desktop;
 
 import de.schliweb.moveapiece.engine.MaiaRatings;
 import de.schliweb.moveapiece.logic.BoardType;
+import de.schliweb.moveapiece.logic.GameSetup;
 import java.util.prefs.Preferences;
 
-/** Persists user-adjustable settings (engine strength, evaluation display) across app restarts. */
+/**
+ * Persists user-adjustable settings (engine strength, Maia rating, evaluation display, physical
+ * board type, last game setup) across app restarts.
+ */
 final class Settings {
 
     private static final Preferences PREFS = Preferences.userNodeForPackage(Settings.class);
@@ -17,6 +21,10 @@ final class Settings {
     private static final String KEY_EVALUATION_ENABLED = "evaluationEnabled";
     private static final String KEY_MAIA_RATING = "maiaRating";
     private static final String KEY_BOARD_TYPE = "boardType";
+    private static final String KEY_LAST_OPPONENT = "lastOpponent";
+    private static final String KEY_LAST_SIDE = "lastSide";
+    private static final String KEY_LAST_OPENING = "lastOpening";
+    private static final String KEY_LAST_TRAINING_HINTS = "lastTrainingHints";
     private static final int DEFAULT_ENGINE_ELO = 2200;
     private static final boolean DEFAULT_EVALUATION_ENABLED = true;
     private static final int DEFAULT_MAIA_RATING = 1500;
@@ -60,5 +68,29 @@ final class Settings {
 
     static void setBoardType(BoardType type) {
         PREFS.put(KEY_BOARD_TYPE, type.key());
+    }
+
+    /**
+     * What the "New Game" dialog last started (see {@link GameSetup}): pre-fills that dialog and is
+     * what a physical board's NEW GAME button repeats right after launch. Read defensively via
+     * {@link GameSetup#fromKeys}; {@link GameSetup#DEFAULT} until anything was chosen.
+     */
+    static GameSetup getLastGameSetup() {
+        return GameSetup.fromKeys(
+                PREFS.get(KEY_LAST_OPPONENT, null),
+                PREFS.get(KEY_LAST_SIDE, null),
+                PREFS.get(KEY_LAST_OPENING, null),
+                PREFS.getBoolean(KEY_LAST_TRAINING_HINTS, true));
+    }
+
+    static void setLastGameSetup(GameSetup setup) {
+        PREFS.put(KEY_LAST_OPPONENT, setup.opponent().key());
+        PREFS.put(KEY_LAST_SIDE, setup.side().name());
+        if (setup.openingId() == null) {
+            PREFS.remove(KEY_LAST_OPENING);
+        } else {
+            PREFS.put(KEY_LAST_OPENING, setup.openingId());
+        }
+        PREFS.putBoolean(KEY_LAST_TRAINING_HINTS, setup.hintsEnabled());
     }
 }
