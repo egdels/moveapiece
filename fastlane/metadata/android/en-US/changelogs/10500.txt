@@ -6,6 +6,8 @@ Chessnut Air support, next to the DGT Pegasus.
   on the board's speaker, a low battery is announced.
 * New: the Chessnut's NEW GAME button restarts what was last played
   (same training line or same opponent) and closes any open dialog.
+* New: the New Game dialog remembers your last choice - opponent,
+  colour, training line and hints - and opens pre-filled with it.
 * Pegasus: engine-move LEDs are re-sent shortly after being shown
   (fixes guides that stayed dark); banner hints for a capture swapped
   too quickly and for a lifted piece without a legal move.
