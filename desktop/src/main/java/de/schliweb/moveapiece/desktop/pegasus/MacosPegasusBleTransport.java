@@ -5,10 +5,10 @@
 
 package de.schliweb.moveapiece.desktop.pegasus;
 
+import de.schliweb.pegasus.core.transport.BleProfile;
 import de.schliweb.pegasus.core.transport.ConnectionState;
 import de.schliweb.pegasus.core.transport.DiscoveredDevice;
 import de.schliweb.pegasus.core.transport.PegasusTransport;
-import de.schliweb.pegasus.core.transport.PegasusUuids;
 import de.schliweb.pegasus.core.transport.ReconnectPolicy;
 import de.schliweb.pegasus.core.transport.ScanListener;
 import de.schliweb.pegasus.core.transport.TransportError;
@@ -72,12 +72,31 @@ public final class MacosPegasusBleTransport implements PegasusTransport {
     private ScheduledFuture<?> connectTimeoutTask;
     private ScheduledFuture<?> reconnectTask;
 
+    private final BleProfile profile;
+
+    /** Transport for a DGT Pegasus ({@link BleProfile#PEGASUS}). */
     public MacosPegasusBleTransport() {
+        this(BleProfile.PEGASUS);
+    }
+
+    /** Transport for whichever board {@code profile} describes; CONNECTED once all subscribed. */
+    public MacosPegasusBleTransport(BleProfile profile) {
+        if (profile == null) {
+            throw new IllegalArgumentException("profile must not be null");
+        }
+        this.profile = profile;
+        String[] notifyServices = new String[profile.subscriptions().size()];
+        String[] notifyChars = new String[profile.subscriptions().size()];
+        for (int i = 0; i < notifyServices.length; i++) {
+            notifyServices[i] = profile.subscriptions().get(i).serviceUuid();
+            notifyChars[i] = profile.subscriptions().get(i).characteristicUuid();
+        }
         handle =
                 nativeCreate(
-                        PegasusUuids.UART_SERVICE,
-                        PegasusUuids.UART_WRITE_CHARACTERISTIC,
-                        PegasusUuids.UART_NOTIFY_CHARACTERISTIC);
+                        profile.writeServiceUuid(),
+                        profile.writeCharacteristicUuid(),
+                        notifyServices,
+                        notifyChars);
     }
 
     @Override
@@ -259,12 +278,12 @@ public final class MacosPegasusBleTransport implements PegasusTransport {
         }
     }
 
-    private void onNativeDataReceived(byte[] data) {
+    private void onNativeDataReceived(String characteristicUuid, byte[] data) {
         Platform.runLater(
                 () -> {
                     TransportListener l = listener;
                     if (l != null) {
-                        l.onDataReceived(PegasusUuids.UART_NOTIFY_CHARACTERISTIC, data);
+                        l.onDataReceived(characteristicUuid, data);
                     }
                 });
     }
@@ -274,7 +293,7 @@ public final class MacosPegasusBleTransport implements PegasusTransport {
                 () -> {
                     TransportListener l = listener;
                     if (l != null) {
-                        l.onDataSent(PegasusUuids.UART_WRITE_CHARACTERISTIC, data);
+                        l.onDataSent(profile.writeCharacteristicUuid(), data);
                     }
                 });
     }
@@ -340,7 +359,10 @@ public final class MacosPegasusBleTransport implements PegasusTransport {
     // ---- native methods, implemented in PegasusBleMac.m --------------------
 
     private native long nativeCreate(
-            String uartServiceUuid, String writeCharUuid, String notifyCharUuid);
+            String writeServiceUuid,
+            String writeCharUuid,
+            String[] notifyServiceUuids,
+            String[] notifyCharUuids);
 
     private static native void nativeDestroy(long handle);
 

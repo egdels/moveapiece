@@ -5,7 +5,11 @@
 
 /*
  * macOS CoreBluetooth backend for MacosPegasusBleTransport (see that class's
- * Javadoc). Raw bytes only - no DGT message interpretation here, mirroring
+ * Javadoc). Which characteristics to write to and subscribe to comes from the
+ * Java side as a profile (write service/characteristic plus a list of notify
+ * service/characteristic pairs - one pair for the DGT Pegasus, two for the
+ * Chessnut Air); CONNECTED is reported once every subscription is enabled.
+ * Raw bytes only - no message interpretation here, mirroring
  * app/src/main/java/de/schliweb/pegasus/bluetooth/AndroidPegasusBleTransport.java's
  * own phase-1 boundary; pegasus-core's PegasusGameBridge-equivalent owns
  * everything above that.
@@ -31,18 +35,24 @@
 @property(nonatomic, strong) NSMutableDictionary<NSString *, CBPeripheral *> *peripheralsById;
 @property(nonatomic, strong) CBPeripheral *connectedPeripheral;
 @property(nonatomic, strong) CBCharacteristic *writeCharacteristic;
-@property(nonatomic, strong) CBCharacteristic *notifyCharacteristic;
-@property(nonatomic, strong) CBUUID *uartServiceUuid;
+/* Resolved notify characteristics, in profile order; subscribed one by one. */
+@property(nonatomic, strong) NSMutableArray<CBCharacteristic *> *notifyCharacteristics;
+@property(nonatomic, strong) CBUUID *writeServiceUuid;
 @property(nonatomic, strong) CBUUID *writeCharUuid;
-@property(nonatomic, strong) CBUUID *notifyCharUuid;
+/* Parallel arrays: notifyServiceUuids[i] is the service that holds notifyCharUuids[i]. */
+@property(nonatomic, strong) NSArray<CBUUID *> *notifyServiceUuids;
+@property(nonatomic, strong) NSArray<CBUUID *> *notifyCharUuids;
+@property(nonatomic, assign) NSUInteger pendingCharacteristicDiscoveries;
+@property(nonatomic, assign) NSUInteger subscribedCount;
 @property(nonatomic, assign) JavaVM *jvm;
 @property(nonatomic, assign) jobject javaTransport;
 
 - (instancetype)initWithEnv:(JNIEnv *)env
                         thiz:(jobject)thiz
-             uartServiceUuid:(NSString *)uartServiceUuid
+            writeServiceUuid:(NSString *)writeServiceUuid
                writeCharUuid:(NSString *)writeCharUuid
-              notifyCharUuid:(NSString *)notifyCharUuid;
+          notifyServiceUuids:(NSArray<NSString *> *)notifyServiceUuids
+             notifyCharUuids:(NSArray<NSString *> *)notifyCharUuids;
 
 - (JNIEnv *)currentEnv;
 - (void)startScan;
@@ -125,19 +135,21 @@ static void reportScanFailed(PegasusBleBridge *bridge, NSString *code, NSString 
     (*env)->DeleteLocalRef(env, jDetail);
 }
 
-static void reportDataReceived(PegasusBleBridge *bridge, NSData *data) {
+static void reportDataReceived(PegasusBleBridge *bridge, NSString *characteristicUuid, NSData *data) {
     JNIEnv *env = [bridge currentEnv];
     if (env == NULL) return;
     jclass cls = (*env)->GetObjectClass(env, bridge.javaTransport);
-    jmethodID mid = (*env)->GetMethodID(env, cls, "onNativeDataReceived", "([B)V");
+    jmethodID mid = (*env)->GetMethodID(env, cls, "onNativeDataReceived", "(Ljava/lang/String;[B)V");
     (*env)->DeleteLocalRef(env, cls);
     if (mid == NULL) {
         (*env)->ExceptionClear(env);
         return;
     }
+    jstring jUuid = (*env)->NewStringUTF(env, characteristicUuid.UTF8String);
     jbyteArray arr = (*env)->NewByteArray(env, (jsize)data.length);
     (*env)->SetByteArrayRegion(env, arr, 0, (jsize)data.length, (const jbyte *)data.bytes);
-    (*env)->CallVoidMethod(env, bridge.javaTransport, mid, arr);
+    (*env)->CallVoidMethod(env, bridge.javaTransport, mid, jUuid, arr);
+    (*env)->DeleteLocalRef(env, jUuid);
     (*env)->DeleteLocalRef(env, arr);
 }
 
@@ -163,20 +175,54 @@ static void reportDataSent(PegasusBleBridge *bridge, NSData *data) {
 
 - (instancetype)initWithEnv:(JNIEnv *)env
                         thiz:(jobject)thiz
-             uartServiceUuid:(NSString *)uartServiceUuid
+            writeServiceUuid:(NSString *)writeServiceUuid
                writeCharUuid:(NSString *)writeCharUuid
-              notifyCharUuid:(NSString *)notifyCharUuid {
+          notifyServiceUuids:(NSArray<NSString *> *)notifyServiceUuids
+             notifyCharUuids:(NSArray<NSString *> *)notifyCharUuids {
     self = [super init];
     if (self != nil) {
         (*env)->GetJavaVM(env, &_jvm);
         _javaTransport = (*env)->NewGlobalRef(env, thiz);
         _peripheralsById = [NSMutableDictionary dictionary];
-        _uartServiceUuid = [CBUUID UUIDWithString:uartServiceUuid];
+        _writeServiceUuid = [CBUUID UUIDWithString:writeServiceUuid];
         _writeCharUuid = [CBUUID UUIDWithString:writeCharUuid];
-        _notifyCharUuid = [CBUUID UUIDWithString:notifyCharUuid];
+        NSMutableArray<CBUUID *> *services = [NSMutableArray array];
+        NSMutableArray<CBUUID *> *chars = [NSMutableArray array];
+        for (NSUInteger i = 0; i < notifyCharUuids.count; i++) {
+            [services addObject:[CBUUID UUIDWithString:notifyServiceUuids[i]]];
+            [chars addObject:[CBUUID UUIDWithString:notifyCharUuids[i]]];
+        }
+        _notifyServiceUuids = services;
+        _notifyCharUuids = chars;
+        _notifyCharacteristics = [NSMutableArray array];
         _central = [[CBCentralManager alloc] initWithDelegate:self queue:dispatch_get_main_queue()];
     }
     return self;
+}
+
+/* Distinct services the profile needs: the write service plus every notify service. */
+- (NSArray<CBUUID *> *)requiredServiceUuids {
+    NSMutableArray<CBUUID *> *result = [NSMutableArray arrayWithObject:self.writeServiceUuid];
+    for (CBUUID *uuid in self.notifyServiceUuids) {
+        if (![result containsObject:uuid]) {
+            [result addObject:uuid];
+        }
+    }
+    return result;
+}
+
+/* Characteristics the profile needs from one particular service. */
+- (NSArray<CBUUID *> *)requiredCharacteristicUuidsForService:(CBUUID *)serviceUuid {
+    NSMutableArray<CBUUID *> *result = [NSMutableArray array];
+    if ([serviceUuid isEqual:self.writeServiceUuid]) {
+        [result addObject:self.writeCharUuid];
+    }
+    for (NSUInteger i = 0; i < self.notifyCharUuids.count; i++) {
+        if ([self.notifyServiceUuids[i] isEqual:serviceUuid]) {
+            [result addObject:self.notifyCharUuids[i]];
+        }
+    }
+    return result;
 }
 
 - (void)dealloc {
@@ -239,7 +285,9 @@ static void reportDataSent(PegasusBleBridge *bridge, NSData *data) {
     peripheral.delegate = self;
     self.connectedPeripheral = peripheral;
     self.writeCharacteristic = nil;
-    self.notifyCharacteristic = nil;
+    [self.notifyCharacteristics removeAllObjects];
+    self.pendingCharacteristicDiscoveries = 0;
+    self.subscribedCount = 0;
     reportConnectionState(self, @"CONNECTING");
     [self.central connectPeripheral:peripheral options:nil];
 }
@@ -288,7 +336,7 @@ static void reportDataSent(PegasusBleBridge *bridge, NSData *data) {
 
 - (void)centralManager:(CBCentralManager *)central didConnectPeripheral:(CBPeripheral *)peripheral {
     reportConnectionState(self, @"DISCOVERING_SERVICES");
-    [peripheral discoverServices:@[ self.uartServiceUuid ]];
+    [peripheral discoverServices:[self requiredServiceUuids]];
 }
 
 - (void)centralManager:(CBCentralManager *)central
@@ -302,7 +350,7 @@ static void reportDataSent(PegasusBleBridge *bridge, NSData *data) {
     didDisconnectPeripheral:(CBPeripheral *)peripheral
                        error:(NSError *)error {
     self.writeCharacteristic = nil;
-    self.notifyCharacteristic = nil;
+    [self.notifyCharacteristics removeAllObjects];
     reportConnectionState(self, @"DISCONNECTED");
 }
 
@@ -314,19 +362,25 @@ static void reportDataSent(PegasusBleBridge *bridge, NSData *data) {
         [self.central cancelPeripheralConnection:peripheral];
         return;
     }
-    CBService *uart = nil;
+    NSArray<CBUUID *> *required = [self requiredServiceUuids];
+    NSMutableArray<CBService *> *found = [NSMutableArray array];
     for (CBService *service in peripheral.services) {
-        if ([service.UUID isEqual:self.uartServiceUuid]) {
-            uart = service;
-            break;
+        if ([required containsObject:service.UUID]) {
+            [found addObject:service];
         }
     }
-    if (uart == nil) {
-        reportError(self, @"SERVICE_NOT_FOUND", @"Nordic UART service not present on this device");
+    if (found.count != required.count) {
+        reportError(self, @"SERVICE_NOT_FOUND",
+                    [NSString stringWithFormat:@"%lu of %lu required services present on this device",
+                                               (unsigned long)found.count, (unsigned long)required.count]);
         [self.central cancelPeripheralConnection:peripheral];
         return;
     }
-    [peripheral discoverCharacteristics:@[ self.writeCharUuid, self.notifyCharUuid ] forService:uart];
+    self.pendingCharacteristicDiscoveries = found.count;
+    for (CBService *service in found) {
+        [peripheral discoverCharacteristics:[self requiredCharacteristicUuidsForService:service.UUID]
+                                 forService:service];
+    }
 }
 
 - (void)peripheral:(CBPeripheral *)peripheral
@@ -338,21 +392,36 @@ static void reportDataSent(PegasusBleBridge *bridge, NSData *data) {
         return;
     }
     for (CBCharacteristic *characteristic in service.characteristics) {
-        if ([characteristic.UUID isEqual:self.writeCharUuid]) {
+        if ([service.UUID isEqual:self.writeServiceUuid] && [characteristic.UUID isEqual:self.writeCharUuid]) {
             self.writeCharacteristic = characteristic;
-        } else if ([characteristic.UUID isEqual:self.notifyCharUuid]) {
-            self.notifyCharacteristic = characteristic;
+        }
+        for (NSUInteger i = 0; i < self.notifyCharUuids.count; i++) {
+            if ([self.notifyServiceUuids[i] isEqual:service.UUID]
+                && [self.notifyCharUuids[i] isEqual:characteristic.UUID]
+                && ![self.notifyCharacteristics containsObject:characteristic]) {
+                [self.notifyCharacteristics addObject:characteristic];
+            }
         }
     }
-    if (self.writeCharacteristic == nil || self.notifyCharacteristic == nil) {
+    if (self.pendingCharacteristicDiscoveries > 0) {
+        self.pendingCharacteristicDiscoveries--;
+    }
+    if (self.pendingCharacteristicDiscoveries > 0) {
+        return; /* other services still being discovered */
+    }
+    if (self.writeCharacteristic == nil || self.notifyCharacteristics.count != self.notifyCharUuids.count) {
         reportError(self, @"CHARACTERISTIC_NOT_FOUND",
-                    [NSString stringWithFormat:@"write=%d notify=%d", self.writeCharacteristic != nil,
-                                                self.notifyCharacteristic != nil]);
+                    [NSString stringWithFormat:@"write=%d notify=%lu/%lu", self.writeCharacteristic != nil,
+                                               (unsigned long)self.notifyCharacteristics.count,
+                                               (unsigned long)self.notifyCharUuids.count]);
         [self.central cancelPeripheralConnection:peripheral];
         return;
     }
     reportConnectionState(self, @"SUBSCRIBING");
-    [peripheral setNotifyValue:YES forCharacteristic:self.notifyCharacteristic];
+    self.subscribedCount = 0;
+    for (CBCharacteristic *characteristic in self.notifyCharacteristics) {
+        [peripheral setNotifyValue:YES forCharacteristic:characteristic];
+    }
 }
 
 - (void)peripheral:(CBPeripheral *)peripheral
@@ -363,7 +432,13 @@ static void reportDataSent(PegasusBleBridge *bridge, NSData *data) {
         [self.central cancelPeripheralConnection:peripheral];
         return;
     }
-    reportConnectionState(self, @"CONNECTED");
+    if (!characteristic.isNotifying) {
+        return; /* unsubscribe confirmation during disconnect */
+    }
+    self.subscribedCount++;
+    if (self.subscribedCount >= self.notifyCharacteristics.count) {
+        reportConnectionState(self, @"CONNECTED");
+    }
 }
 
 - (void)peripheral:(CBPeripheral *)peripheral
@@ -372,8 +447,8 @@ static void reportDataSent(PegasusBleBridge *bridge, NSData *data) {
     if (error != nil || characteristic.value == nil) {
         return;
     }
-    if ([characteristic.UUID isEqual:self.notifyCharUuid]) {
-        reportDataReceived(self, characteristic.value);
+    if ([self.notifyCharUuids containsObject:characteristic.UUID]) {
+        reportDataReceived(self, characteristic.UUID.UUIDString.lowercaseString, characteristic.value);
     }
 }
 
@@ -393,22 +468,36 @@ static void reportDataSent(PegasusBleBridge *bridge, NSData *data) {
 
 // ---- JNI exports ---------------------------------------------------------
 
+static NSString *toNSString(JNIEnv *env, jstring s) {
+    const char *c = (*env)->GetStringUTFChars(env, s, NULL);
+    NSString *result = [NSString stringWithUTF8String:c];
+    (*env)->ReleaseStringUTFChars(env, s, c);
+    return result;
+}
+
+static NSArray<NSString *> *toNSStringArray(JNIEnv *env, jobjectArray array) {
+    NSMutableArray<NSString *> *result = [NSMutableArray array];
+    jsize n = (*env)->GetArrayLength(env, array);
+    for (jsize i = 0; i < n; i++) {
+        jstring s = (jstring)(*env)->GetObjectArrayElement(env, array, i);
+        [result addObject:toNSString(env, s)];
+        (*env)->DeleteLocalRef(env, s);
+    }
+    return result;
+}
+
 JNIEXPORT jlong JNICALL Java_de_schliweb_moveapiece_desktop_pegasus_MacosPegasusBleTransport_nativeCreate(
-        JNIEnv *env, jobject thiz, jstring uartServiceUuid, jstring writeCharUuid, jstring notifyCharUuid) {
-    const char *uartC = (*env)->GetStringUTFChars(env, uartServiceUuid, NULL);
-    const char *writeC = (*env)->GetStringUTFChars(env, writeCharUuid, NULL);
-    const char *notifyC = (*env)->GetStringUTFChars(env, notifyCharUuid, NULL);
+        JNIEnv *env, jobject thiz, jstring writeServiceUuid, jstring writeCharUuid,
+        jobjectArray notifyServiceUuids, jobjectArray notifyCharUuids) {
     PegasusBleBridge *bridge;
     @autoreleasepool {
         bridge = [[PegasusBleBridge alloc] initWithEnv:env
                                                    thiz:thiz
-                                        uartServiceUuid:[NSString stringWithUTF8String:uartC]
-                                          writeCharUuid:[NSString stringWithUTF8String:writeC]
-                                         notifyCharUuid:[NSString stringWithUTF8String:notifyC]];
+                                       writeServiceUuid:toNSString(env, writeServiceUuid)
+                                          writeCharUuid:toNSString(env, writeCharUuid)
+                                     notifyServiceUuids:toNSStringArray(env, notifyServiceUuids)
+                                        notifyCharUuids:toNSStringArray(env, notifyCharUuids)];
     }
-    (*env)->ReleaseStringUTFChars(env, uartServiceUuid, uartC);
-    (*env)->ReleaseStringUTFChars(env, writeCharUuid, writeC);
-    (*env)->ReleaseStringUTFChars(env, notifyCharUuid, notifyC);
     return (jlong)(intptr_t)(__bridge_retained void *)bridge;
 }
 

@@ -5,7 +5,11 @@
 
 /*
  * Windows Runtime backend for WindowsPegasusBleTransport (see that class's
- * Javadoc). Raw bytes only - no DGT message interpretation here, mirroring
+ * Javadoc). Which characteristics to write to and subscribe to comes from the
+ * Java side as a profile (write service/characteristic plus a list of notify
+ * service/characteristic pairs - one for the DGT Pegasus, two for the Chessnut
+ * Air); CONNECTED is reported once every subscription is enabled.
+ * Raw bytes only - no message interpretation here, mirroring
  * app/src/main/java/de/schliweb/pegasus/bluetooth/AndroidPegasusBleTransport.java's
  * own phase-1 boundary and desktop/src/main/native/macos/PegasusBleMac.m's
  * equivalent macOS boundary; pegasus-core's PegasusGameBridge-equivalent
@@ -131,13 +135,23 @@ IBuffer ToBuffer(std::vector<uint8_t> const& data) {
 
 }  // namespace
 
+/* One notify subscription of the profile: the characteristic and the service holding it. */
+struct NotifySubscription {
+    winrt::guid serviceUuid;
+    winrt::guid charUuid;
+    std::wstring charUuidText;  // as given by Java (lower-case), echoed back with every notification
+};
+
 class PegasusBleBridge {
    public:
-    PegasusBleBridge(JNIEnv* env, jobject thiz, std::wstring const& uartServiceUuid,
-                      std::wstring const& writeCharUuid, std::wstring const& notifyCharUuid)
-        : uartServiceUuid_(ParseGuid(uartServiceUuid)),
-          writeCharUuid_(ParseGuid(writeCharUuid)),
-          notifyCharUuid_(ParseGuid(notifyCharUuid)) {
+    PegasusBleBridge(JNIEnv* env, jobject thiz, std::wstring const& writeServiceUuid,
+                      std::wstring const& writeCharUuid, std::vector<std::wstring> const& notifyServiceUuids,
+                      std::vector<std::wstring> const& notifyCharUuids)
+        : writeServiceUuid_(ParseGuid(writeServiceUuid)), writeCharUuid_(ParseGuid(writeCharUuid)) {
+        for (size_t i = 0; i < notifyCharUuids.size(); i++) {
+            subscriptions_.push_back(
+                    {ParseGuid(notifyServiceUuids[i]), ParseGuid(notifyCharUuids[i]), notifyCharUuids[i]});
+        }
         env->GetJavaVM(&jvm_);
         javaTransport_ = env->NewGlobalRef(thiz);
     }
@@ -186,12 +200,14 @@ class PegasusBleBridge {
             device_.ConnectionStatusChanged(connectionStatusToken_);
             connectionStatusToken_ = {};
         }
-        if (notifyValueChangedToken_ && notifyChar_) {
-            notifyChar_.ValueChanged(notifyValueChangedToken_);
-            notifyValueChangedToken_ = {};
+        for (size_t i = 0; i < notifyChars_.size(); i++) {
+            if (notifyTokens_[i]) {
+                notifyChars_[i].ValueChanged(notifyTokens_[i]);
+            }
         }
+        notifyChars_.clear();
+        notifyTokens_.clear();
         writeChar_ = nullptr;
-        notifyChar_ = nullptr;
         if (device_) {
             device_.Close();
             device_ = nullptr;
@@ -222,43 +238,61 @@ class PegasusBleBridge {
                     device_.ConnectionStatusChanged({this, &PegasusBleBridge::OnConnectionStatusChanged});
 
             ReportConnectionState(L"DISCOVERING_SERVICES");
-            auto servicesResult =
-                    co_await device_.GetGattServicesForUuidAsync(uartServiceUuid_, BluetoothCacheMode::Uncached);
-            if (servicesResult.Status() != GattCommunicationStatus::Success
-                || servicesResult.Services().Size() == 0) {
-                ReportError(L"SERVICE_NOT_FOUND", L"Nordic UART service not present on this device");
+            auto writeServiceResult = co_await device_.GetGattServicesForUuidAsync(
+                    writeServiceUuid_, BluetoothCacheMode::Uncached);
+            if (writeServiceResult.Status() != GattCommunicationStatus::Success
+                || writeServiceResult.Services().Size() == 0) {
+                ReportError(L"SERVICE_NOT_FOUND", L"Write service not present on this device");
                 Disconnect();
                 co_return;
             }
-            auto service = servicesResult.Services().GetAt(0);
-
-            auto writeCharsResult =
-                    co_await service.GetCharacteristicsForUuidAsync(writeCharUuid_, BluetoothCacheMode::Uncached);
-            auto notifyCharsResult =
-                    co_await service.GetCharacteristicsForUuidAsync(notifyCharUuid_, BluetoothCacheMode::Uncached);
+            auto writeService = writeServiceResult.Services().GetAt(0);
+            auto writeCharsResult = co_await writeService.GetCharacteristicsForUuidAsync(
+                    writeCharUuid_, BluetoothCacheMode::Uncached);
             bool haveWrite = writeCharsResult.Status() == GattCommunicationStatus::Success
                               && writeCharsResult.Characteristics().Size() > 0;
-            bool haveNotify = notifyCharsResult.Status() == GattCommunicationStatus::Success
-                               && notifyCharsResult.Characteristics().Size() > 0;
-            if (!haveWrite || !haveNotify) {
+
+            std::vector<GattCharacteristic> notifies;
+            for (auto const& sub : subscriptions_) {
+                auto serviceResult = co_await device_.GetGattServicesForUuidAsync(
+                        sub.serviceUuid, BluetoothCacheMode::Uncached);
+                if (serviceResult.Status() != GattCommunicationStatus::Success
+                    || serviceResult.Services().Size() == 0) {
+                    continue;
+                }
+                auto charsResult = co_await serviceResult.Services().GetAt(0).GetCharacteristicsForUuidAsync(
+                        sub.charUuid, BluetoothCacheMode::Uncached);
+                if (charsResult.Status() == GattCommunicationStatus::Success
+                    && charsResult.Characteristics().Size() > 0) {
+                    notifies.push_back(charsResult.Characteristics().GetAt(0));
+                }
+            }
+            if (!haveWrite || notifies.size() != subscriptions_.size()) {
                 wchar_t detail[64];
-                swprintf_s(detail, L"write=%d notify=%d", haveWrite, haveNotify);
+                swprintf_s(detail, L"write=%d notify=%zu/%zu", haveWrite, notifies.size(), subscriptions_.size());
                 ReportError(L"CHARACTERISTIC_NOT_FOUND", detail);
                 Disconnect();
                 co_return;
             }
             writeChar_ = writeCharsResult.Characteristics().GetAt(0);
-            notifyChar_ = notifyCharsResult.Characteristics().GetAt(0);
 
             ReportConnectionState(L"SUBSCRIBING");
-            auto notifyStatus = co_await notifyChar_.WriteClientCharacteristicConfigurationDescriptorAsync(
-                    GattClientCharacteristicConfigurationDescriptorValue::Notify);
-            if (notifyStatus != GattCommunicationStatus::Success) {
-                ReportError(L"NOTIFICATION_SETUP_FAILED", L"CCCD write failed");
-                Disconnect();
-                co_return;
+            for (size_t i = 0; i < notifies.size(); i++) {
+                auto notifyStatus = co_await notifies[i].WriteClientCharacteristicConfigurationDescriptorAsync(
+                        GattClientCharacteristicConfigurationDescriptorValue::Notify);
+                if (notifyStatus != GattCommunicationStatus::Success) {
+                    ReportError(L"NOTIFICATION_SETUP_FAILED", L"CCCD write failed");
+                    Disconnect();
+                    co_return;
+                }
+                std::wstring uuidText = subscriptions_[i].charUuidText;
+                auto token = notifies[i].ValueChanged(
+                        [this, uuidText](GattCharacteristic const&, GattValueChangedEventArgs const& args) {
+                            ReportDataReceived(uuidText, ToVector(args.CharacteristicValue()));
+                        });
+                notifyChars_.push_back(notifies[i]);
+                notifyTokens_.push_back(token);
             }
-            notifyValueChangedToken_ = notifyChar_.ValueChanged({this, &PegasusBleBridge::OnValueChanged});
 
             ReportConnectionState(L"CONNECTED");
         } catch (winrt::hresult_error const& e) {
@@ -331,10 +365,6 @@ class PegasusBleBridge {
         if (sender.ConnectionStatus() == BluetoothConnectionStatus::Disconnected) {
             ReportConnectionState(L"DISCONNECTED");
         }
-    }
-
-    void OnValueChanged(GattCharacteristic const&, GattValueChangedEventArgs const& args) {
-        ReportDataReceived(ToVector(args.CharacteristicValue()));
     }
 
     // ---- JNI callback dispatch --------------------------------------------
@@ -429,21 +459,23 @@ class PegasusBleBridge {
         env->DeleteLocalRef(jDetail);
     }
 
-    void ReportDataReceived(std::vector<uint8_t> const& data) {
+    void ReportDataReceived(std::wstring const& characteristicUuid, std::vector<uint8_t> const& data) {
         JNIEnv* env = CurrentEnv();
         if (env == nullptr) {
             return;
         }
         jclass cls = env->GetObjectClass(javaTransport_);
-        jmethodID mid = env->GetMethodID(cls, "onNativeDataReceived", "([B)V");
+        jmethodID mid = env->GetMethodID(cls, "onNativeDataReceived", "(Ljava/lang/String;[B)V");
         env->DeleteLocalRef(cls);
         if (mid == nullptr) {
             env->ExceptionClear();
             return;
         }
+        jstring jUuid = env->NewStringUTF(ToUtf8(characteristicUuid).c_str());
         jbyteArray arr = env->NewByteArray(static_cast<jsize>(data.size()));
         env->SetByteArrayRegion(arr, 0, static_cast<jsize>(data.size()), reinterpret_cast<const jbyte*>(data.data()));
-        env->CallVoidMethod(javaTransport_, mid, arr);
+        env->CallVoidMethod(javaTransport_, mid, jUuid, arr);
+        env->DeleteLocalRef(jUuid);
         env->DeleteLocalRef(arr);
     }
 
@@ -467,24 +499,40 @@ class PegasusBleBridge {
 
     JavaVM* jvm_ = nullptr;
     jobject javaTransport_ = nullptr;
-    winrt::guid uartServiceUuid_;
+    winrt::guid writeServiceUuid_;
     winrt::guid writeCharUuid_;
-    winrt::guid notifyCharUuid_;
+    std::vector<NotifySubscription> subscriptions_;
     BluetoothLEAdvertisementWatcher watcher_{nullptr};
     winrt::event_token receivedToken_{};
     std::unordered_map<uint64_t, std::wstring> knownNames_;
     BluetoothLEDevice device_{nullptr};
     winrt::event_token connectionStatusToken_{};
     GattCharacteristic writeChar_{nullptr};
-    GattCharacteristic notifyChar_{nullptr};
-    winrt::event_token notifyValueChangedToken_{};
+    std::vector<GattCharacteristic> notifyChars_;
+    std::vector<winrt::event_token> notifyTokens_;
 };
+
+namespace {
+
+std::vector<std::wstring> JStringArrayToVector(JNIEnv* env, jobjectArray array) {
+    std::vector<std::wstring> result;
+    jsize n = env->GetArrayLength(array);
+    for (jsize i = 0; i < n; i++) {
+        jstring s = static_cast<jstring>(env->GetObjectArrayElement(array, i));
+        result.push_back(JStringToWString(env, s));
+        env->DeleteLocalRef(s);
+    }
+    return result;
+}
+
+}  // namespace
 
 // ---- JNI exports ---------------------------------------------------------
 
 extern "C" JNIEXPORT jlong JNICALL
 Java_de_schliweb_moveapiece_desktop_pegasus_WindowsPegasusBleTransport_nativeCreate(
-        JNIEnv* env, jobject thiz, jstring uartServiceUuid, jstring writeCharUuid, jstring notifyCharUuid) {
+        JNIEnv* env, jobject thiz, jstring writeServiceUuid, jstring writeCharUuid,
+        jobjectArray notifyServiceUuids, jobjectArray notifyCharUuids) {
     static bool apartmentInitialized = false;
     if (!apartmentInitialized) {
         try {
@@ -503,9 +551,10 @@ Java_de_schliweb_moveapiece_desktop_pegasus_WindowsPegasusBleTransport_nativeCre
         }
         apartmentInitialized = true;
     }
-    auto* bridge = new PegasusBleBridge(env, thiz, JStringToWString(env, uartServiceUuid),
+    auto* bridge = new PegasusBleBridge(env, thiz, JStringToWString(env, writeServiceUuid),
                                          JStringToWString(env, writeCharUuid),
-                                         JStringToWString(env, notifyCharUuid));
+                                         JStringArrayToVector(env, notifyServiceUuids),
+                                         JStringArrayToVector(env, notifyCharUuids));
     return reinterpret_cast<jlong>(bridge);
 }
 

@@ -10,16 +10,18 @@ import com.github.hypfvieh.bluetooth.wrapper.BluetoothAdapter;
 import com.github.hypfvieh.bluetooth.wrapper.BluetoothDevice;
 import com.github.hypfvieh.bluetooth.wrapper.BluetoothGattCharacteristic;
 import com.github.hypfvieh.bluetooth.wrapper.BluetoothGattService;
+import de.schliweb.pegasus.core.transport.BleProfile;
 import de.schliweb.pegasus.core.transport.ConnectionState;
 import de.schliweb.pegasus.core.transport.DiscoveredDevice;
 import de.schliweb.pegasus.core.transport.PegasusTransport;
-import de.schliweb.pegasus.core.transport.PegasusUuids;
 import de.schliweb.pegasus.core.transport.ReconnectPolicy;
 import de.schliweb.pegasus.core.transport.ScanListener;
 import de.schliweb.pegasus.core.transport.TransportError;
 import de.schliweb.pegasus.core.transport.TransportListener;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -99,11 +101,22 @@ public final class LinuxPegasusBleTransport implements PegasusTransport {
     private String currentAddress;
     private volatile BluetoothDevice connectedDevice;
     private volatile BluetoothGattCharacteristic writeChar;
-    private volatile BluetoothGattCharacteristic notifyChar;
+    private volatile List<BluetoothGattCharacteristic> notifyChars = List.of();
+    private final BleProfile profile;
     private ScheduledFuture<?> connectTimeoutTask;
     private ScheduledFuture<?> reconnectTask;
 
+    /** Transport for a DGT Pegasus ({@link BleProfile#PEGASUS}). */
     public LinuxPegasusBleTransport() {
+        this(BleProfile.PEGASUS);
+    }
+
+    /** Transport for whichever board {@code profile} describes; CONNECTED once all subscribed. */
+    public LinuxPegasusBleTransport(BleProfile profile) {
+        if (profile == null) {
+            throw new IllegalArgumentException("profile must not be null");
+        }
+        this.profile = profile;
         try {
             deviceManager = DeviceManager.createInstance(false);
             deviceManager.registerPropertyHandler(propertiesHandler);
@@ -278,37 +291,51 @@ public final class LinuxPegasusBleTransport implements PegasusTransport {
                     && System.currentTimeMillis() < deadline) {
                 Thread.sleep(200);
             }
-            BluetoothGattService service = device.getGattServiceByUuid(PegasusUuids.UART_SERVICE);
-            if (service == null) {
-                Platform.runLater(
-                        () ->
-                                emitError(
-                                        TransportError.SERVICE_NOT_FOUND,
-                                        "Nordic UART service not present on this device"));
+            BluetoothGattService writeService =
+                    device.getGattServiceByUuid(profile.writeServiceUuid());
+            if (writeService == null) {
+                String detail =
+                        profile.displayName()
+                                + " service "
+                                + profile.writeServiceUuid()
+                                + " not present on this device";
+                Platform.runLater(() -> emitError(TransportError.SERVICE_NOT_FOUND, detail));
                 doDisconnectQuiet(device);
                 Platform.runLater(this::handleDisconnected);
                 return;
             }
             BluetoothGattCharacteristic write =
-                    service.getGattCharacteristicByUuid(PegasusUuids.UART_WRITE_CHARACTERISTIC);
-            BluetoothGattCharacteristic notify =
-                    service.getGattCharacteristicByUuid(PegasusUuids.UART_NOTIFY_CHARACTERISTIC);
-            if (write == null || notify == null) {
-                boolean haveWrite = write != null;
-                boolean haveNotify = notify != null;
-                Platform.runLater(
-                        () ->
-                                emitError(
-                                        TransportError.CHARACTERISTIC_NOT_FOUND,
-                                        "write=" + haveWrite + " notify=" + haveNotify));
+                    writeService.getGattCharacteristicByUuid(profile.writeCharacteristicUuid());
+            List<BluetoothGattCharacteristic> notifies = new ArrayList<>();
+            for (BleProfile.Subscription sub : profile.subscriptions()) {
+                BluetoothGattService service = device.getGattServiceByUuid(sub.serviceUuid());
+                BluetoothGattCharacteristic ch =
+                        service == null
+                                ? null
+                                : service.getGattCharacteristicByUuid(sub.characteristicUuid());
+                if (ch != null) {
+                    notifies.add(ch);
+                }
+            }
+            if (write == null || notifies.size() != profile.subscriptions().size()) {
+                String detail =
+                        "write="
+                                + (write != null)
+                                + " notify="
+                                + notifies.size()
+                                + "/"
+                                + profile.subscriptions().size();
+                Platform.runLater(() -> emitError(TransportError.CHARACTERISTIC_NOT_FOUND, detail));
                 doDisconnectQuiet(device);
                 Platform.runLater(this::handleDisconnected);
                 return;
             }
             Platform.runLater(() -> setState(ConnectionState.SUBSCRIBING));
-            notify.startNotify();
+            for (BluetoothGattCharacteristic ch : notifies) {
+                ch.startNotify();
+            }
             writeChar = write;
-            notifyChar = notify;
+            notifyChars = List.copyOf(notifies);
             Platform.runLater(() -> setState(ConnectionState.CONNECTED));
         } catch (Exception e) {
             Platform.runLater(
@@ -345,7 +372,7 @@ public final class LinuxPegasusBleTransport implements PegasusTransport {
 
     private void doDisconnectQuiet(BluetoothDevice device) {
         writeChar = null;
-        notifyChar = null;
+        notifyChars = List.of();
         connectedDevice = null;
         if (device != null) {
             try {
@@ -387,7 +414,7 @@ public final class LinuxPegasusBleTransport implements PegasusTransport {
                                 () -> {
                                     TransportListener l = listener;
                                     if (l != null) {
-                                        l.onDataSent(PegasusUuids.UART_WRITE_CHARACTERISTIC, data);
+                                        l.onDataSent(profile.writeCharacteristicUuid(), data);
                                     }
                                 });
                     } catch (Exception e) {
@@ -409,7 +436,6 @@ public final class LinuxPegasusBleTransport implements PegasusTransport {
 
     private void onPropertiesChanged(PropertiesChanged signal) {
         BluetoothDevice device = connectedDevice;
-        BluetoothGattCharacteristic notify = notifyChar;
         if (device != null
                 && signal.getPath().equals(device.getDbusPath())
                 && "org.bluez.Device1".equals(signal.getInterfaceName())) {
@@ -417,20 +443,28 @@ public final class LinuxPegasusBleTransport implements PegasusTransport {
             if (connected != null && Boolean.FALSE.equals(connected.getValue())) {
                 Platform.runLater(this::handleDisconnected);
             }
-        } else if (notify != null
-                && signal.getPath().equals(notify.getDbusPath())
-                && "org.bluez.GattCharacteristic1".equals(signal.getInterfaceName())) {
+            return;
+        }
+        if (!"org.bluez.GattCharacteristic1".equals(signal.getInterfaceName())) {
+            return;
+        }
+        for (BluetoothGattCharacteristic notify : notifyChars) {
+            if (!signal.getPath().equals(notify.getDbusPath())) {
+                continue;
+            }
             Variant<?> value = signal.getPropertiesChanged().get("Value");
             if (value != null) {
                 byte[] data = toByteArray(value.getValue());
+                String uuid = notify.getUuid().toLowerCase(Locale.ROOT);
                 Platform.runLater(
                         () -> {
                             TransportListener l = listener;
                             if (l != null) {
-                                l.onDataReceived(PegasusUuids.UART_NOTIFY_CHARACTERISTIC, data);
+                                l.onDataReceived(uuid, data);
                             }
                         });
             }
+            return;
         }
     }
 
