@@ -191,6 +191,8 @@ dependencies {
     // Physical DGT Pegasus board support (BLE); see :pegasus-core and
     // THIRD-PARTY-NOTICES.md for provenance.
     implementation project(':pegasus-core')
+    // Chessnut Air support; protocol and game flow live in :chessnut-core (see its README).
+    implementation project(':chessnut-core')
     // Platform-agnostic chess/engine/opening-trainer logic shared with the
     // desktop app; see :core and its build.gradle.
     implementation project(':core')

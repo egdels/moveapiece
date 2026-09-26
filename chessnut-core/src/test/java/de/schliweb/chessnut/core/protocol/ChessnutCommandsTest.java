@@ -6,6 +6,7 @@
 package de.schliweb.chessnut.core.protocol;
 
 import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
 
 import de.schliweb.pegasus.core.protocol.BoardState;
 import org.junit.Test;
@@ -41,6 +42,24 @@ public class ChessnutCommandsTest {
                 Fixtures.hex("0a 08 00 00 00 00 00 00 00 80"),
                 ChessnutCommands.encodeLeds(
                         BoardState.squareIndex("a1"), BoardState.squareIndex("a1")));
+    }
+
+    @Test
+    public void profileWritesToCommandServiceAndSubscribesToBothNotifies() {
+        assertEquals(ChessnutUuids.COMMAND_SERVICE, ChessnutUuids.PROFILE.writeServiceUuid());
+        assertEquals(
+                ChessnutUuids.COMMAND_WRITE_CHARACTERISTIC,
+                ChessnutUuids.PROFILE.writeCharacteristicUuid());
+        assertEquals(2, ChessnutUuids.PROFILE.subscriptions().size());
+        assertEquals(
+                ChessnutUuids.COMMAND_NOTIFY_CHARACTERISTIC,
+                ChessnutUuids.PROFILE.subscriptions().get(0).characteristicUuid());
+        assertEquals(
+                ChessnutUuids.BOARD_SERVICE,
+                ChessnutUuids.PROFILE.subscriptions().get(1).serviceUuid());
+        assertEquals(
+                ChessnutUuids.BOARD_NOTIFY_CHARACTERISTIC,
+                ChessnutUuids.PROFILE.subscriptions().get(1).characteristicUuid());
     }
 
     @Test

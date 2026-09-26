@@ -5,6 +5,9 @@
 
 package de.schliweb.chessnut.core.protocol;
 
+import de.schliweb.pegasus.core.transport.BleProfile;
+import java.util.Arrays;
+
 /**
  * BLE UUIDs of a Chessnut Air, VERIFIED on real hardware 2026-09-26 (see
  * tools/chessnut-sniffer/CHESSNUT_PROTOCOL.md).
@@ -38,6 +41,18 @@ public final class ChessnutUuids {
 
     /** Advertised local name prefix (the board advertises no service UUIDs). */
     public static final String NAME_PREFIX = "Chessnut";
+
+    /** Transport wiring: write to the command service, subscribe to replies and board reports. */
+    public static final BleProfile PROFILE =
+            new BleProfile(
+                    "Chessnut Air",
+                    COMMAND_SERVICE,
+                    COMMAND_WRITE_CHARACTERISTIC,
+                    Arrays.asList(
+                            new BleProfile.Subscription(
+                                    COMMAND_SERVICE, COMMAND_NOTIFY_CHARACTERISTIC),
+                            new BleProfile.Subscription(
+                                    BOARD_SERVICE, BOARD_NOTIFY_CHARACTERISTIC)));
 
     private ChessnutUuids() {}
 }
