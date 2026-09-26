@@ -218,6 +218,9 @@ public class DesktopPegasusGameBridge {
     private ScheduledFuture<?> checkIndicatorFuture;
     private ScheduledFuture<?> guidedCaptureSettleFuture;
 
+    /** One-shot re-assert of a freshly started guide's LEDs, see {@link #GUIDE_LED_REASSERT_MS}. */
+    private ScheduledFuture<?> guideLedReassertFuture;
+
     /**
      * Pending, not-yet-fired writes of {@link #sendOfficialInitSequence()}. The sequence spans 12 s
      * (8 commands x 1.5 s); a disconnect during that window (manual toolbar click, unexpected drop)
@@ -974,6 +977,7 @@ public class DesktopPegasusGameBridge {
             if (guideCaptureSquare != null && showLed && syncGuide.isActive()) {
                 ledController.showMove(move.from(), move.to());
             }
+            scheduleGuideLedReassert();
         } catch (IllegalArgumentException ignored) {
             // Malformed UCI; nothing sensible to guide toward.
         }
@@ -1008,9 +1012,38 @@ public class DesktopPegasusGameBridge {
         }
     }
 
+    /**
+     * A guide usually starts within a few tens of milliseconds of the field update that confirmed
+     * the player's own move, and a pattern sent that close to an incoming FIELD_UPDATE has been
+     * observed to only flash briefly before the board clears it again (see {@link #feedDetector}).
+     * Every later physical event re-asserts the pattern, but a player who waits for the LEDs never
+     * causes one - observed on hardware twice on 2026-09-26, both times for a capture guide that
+     * stayed dark until the player moved anyway. Re-send once after a short pause. Once, not
+     * periodically: re-sending restarts the alternate blink at its first square, and a periodic
+     * refresh of a two-square pattern left only one square ever visible (2026-09-25).
+     */
+    private static final long GUIDE_LED_REASSERT_MS = 800;
+
+    private void scheduleGuideLedReassert() {
+        cancel(guideLedReassertFuture);
+        guideLedReassertFuture =
+                postDelayed(
+                        () -> {
+                            if (syncGuide.isActive()) {
+                                LOG.log(
+                                        Level.INFO,
+                                        "guide: re-asserting LEDs for {0}",
+                                        guideMoveUci);
+                                ledController.resend();
+                            }
+                        },
+                        GUIDE_LED_REASSERT_MS);
+    }
+
     private void abortGuide() {
         clearGuideDeviation();
         cancel(guidedCaptureSettleFuture);
+        cancel(guideLedReassertFuture);
         syncGuide.cancel();
         guideMoveUci = null;
         guideTargetPosition = null;

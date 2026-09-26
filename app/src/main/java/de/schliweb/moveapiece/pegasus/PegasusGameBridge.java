@@ -155,6 +155,7 @@ public class PegasusGameBridge {
     private final Runnable keepalivePollRunnable = this::sendKeepalivePoll;
     private final Runnable checkIndicatorRefreshRunnable = this::refreshCheckIndicator;
     private final Runnable guidedCaptureSettleRunnable = this::settleUnprovenGuidedCapture;
+    private final Runnable guideLedReassertRunnable = this::reassertGuideLeds;
     private final MoveDetector moveDetector = new MoveDetector(ChessPosition.starting(), null);
 
     private final BoardSyncGuide syncGuide =
@@ -1114,6 +1115,8 @@ public class PegasusGameBridge {
                 // (hardware-verified gap).
                 ledController.showMove(move.from(), move.to());
             }
+            mainHandler.removeCallbacks(guideLedReassertRunnable);
+            mainHandler.postDelayed(guideLedReassertRunnable, GUIDE_LED_REASSERT_MS);
         } catch (IllegalArgumentException ignored) {
             // Malformed UCI; nothing sensible to guide toward.
         }
@@ -1157,9 +1160,29 @@ public class PegasusGameBridge {
         }
     }
 
+    /**
+     * A guide usually starts within a few tens of milliseconds of the field update that confirmed
+     * the player's own move, and a pattern sent that close to an incoming FIELD_UPDATE has been
+     * observed to only flash briefly before the board clears it again (see {@link #feedDetector}).
+     * Every later physical event re-asserts the pattern, but a player who waits for the LEDs never
+     * causes one - observed on hardware twice on 2026-09-26, both times for a capture guide that
+     * stayed dark until the player moved anyway. Re-send once after a short pause. Once, not
+     * periodically: re-sending restarts the alternate blink at its first square, and a periodic
+     * refresh of a two-square pattern left only one square ever visible (2026-09-25).
+     */
+    private static final long GUIDE_LED_REASSERT_MS = 800;
+
+    private void reassertGuideLeds() {
+        if (syncGuide.isActive()) {
+            Log.i(TAG, "guide: re-asserting LEDs for " + guideMoveUci);
+            ledController.resend();
+        }
+    }
+
     private void abortGuide() {
         clearGuideDeviation();
         mainHandler.removeCallbacks(guidedCaptureSettleRunnable);
+        mainHandler.removeCallbacks(guideLedReassertRunnable);
         syncGuide.cancel();
         guideMoveUci = null;
         guideTargetPosition = null;
