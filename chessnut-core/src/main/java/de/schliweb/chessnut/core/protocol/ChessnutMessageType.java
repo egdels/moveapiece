@@ -17,6 +17,11 @@ public final class ChessnutMessageType {
     /** Set LEDs, payload 8 bytes, one bit per square (app → board). */
     public static final int SET_LEDS = 0x0A;
 
+    /**
+     * Beep, payload 4 bytes: frequency Hz and duration ms, each 16-bit big-endian (app → board).
+     */
+    public static final int BEEP = 0x0B;
+
     /** Button event, payload 1 byte (board → app). */
     public static final int BUTTON = 0x0F;
 

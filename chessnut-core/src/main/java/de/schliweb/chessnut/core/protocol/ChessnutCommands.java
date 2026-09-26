@@ -43,6 +43,24 @@ public final class ChessnutCommands {
         return out;
     }
 
+    /**
+     * {@code 0b 04 <hz> <ms>}: plays a tone on the board's speaker. Frequency and duration are
+     * 16-bit big-endian (unlike the little-endian uptime counter; verified on hardware, a
+     * little-endian 2000 Hz only clicks). Values are clamped to 1–65535.
+     */
+    public static byte[] encodeBeep(int frequencyHz, int durationMs) {
+        int hz = Math.max(1, Math.min(0xFFFF, frequencyHz));
+        int ms = Math.max(1, Math.min(0xFFFF, durationMs));
+        return new byte[] {
+            (byte) ChessnutMessageType.BEEP,
+            0x04,
+            (byte) (hz >>> 8),
+            (byte) hz,
+            (byte) (ms >>> 8),
+            (byte) ms
+        };
+    }
+
     /** All LEDs off. */
     public static byte[] encodeLedsOff() {
         return encodeLeds();

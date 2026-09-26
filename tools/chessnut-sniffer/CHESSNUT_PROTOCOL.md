@@ -32,9 +32,16 @@ Subscribe to `…8262` and `…8273`, write to `…8272`.
 | `21 01 00`                     | enable real-time board reports       | `23 01 00` |
 | `29 01 00`                     | battery request                      | `2a 02 <level> <flag>` e.g. `2a 02 64 00` = 100 %, flag 0 |
 | `0a 08 b0 b1 b2 b3 b4 b5 b6 b7` | set LEDs, one bit per square         | `23 01 00` |
+| `0b 04 f1 f0 d1 d0`            | beep: frequency Hz, duration ms, both 16-bit **big-endian** | `23 01 00` |
 
-`23 01 00` is a generic ack, it followed both the enable and the LED
-command. The battery flag's meaning is not verified yet (0 while on
+`23 01 00` is a generic ack, it followed the enable, LED and beep
+commands.
+
+Beep, verified 2026-09-26: `0b 04 07 d0 01 f4` plays 2000 Hz for 500 ms,
+`0b 04 01 90 01 f4` 400 Hz for 500 ms. Note the byte order differs from
+the little-endian uptime counter: sent little-endian, 2000 Hz becomes
+53 kHz and the piezo only clicks. The board also plays a short tone of
+its own when the BLE connection drops. The battery flag's meaning is not verified yet (0 while on
 battery; check while charging).
 
 ## Button events (notify on `…8273`)

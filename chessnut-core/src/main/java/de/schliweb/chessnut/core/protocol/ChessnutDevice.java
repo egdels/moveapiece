@@ -80,6 +80,11 @@ public final class ChessnutDevice {
         sink.write(ChessnutCommands.encodeLedsOff());
     }
 
+    /** Plays a tone on the board's speaker (see {@link ChessnutCommands#encodeBeep}). */
+    public void beep(int frequencyHz, int durationMs) {
+        sink.write(ChessnutCommands.encodeBeep(frequencyHz, durationMs));
+    }
+
     /**
      * Feeds raw notification bytes from one characteristic; dispatches every completed frame.
      * Fragments of different characteristics are reassembled independently.

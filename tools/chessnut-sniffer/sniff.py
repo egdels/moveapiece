@@ -20,6 +20,7 @@ Interactive commands once connected (type + Enter):
     led N          light the LED for bit N (0..63) to map bit -> square
     led a1 e4 ..   light LEDs for squares under the ASSUMED bit mapping
     ledoff         clear all LEDs
+    beep HZ MS     play a tone, e.g. beep 2000 500
     raw 21 01 00   send arbitrary hex bytes to the write characteristic
     q              disconnect and quit
 
@@ -41,7 +42,8 @@ from bleak import BleakClient, BleakScanner
 # board reports (01 24 + 32 bytes + 4-byte seconds counter) stream at ~10 Hz
 # on 1b7e8262 in service 1b7e8261 regardless of changes. Battery reply
 # 2a 02 <level 0-100> <flag>. Every command is acked with 23 01 00.
-# LED frame 0a 08 + 8 bytes VERIFIED: byte 0 bit 0 lights h8.
+# LED frame 0a 08 + 8 bytes VERIFIED: byte 0 bit 0 lights h8. Beep 0b 04 + Hz + ms,
+# both 16-bit BIG-endian, VERIFIED (2000 Hz / 400 Hz / 500 ms audibly distinct).
 # Square order and all twelve piece codes VERIFIED against the start
 # position and e2-e4 (captures/chessnut-20260926-053406.log). The 4-byte
 # trailer is a little-endian seconds-since-power-on counter.
@@ -54,6 +56,7 @@ ASSUMED_NOTIFY = "1b7e8273-2877-41c3-b46e-cf057c562023"
 CMD_ENABLE_REALTIME = bytes([0x21, 0x01, 0x00])
 CMD_BATTERY = bytes([0x29, 0x01, 0x00])
 LED_HEADER = bytes([0x0A, 0x08])
+BEEP_HEADER = bytes([0x0B, 0x04])  # + frequency Hz, duration ms, both 16-bit big-endian
 
 # Board report: 01 24 + 32 bytes (two squares per byte) + trailing bytes.
 BOARD_HEADER = bytes([0x01, 0x24])
@@ -216,7 +219,7 @@ async def read_stdin(queue: asyncio.Queue):
         await queue.put(line.strip())
 
 
-async def session(address: str, cap: Capture, listen_seconds: float | None = None, extra_sends: list[bytes] = ()):
+async def session(address: str, cap: Capture, listen_seconds: float | None = None, extra_sends: list[bytes] = (), send_delay: float = 0.5):
     tracker = BoardTracker(cap)
     write_uuid = None
     disconnected = asyncio.Event()
@@ -288,7 +291,7 @@ async def session(address: str, cap: Capture, listen_seconds: float | None = Non
 
         await send(CMD_ENABLE_REALTIME, "enable real-time board reports")
         for extra in extra_sends:
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(send_delay)
             await send(extra, "extra --send")
 
         if listen_seconds is not None:
@@ -305,7 +308,7 @@ async def session(address: str, cap: Capture, listen_seconds: float | None = Non
             cap.text("session closed")
             return
 
-        cap.text("ready. commands: board | bat | led N | led a1 e4 | ledoff | raw .. | q")
+        cap.text("ready. commands: board | bat | led N | led a1 e4 | ledoff | beep HZ MS | raw .. | q")
 
         queue: asyncio.Queue = asyncio.Queue()
         stdin_task = asyncio.create_task(read_stdin(queue))
@@ -341,6 +344,9 @@ async def session(address: str, cap: Capture, listen_seconds: float | None = Non
                         else:
                             cap.text(f"bad led arg {arg!r}")
                     await send(led_frame(bits), f"led bits {sorted(bits)}")
+                elif op == "beep" and len(parts) == 3 and parts[1].isdigit() and parts[2].isdigit():
+                    hz, ms = int(parts[1]), int(parts[2])
+                    await send(BEEP_HEADER + hz.to_bytes(2, "big") + ms.to_bytes(2, "big"), f"beep {hz} Hz {ms} ms")
                 elif op == "raw":
                     try:
                         await send(bytes.fromhex("".join(parts[1:])), "raw")
@@ -365,6 +371,8 @@ async def main():
     ap.add_argument("--scan-seconds", type=float, default=8.0)
     ap.add_argument("--listen", type=float, metavar="SECONDS",
                     help="non-interactive: connect, init, log for SECONDS, exit")
+    ap.add_argument("--send-delay", type=float, default=0.5, metavar="SECONDS",
+                    help="pause before each --send (default 0.5)")
     ap.add_argument("--send", action="append", default=[], metavar="HEX",
                     help="extra hex bytes to send after init (repeatable), e.g. --send '29 01 00'")
     args = ap.parse_args()
@@ -384,7 +392,7 @@ async def main():
     cap = Capture()
     cap.text(f"capture file: {cap.path}")
     try:
-        await session(address, cap, args.listen, [bytes.fromhex(h) for h in args.send])
+        await session(address, cap, args.listen, [bytes.fromhex(h) for h in args.send], args.send_delay)
     finally:
         cap.close()
         print(f"capture written to {cap.path}")

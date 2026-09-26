@@ -266,6 +266,11 @@ public class ChessnutGameBridge {
         device.requestBattery();
     }
 
+    /** Plays a tone on the board's speaker; ignored while not connected. */
+    public void beep(int frequencyHz, int durationMs) {
+        device.beep(frequencyHz, durationMs);
+    }
+
     // ------------------------------------------------------------ recording
 
     /**

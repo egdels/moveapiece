@@ -63,6 +63,15 @@ public class ChessnutCommandsTest {
     }
 
     @Test
+    public void beepIsBigEndianAsVerifiedByEar() {
+        // 2000 Hz / 500 ms and 400 Hz / 500 ms were audibly distinct on hardware 2026-09-26.
+        assertArrayEquals(
+                Fixtures.hex("0b 04 07 d0 01 f4"), ChessnutCommands.encodeBeep(2000, 500));
+        assertArrayEquals(Fixtures.hex("0b 04 01 90 01 f4"), ChessnutCommands.encodeBeep(400, 500));
+        assertArrayEquals(Fixtures.hex("0b 04 ff ff 00 01"), ChessnutCommands.encodeBeep(70000, 0));
+    }
+
+    @Test
     public void offIsAllZeros() {
         assertArrayEquals(
                 Fixtures.hex("0a 08 00 00 00 00 00 00 00 00"), ChessnutCommands.encodeLedsOff());
