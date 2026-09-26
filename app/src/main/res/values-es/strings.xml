@@ -7,8 +7,9 @@
     <string name="menu_opening_library">Biblioteca de aperturas</string>
     <string name="menu_hint">Pista</string>
     <string name="menu_opponent">Rival</string>
-    <string name="menu_pegasus_connect">Conectar tablero Pegasus…</string>
-    <string name="menu_pegasus_disconnect">Desconectar tablero Pegasus</string>
+    <string name="menu_board_connect">Conectar tablero…</string>
+    <string name="menu_board_connect_format">Conectar %1$s…</string>
+    <string name="menu_board_disconnect_format">Desconectar %1$s</string>
 
     <string name="dialog_new_game_title">Partida nueva</string>
     <string name="opponent_human">Humano (2 jugadores)</string>
@@ -83,16 +84,19 @@
     <string name="action_ok">Aceptar</string>
     <string name="action_cancel">Cancelar</string>
 
-    <string name="dialog_pegasus_title">Conectar tablero Pegasus</string>
+    <string name="dialog_board_connect_format">Conectar %1$s</string>
     <string name="pegasus_scan_empty">Buscando dispositivos…</string>
     <string name="pegasus_scan_failed">Error en la búsqueda Bluetooth</string>
-    <string name="pegasus_connected">Tablero Pegasus conectado</string>
-    <string name="pegasus_disconnected">Tablero Pegasus desconectado</string>
+    <string name="board_connected_format">%1$s conectado</string>
+    <string name="board_disconnected_format">%1$s desconectado</string>
     <string name="pegasus_permission_required">Se requiere permiso de Bluetooth</string>
     <string name="pegasus_location_required">Activa la ubicación para buscar dispositivos Bluetooth</string>
-    <string name="pegasus_error_format">Error de Pegasus: %1$s</string>
-    <string name="pegasus_battery_format">Batería del tablero Pegasus: %1$d %%</string>
+    <string name="board_error_format">Error de %1$s: %2$s</string>
+    <string name="board_battery_format">Batería de %1$s: %2$d %%</string>
     <string name="pegasus_battery_critical_format">Batería del tablero Pegasus muy baja (%1$d %%): se apagará pronto</string>
+    <string name="board_battery_low_format">Batería de %1$s baja (%2$d %%)</string>
+    <string name="board_type_button">Tipo de tablero</string>
+    <string name="dialog_board_type_title">¿Qué tablero?</string>
     <string name="pegasus_board_mismatch">El tablero no coincide con la posición: corrige las piezas según los LED</string>
     <string name="pegasus_auto_move_held">La jugada de la aplicación espera a que el tablero coincida</string>
     <string name="pegasus_mismatch_squares_format">Casillas: %1$s</string>

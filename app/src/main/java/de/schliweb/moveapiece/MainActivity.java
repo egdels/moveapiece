@@ -6,6 +6,7 @@
 package de.schliweb.moveapiece;
 
 import android.app.Dialog;
+import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.net.Uri;
@@ -34,6 +35,12 @@ import com.github.bhlangonijr.chesslib.PieceType;
 import com.github.bhlangonijr.chesslib.Side;
 import com.github.bhlangonijr.chesslib.Square;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import de.schliweb.chessnut.core.protocol.ChessnutUuids;
+import de.schliweb.moveapiece.board.BoardType;
+import de.schliweb.moveapiece.board.ChessnutBoardAdapter;
+import de.schliweb.moveapiece.board.PegasusBoardAdapter;
+import de.schliweb.moveapiece.board.PhysicalBoardBridge;
+import de.schliweb.moveapiece.chessnut.ChessnutGameBridge;
 import de.schliweb.moveapiece.databinding.ActivityMainBinding;
 import de.schliweb.moveapiece.databinding.DialogContinueFreePlayBinding;
 import de.schliweb.moveapiece.databinding.DialogNewGameBinding;
@@ -80,7 +87,8 @@ public class MainActivity extends AppCompatActivity
         implements BoardView.MoveSource,
                 BoardView.OnMoveListener,
                 EngineListener,
-                PegasusGameBridge.Listener {
+                PegasusGameBridge.Listener,
+                ChessnutGameBridge.Listener {
 
     private static final int ELO_MIN = 1320;
     private static final int ELO_MAX = 3190;
@@ -147,7 +155,11 @@ public class MainActivity extends AppCompatActivity
     private int maiaSearchGeneration = -1;
     private MoveSoundPlayer soundPlayer;
     private Settings settings;
-    private PegasusGameBridge pegasusBridge;
+
+    /** The selected physical board, see {@link #createBoardBridge}. */
+    private PhysicalBoardBridge board;
+
+    private BoardType boardType;
     private ActivityResultLauncher<String[]> blePermissionLauncher;
     private ActivityResultLauncher<String> pgnImportLauncher;
 
@@ -309,9 +321,8 @@ public class MainActivity extends AppCompatActivity
         engineElo = settings.getEngineElo(engineElo);
         currentMaiaRating = settings.getMaiaRating();
         evaluationEnabled = settings.isEvaluationDisplayEnabled(evaluationEnabled);
-        pegasusBridge =
-                new PegasusGameBridge(
-                        new AndroidPegasusBleTransport(getApplicationContext()), this);
+        boardType = settings.getBoardType();
+        board = createBoardBridge(boardType);
         maybeStartPegasusRecording();
         blePermissionLauncher =
                 registerForActivityResult(
@@ -349,9 +360,12 @@ public class MainActivity extends AppCompatActivity
         if (!dir.exists() && !dir.mkdirs()) {
             return;
         }
-        File file = new File(dir, "session-" + System.currentTimeMillis() + ".ndjson");
+        File file =
+                new File(
+                        dir,
+                        boardType.key() + "-session-" + System.currentTimeMillis() + ".ndjson");
         try {
-            pegasusBridge.startRecording(file);
+            board.startRecording(file);
         } catch (IOException e) {
             // Non-critical; see javadoc above.
         }
@@ -384,7 +398,7 @@ public class MainActivity extends AppCompatActivity
                 v -> startActivity(new Intent(this, OpeningLibraryActivity.class)));
         binding.hintButton.setOnClickListener(v -> requestHint());
         binding.pegasusButton.setOnClickListener(v -> onPegasusButtonClicked());
-        updatePegasusButtonLabel(pegasusBridge.getConnectionState());
+        updatePegasusButtonLabel(board.getConnectionState());
         binding.exportPgnButton.setOnClickListener(v -> exportGamePgn());
         binding.importPgnButton.setOnClickListener(v -> pgnImportLauncher.launch("*/*"));
         binding.analyzeGameButton.setOnClickListener(v -> startPostGameAnalysis());
@@ -460,8 +474,8 @@ public class MainActivity extends AppCompatActivity
     // ---- Pegasus board -----------------------------------------------------
 
     private void onPegasusButtonClicked() {
-        if (pegasusBridge.getConnectionState() == ConnectionState.CONNECTED) {
-            pegasusBridge.disconnect();
+        if (board.getConnectionState() == ConnectionState.CONNECTED) {
+            board.disconnect();
             return;
         }
         if (!BlePermissions.allGranted(this)) {
@@ -478,33 +492,47 @@ public class MainActivity extends AppCompatActivity
 
         currentDialog =
                 new MaterialAlertDialogBuilder(this)
-                        .setTitle(R.string.dialog_pegasus_title)
+                        .setTitle(
+                                getString(
+                                        R.string.dialog_board_connect_format,
+                                        boardType.displayName()))
                         .setAdapter(
                                 adapter,
                                 (dialog, which) -> {
-                                    pegasusBridge.stopScan();
-                                    pegasusBridge.connect(found.get(which).getAddress());
+                                    board.stopScan();
+                                    board.connect(found.get(which).getAddress());
                                 })
                         .setNegativeButton(
-                                R.string.action_cancel, (dialog, which) -> pegasusBridge.stopScan())
-                        .setOnDismissListener(dialog -> pegasusBridge.stopScan())
+                                R.string.action_cancel, (dialog, which) -> board.stopScan())
+                        .setNeutralButton(
+                                R.string.board_type_button,
+                                (dialog, which) -> showBoardTypeDialog())
+                        .setOnDismissListener(dialog -> board.stopScan())
                         .show();
 
         Toast.makeText(this, R.string.pegasus_scan_empty, Toast.LENGTH_SHORT).show();
-        pegasusBridge.startScan(
+        board.startScan(
                 new ScanListener() {
                     @Override
                     public void onDeviceFound(DiscoveredDevice device) {
                         if (device.getName() == null || device.getName().trim().isEmpty()) {
-                            // Unnamed BLE devices clutter the list and are never the
-                            // Pegasus board, which always advertises a name.
+                            // Unnamed BLE devices clutter the list and are never a
+                            // supported board; both always advertise a name.
                             return;
                         }
+                        // The Chessnut Air advertises its name with a trailing newline.
+                        String label =
+                                device.getName().trim()
+                                        + " ["
+                                        + device.getAddress()
+                                        + "] "
+                                        + device.getRssi()
+                                        + " dBm";
                         runOnUiThread(
                                 () -> {
                                     if (!found.contains(device)) {
                                         found.add(device);
-                                        adapter.add(device.toString());
+                                        adapter.add(label);
                                     }
                                 });
                     }
@@ -556,8 +584,69 @@ public class MainActivity extends AppCompatActivity
         binding.pegasusButton.setContentDescription(
                 getString(
                         connected
-                                ? R.string.menu_pegasus_disconnect
-                                : R.string.menu_pegasus_connect));
+                                ? R.string.menu_board_disconnect_format
+                                : R.string.menu_board_connect_format,
+                        boardType.displayName()));
+    }
+
+    /**
+     * Builds the bridge for {@code type}. Each board keeps its own bridge and transport; this
+     * activity only ever holds one at a time and implements both listener interfaces.
+     */
+    private PhysicalBoardBridge createBoardBridge(BoardType type) {
+        Context app = getApplicationContext();
+        if (type == BoardType.CHESSNUT) {
+            return new ChessnutBoardAdapter(
+                    new ChessnutGameBridge(
+                            new AndroidPegasusBleTransport(app, ChessnutUuids.PROFILE), this));
+        }
+        return new PegasusBoardAdapter(
+                new PegasusGameBridge(new AndroidPegasusBleTransport(app), this));
+    }
+
+    /** Lets the player pick the board type, then reopens the scan dialog for it. */
+    private void showBoardTypeDialog() {
+        BoardType[] types = BoardType.values();
+        String[] labels = new String[types.length];
+        int checked = 0;
+        for (int i = 0; i < types.length; i++) {
+            labels[i] = types[i].displayName();
+            if (types[i] == boardType) {
+                checked = i;
+            }
+        }
+        currentDialog =
+                new MaterialAlertDialogBuilder(this)
+                        .setTitle(R.string.dialog_board_type_title)
+                        .setSingleChoiceItems(
+                                labels,
+                                checked,
+                                (dialog, which) -> {
+                                    dialog.dismiss();
+                                    switchBoardType(types[which]);
+                                })
+                        .setNegativeButton(R.string.action_cancel, null)
+                        .show();
+    }
+
+    /**
+     * Replaces the current bridge with one for {@code type}: the old one is disconnected and shut
+     * down (recording included), the choice is persisted, and the scan dialog reopens.
+     */
+    private void switchBoardType(BoardType type) {
+        if (type != boardType) {
+            // Detach first: a late callback from the old bridge must not be attributed to the
+            // new board (toasts and button label use boardType).
+            board.detachListener();
+            board.shutdown();
+            boardType = type;
+            settings.setBoardType(type);
+            board = createBoardBridge(type);
+            maybeStartPegasusRecording();
+            updatePegasusButtonLabel(board.getConnectionState());
+            updatePegasusMismatchText();
+        }
+        showPegasusScanDialog();
     }
 
     /**
@@ -567,15 +656,14 @@ public class MainActivity extends AppCompatActivity
      * promotion choice there comes from a dialog, not a UCI move string.
      */
     private void applyConfirmedMove(String uci, boolean isEngineMove) {
-        boolean guided =
-                isEngineMove && pegasusBridge.getConnectionState() == ConnectionState.CONNECTED;
+        boolean guided = isEngineMove && board.getConnectionState() == ConnectionState.CONNECTED;
         Square to = Square.valueOf(uci.substring(2, 4).toUpperCase(Locale.ROOT));
         boolean wasCapture = game.pieceAt(to) != Piece.NONE;
         // A guided engine move sounds on physical confirmation, not when applied.
         if (applyUciToGame(uci, !guided)) {
             if (guided) {
-                pegasusBridge.guideEngineMove(uci);
-                if (pegasusBridge.isGuideActive()) {
+                board.guideEngineMove(uci);
+                if (board.isGuideActive()) {
                     engineMoveSoundPending = true;
                     engineMoveWasCapture = wasCapture;
                 } else {
@@ -614,7 +702,7 @@ public class MainActivity extends AppCompatActivity
         return true;
     }
 
-    // ---- PegasusGameBridge.Listener -----------------------------------------
+    // ---- PegasusGameBridge.Listener / ChessnutGameBridge.Listener -------------
 
     @Override
     public void onConnectionStateChanged(ConnectionState state) {
@@ -638,7 +726,7 @@ public class MainActivity extends AppCompatActivity
             // authoritative position on every (re)connect so the board can
             // resume physical play correctly - see PegasusGameBridge
             // .syncBoardToPosition for how a mismatch is then resolved.
-            pegasusBridge.syncBoardToPosition(game.toFen());
+            board.syncBoardToPosition(game.toFen());
             if (mode == GameMode.TRAINING) {
                 // Re-issues the current hint (or resumes book-side play) if a
                 // guide was mid-flight when the board disconnected - without
@@ -646,9 +734,17 @@ public class MainActivity extends AppCompatActivity
                 // to resolve things on its own.
                 maybeAdvanceTraining();
             }
-            Toast.makeText(this, R.string.pegasus_connected, Toast.LENGTH_SHORT).show();
+            Toast.makeText(
+                            this,
+                            getString(R.string.board_connected_format, boardType.displayName()),
+                            Toast.LENGTH_SHORT)
+                    .show();
         } else if (state == ConnectionState.DISCONNECTED) {
-            Toast.makeText(this, R.string.pegasus_disconnected, Toast.LENGTH_SHORT).show();
+            Toast.makeText(
+                            this,
+                            getString(R.string.board_disconnected_format, boardType.displayName()),
+                            Toast.LENGTH_SHORT)
+                    .show();
         }
     }
 
@@ -701,8 +797,7 @@ public class MainActivity extends AppCompatActivity
      * would be left with a screen that ran ahead of the board.
      */
     private boolean pegasusBlocksAutoMoves() {
-        return pegasusBridge.getConnectionState() == ConnectionState.CONNECTED
-                && !pegasusBridge.isBoardInSync();
+        return board.getConnectionState() == ConnectionState.CONNECTED && !board.isBoardInSync();
     }
 
     /**
@@ -723,8 +818,8 @@ public class MainActivity extends AppCompatActivity
     /** Banner + board highlight while the physical board disagrees with the position on screen. */
     private void updatePegasusMismatchText() {
         boolean mismatched =
-                pegasusBridge.getConnectionState() == ConnectionState.CONNECTED
-                        && pegasusBridge.isBoardMismatched();
+                board.getConnectionState() == ConnectionState.CONNECTED
+                        && board.isBoardMismatched();
         if (!mismatched) {
             binding.pegasusMismatchText.setVisibility(View.GONE);
             binding.boardView.setMismatchSquares(java.util.Collections.emptyList());
@@ -732,7 +827,7 @@ public class MainActivity extends AppCompatActivity
         }
         List<Square> squares = new ArrayList<>();
         List<String> names = new ArrayList<>();
-        for (int index : pegasusBridge.mismatchSquares()) {
+        for (int index : board.mismatchSquares()) {
             String name = BoardState.squareName(index);
             names.add(name);
             squares.add(Square.valueOf(name.toUpperCase(Locale.ROOT)));
@@ -771,17 +866,35 @@ public class MainActivity extends AppCompatActivity
 
     @Override
     public void onTransportError(TransportError error, String detail) {
-        Toast.makeText(this, getString(R.string.pegasus_error_format, error), Toast.LENGTH_SHORT)
+        Toast.makeText(
+                        this,
+                        getString(R.string.board_error_format, boardType.displayName(), error),
+                        Toast.LENGTH_SHORT)
                 .show();
     }
 
+    /**
+     * Shared by both listener interfaces. For the Pegasus {@code low} means critically low (the
+     * board shuts down within minutes, per DGT); for the Chessnut it is a plain low-battery hint.
+     */
     @Override
-    public void onBatteryStatus(int percent, boolean criticallyLow) {
-        int messageRes =
-                criticallyLow
-                        ? R.string.pegasus_battery_critical_format
-                        : R.string.pegasus_battery_format;
-        Toast.makeText(this, getString(messageRes, percent), Toast.LENGTH_LONG).show();
+    public void onBatteryStatus(int percent, boolean low) {
+        String message;
+        if (low && boardType == BoardType.PEGASUS) {
+            message = getString(R.string.pegasus_battery_critical_format, percent);
+        } else if (low) {
+            message =
+                    getString(R.string.board_battery_low_format, boardType.displayName(), percent);
+        } else {
+            message = getString(R.string.board_battery_format, boardType.displayName(), percent);
+        }
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+    }
+
+    /** Chessnut only: the board's NEW GAME button opens the same dialog as the on-screen one. */
+    @Override
+    public void onNewGameButton() {
+        showNewGameDialog();
     }
 
     // ---- New game setup ----------------------------------------------------
@@ -965,7 +1078,7 @@ public class MainActivity extends AppCompatActivity
         binding.undoButton.setEnabled(true);
 
         game.reset();
-        pegasusBridge.resetForNewGame();
+        board.resetForNewGame();
         boolean flip =
                 (isPairedEngineMode() && engineSide == Side.WHITE)
                         || (mode == GameMode.TRAINING && chosenSide == Side.BLACK);
@@ -1374,8 +1487,8 @@ public class MainActivity extends AppCompatActivity
      * board is live-connected.
      */
     private void syncPegasusPosition() {
-        if (pegasusBridge.getConnectionState() == ConnectionState.CONNECTED) {
-            pegasusBridge.syncBoardToPosition(game.toFen());
+        if (board.getConnectionState() == ConnectionState.CONNECTED) {
+            board.syncBoardToPosition(game.toFen());
         }
     }
 
@@ -1523,7 +1636,7 @@ public class MainActivity extends AppCompatActivity
         binding.boardView.setCheckedKingSquare(null);
         binding.boardView.setTrainingHint(null, null);
         binding.boardView.clearSelection();
-        pegasusBridge.resetForNewGame();
+        board.resetForNewGame();
         if (engineReady) {
             engine.newGame();
             engine.setFullStrength();
@@ -2238,7 +2351,7 @@ public class MainActivity extends AppCompatActivity
             de.schliweb.pegasus.core.chess.PieceType.BISHOP,
             de.schliweb.pegasus.core.chess.PieceType.KNIGHT,
         };
-        showPromotionPickerDialog(side, which -> pegasusBridge.selectPromotion(types[which]));
+        showPromotionPickerDialog(side, which -> board.selectPromotion(types[which]));
     }
 
     /**
@@ -2301,9 +2414,7 @@ public class MainActivity extends AppCompatActivity
         currentDialog =
                 new MaterialAlertDialogBuilder(this)
                         .setTitle(R.string.pegasus_ambiguous_title)
-                        .setItems(
-                                items,
-                                (dialog, which) -> pegasusBridge.selectCandidate(items[which]))
+                        .setItems(items, (dialog, which) -> board.selectCandidate(items[which]))
                         .setCancelable(false)
                         .show();
     }
@@ -2541,7 +2652,7 @@ public class MainActivity extends AppCompatActivity
      */
     private void scheduleMaiaMove(String bestMoveUci) {
         stopPendingMaiaMove();
-        boolean pegasusConnected = pegasusBridge.getConnectionState() == ConnectionState.CONNECTED;
+        boolean pegasusConnected = board.getConnectionState() == ConnectionState.CONNECTED;
         long elapsedMs = SystemClock.elapsedRealtime() - maiaRequestStartElapsedMs;
         long targetMs =
                 pegasusConnected
@@ -2590,8 +2701,8 @@ public class MainActivity extends AppCompatActivity
         if (soundPlayer != null) {
             soundPlayer.release();
         }
-        if (pegasusBridge != null) {
-            pegasusBridge.shutdown();
+        if (board != null) {
+            board.shutdown();
         }
         super.onDestroy();
     }
@@ -2602,32 +2713,32 @@ public class MainActivity extends AppCompatActivity
     private final class TrainingBoardAdapter implements TrainingFlow.Board {
         @Override
         public boolean isConnected() {
-            return pegasusBridge.getConnectionState() == ConnectionState.CONNECTED;
+            return board.getConnectionState() == ConnectionState.CONNECTED;
         }
 
         @Override
         public boolean isInSync() {
-            return pegasusBridge.isBoardInSync();
+            return board.isBoardInSync();
         }
 
         @Override
         public boolean isGuideActive() {
-            return pegasusBridge.isGuideActive();
+            return board.isGuideActive();
         }
 
         @Override
         public String trackedFen() {
-            return pegasusBridge.trackedFen();
+            return board.trackedFen();
         }
 
         @Override
         public void guideMove(String uci, boolean showLeds) {
-            pegasusBridge.guideEngineMove(uci, showLeds);
+            board.guideEngineMove(uci, showLeds);
         }
 
         @Override
         public void syncToPosition(String fen) {
-            pegasusBridge.syncBoardToPosition(fen);
+            board.syncBoardToPosition(fen);
         }
     }
 

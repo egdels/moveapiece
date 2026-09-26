@@ -7,8 +7,9 @@
     <string name="menu_opening_library">Bibliothèque d\'ouvertures</string>
     <string name="menu_hint">Indice</string>
     <string name="menu_opponent">Adversaire</string>
-    <string name="menu_pegasus_connect">Connecter l\'échiquier Pegasus…</string>
-    <string name="menu_pegasus_disconnect">Déconnecter l\'échiquier Pegasus</string>
+    <string name="menu_board_connect">Connecter l\'échiquier…</string>
+    <string name="menu_board_connect_format">Connecter %1$s…</string>
+    <string name="menu_board_disconnect_format">Déconnecter %1$s</string>
 
     <string name="dialog_new_game_title">Nouvelle partie</string>
     <string name="opponent_human">Humain (2 joueurs)</string>
@@ -83,16 +84,19 @@
     <string name="action_ok">OK</string>
     <string name="action_cancel">Annuler</string>
 
-    <string name="dialog_pegasus_title">Connecter l\'échiquier Pegasus</string>
+    <string name="dialog_board_connect_format">Connecter %1$s</string>
     <string name="pegasus_scan_empty">Recherche d\'appareils…</string>
     <string name="pegasus_scan_failed">Échec de la recherche Bluetooth</string>
-    <string name="pegasus_connected">Échiquier Pegasus connecté</string>
-    <string name="pegasus_disconnected">Échiquier Pegasus déconnecté</string>
+    <string name="board_connected_format">%1$s connecté</string>
+    <string name="board_disconnected_format">%1$s déconnecté</string>
     <string name="pegasus_permission_required">Autorisation Bluetooth requise</string>
     <string name="pegasus_location_required">Activez la localisation pour rechercher des appareils Bluetooth</string>
-    <string name="pegasus_error_format">Erreur Pegasus : %1$s</string>
-    <string name="pegasus_battery_format">Batterie de l\'échiquier Pegasus : %1$d %%</string>
+    <string name="board_error_format">Erreur %1$s : %2$s</string>
+    <string name="board_battery_format">Batterie %1$s : %2$d %%</string>
     <string name="pegasus_battery_critical_format">Batterie de l\'échiquier Pegasus critique (%1$d %%) — extinction imminente</string>
+    <string name="board_battery_low_format">Batterie %1$s faible (%2$d %%)</string>
+    <string name="board_type_button">Type d\'échiquier</string>
+    <string name="dialog_board_type_title">Quel échiquier ?</string>
     <string name="pegasus_board_mismatch">L\'échiquier ne correspond pas à la position — corrigez les pièces selon les LED</string>
     <string name="pegasus_auto_move_held">Le coup de l\'application attend que l\'échiquier corresponde</string>
     <string name="pegasus_mismatch_squares_format">Cases : %1$s</string>

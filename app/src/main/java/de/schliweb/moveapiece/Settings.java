@@ -7,11 +7,12 @@ package de.schliweb.moveapiece;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import de.schliweb.moveapiece.board.BoardType;
 import de.schliweb.moveapiece.engine.MaiaRatings;
 
 /**
- * Persists user-adjustable settings (engine strength, Maia rating, evaluation display) across app
- * restarts.
+ * Persists user-adjustable settings (engine strength, Maia rating, evaluation display, physical
+ * board type) across app restarts.
  */
 final class Settings {
 
@@ -19,6 +20,7 @@ final class Settings {
     private static final String KEY_ENGINE_ELO = "engineElo";
     private static final String KEY_MAIA_RATING = "maiaRating";
     private static final String KEY_EVALUATION_ENABLED = "evaluationEnabled";
+    private static final String KEY_BOARD_TYPE = "boardType";
     private static final int DEFAULT_MAIA_RATING = 1500;
 
     private final SharedPreferences prefs;
@@ -55,5 +57,14 @@ final class Settings {
 
     void setEvaluationDisplayEnabled(boolean enabled) {
         prefs.edit().putBoolean(KEY_EVALUATION_ENABLED, enabled).apply();
+    }
+
+    /** Which physical board the connect button talks to; {@link BoardType#PEGASUS} until chosen. */
+    BoardType getBoardType() {
+        return BoardType.fromKey(prefs.getString(KEY_BOARD_TYPE, null));
+    }
+
+    void setBoardType(BoardType type) {
+        prefs.edit().putString(KEY_BOARD_TYPE, type.key()).apply();
     }
 }

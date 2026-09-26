@@ -7,8 +7,9 @@
     <string name="menu_opening_library">Openingsbibliotheek</string>
     <string name="menu_hint">Hint</string>
     <string name="menu_opponent">Tegenstander</string>
-    <string name="menu_pegasus_connect">Pegasus-bord verbinden…</string>
-    <string name="menu_pegasus_disconnect">Pegasus-bord loskoppelen</string>
+    <string name="menu_board_connect">Bord verbinden…</string>
+    <string name="menu_board_connect_format">%1$s verbinden…</string>
+    <string name="menu_board_disconnect_format">%1$s loskoppelen</string>
 
     <string name="dialog_new_game_title">Nieuw spel</string>
     <string name="opponent_human">Mens (2 spelers)</string>
@@ -83,16 +84,19 @@
     <string name="action_ok">OK</string>
     <string name="action_cancel">Annuleren</string>
 
-    <string name="dialog_pegasus_title">Pegasus-bord verbinden</string>
+    <string name="dialog_board_connect_format">%1$s verbinden</string>
     <string name="pegasus_scan_empty">Apparaten zoeken…</string>
     <string name="pegasus_scan_failed">Bluetooth-zoekopdracht mislukt</string>
-    <string name="pegasus_connected">Pegasus-bord verbonden</string>
-    <string name="pegasus_disconnected">Pegasus-bord losgekoppeld</string>
+    <string name="board_connected_format">%1$s verbonden</string>
+    <string name="board_disconnected_format">%1$s losgekoppeld</string>
     <string name="pegasus_permission_required">Bluetooth-toestemming vereist</string>
     <string name="pegasus_location_required">Zet locatie aan om naar Bluetooth-apparaten te zoeken</string>
-    <string name="pegasus_error_format">Pegasus-fout: %1$s</string>
-    <string name="pegasus_battery_format">Accu Pegasus-bord: %1$d %%</string>
+    <string name="board_error_format">%1$s-fout: %2$s</string>
+    <string name="board_battery_format">Accu %1$s: %2$d %%</string>
     <string name="pegasus_battery_critical_format">Accu Pegasus-bord kritiek laag (%1$d %%) — schakelt binnenkort uit</string>
+    <string name="board_battery_low_format">Accu %1$s bijna leeg (%2$d %%)</string>
+    <string name="board_type_button">Bordtype</string>
+    <string name="dialog_board_type_title">Welk bord?</string>
     <string name="pegasus_board_mismatch">Bord komt niet overeen met de stelling — corrigeer de stukken volgens de leds</string>
     <string name="pegasus_auto_move_held">De zet van de app wacht tot het bord klopt</string>
     <string name="pegasus_mismatch_squares_format">Velden: %1$s</string>
