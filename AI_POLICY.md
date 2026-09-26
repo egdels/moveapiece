@@ -36,7 +36,7 @@ git log --format="%b" | grep -c "Co-Authored-By: Claude"    # AI-assisted commit
 - Sets up and maintains build/CI tooling (Gradle, the three GitHub Actions
   workflows in `.github/workflows/`, formatting and lint checks)
 - Drafts documentation, release notes, and store metadata
-- For the physical DGT Pegasus board integration, drives real-hardware test
+- For the physical board integrations (DGT Pegasus, Chessnut Air), drives real-hardware test
   sessions (over `adb` on Android; directly on the macOS and Windows desktop
   builds) — installing builds, capturing screenshots, reading logs — but
   cannot itself hold or move pieces on a physical board, so those sessions
@@ -84,5 +84,5 @@ runs the Android unit and instrumented tests plus a two-runner
 reproducible-build comparison; `desktop.yml` runs the shared `core` tests
 and the desktop tests (including the Maia golden tests against lc0's
 output) on every supported OS/architecture before packaging. The physical
-Pegasus board integration is additionally verified in real hardware
-sessions with the developer.
+board integrations (DGT Pegasus, Chessnut Air) are additionally verified in
+real hardware sessions with the developer.

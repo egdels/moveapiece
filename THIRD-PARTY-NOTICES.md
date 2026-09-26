@@ -190,3 +190,23 @@ labels, separately verified against real Pegasus hardware:
 
 No binaries from either project are included in this repository or in the
 built app; nothing beyond the protocol facts above was reused.
+
+## Chessnut Air board integration
+
+`chessnut-core/` and the `chessnut/` packages in `app/` and `desktop/` are
+MoveAPiece's own code (GPLv3, same as the rest). The Chessnut Air BLE
+protocol implementation (`ChessnutUuids`, `ChessnutCommands`,
+`ChessnutFrameParser`, `ChessnutBoardReport`, `ChessnutPieceCodes`,
+`ChessnutDevice`) was written from publicly known facts about the board's
+BLE interface — service/characteristic UUIDs, the enable-reports, LED, beep
+and battery commands, the board-report layout and piece codes — as
+circulated in community reverse-engineering notes and consistent with the
+vendor's own published EasyLink SDK. **No source code from any such project
+was copied or translated.** Every fact was then verified against a real
+Chessnut Air with the capture tool in `tools/chessnut-sniffer/`
+(`sniff.py`, a small Python script over the MIT-licensed
+[bleak](https://github.com/hbldh/bleak) library — a development tool only,
+not part of the build or of the shipped apps); the verified protocol is
+written up in `tools/chessnut-sniffer/CHESSNUT_PROTOCOL.md`, and the unit
+tests use frames recorded from the board. No vendor documentation under
+NDA or confidentiality was used.

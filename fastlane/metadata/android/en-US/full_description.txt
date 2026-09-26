@@ -4,8 +4,8 @@ a bundled neural network – fully offline, without accounts, without
 network access, and without proprietary services.
 
 Optionally, MoveAPiece can connect via Bluetooth LE to a physical
-DGT Pegasus chess board, so you can play against Stockfish on a real
-board instead of on the screen.
+chess board – a DGT Pegasus or a Chessnut Air – so you can play against
+Stockfish or Maia on a real board instead of on the screen.
 
 Features:
 
@@ -29,9 +29,12 @@ Features:
 * Move, capture, and check sound effects
 * Portrait and landscape orientation
 * Available in German, English, French, Spanish, Italian, and Dutch
-* Support for physical boards (DGT Pegasus, BLE): moves on the board
-  are automatically detected and applied, and Stockfish's responses
-  are shown via LEDs on the board. Full touchscreen control remains
-  available at all times.
+* Support for physical boards (DGT Pegasus and Chessnut Air, BLE):
+  moves on the board are automatically detected and applied, and the
+  opponent's replies are shown via LEDs on the board. The Chessnut Air
+  additionally recognises each piece, so promotions need no dialog, a
+  position set up on the board can be taken over into the game, and
+  move sounds come from the board's speaker. Full touchscreen control
+  remains available at all times.
 
 MoveAPiece is licensed under the GPLv3.
