@@ -59,7 +59,8 @@ OSes), so you can play Stockfish on a real board instead of tapping the screen.
     are recognised directly (set the promoted piece down, no dialog), a
     position set up on the board can be taken over into the game (tap the
     mismatch banner), move sounds play on the board's own speaker, and its
-    NEW GAME button opens the new-game dialog. Hardware-verified on Android
+    NEW GAME button restarts what was last played (the same training line,
+    or a fresh game against the same opponent). Hardware-verified on Android
     and macOS; Windows and Linux share the same transports and are
     expected to work but are not yet verified.
 

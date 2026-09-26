@@ -66,6 +66,7 @@ import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ChoiceDialog;
+import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Slider;
@@ -304,6 +305,10 @@ final class GameController
     private Mode mode = Mode.HUMAN_VS_STOCKFISH;
     private Side humanSide = Side.WHITE;
     private TrainingSession trainingSession;
+    // Closes the modal dialog currently blocking in showAndWait (see #showTracked), so the
+    // board's NEW GAME button can dismiss it - the desktop counterpart of the Android app's
+    // currentDialog. Null while no tracked modal is open.
+    private Runnable closeCurrentModal;
 
     /**
      * The opening trainer's move flow (shared with Android, tested in core's TrainingFlowTest);
@@ -743,7 +748,7 @@ final class GameController
         Scene scene = new Scene(content);
         Styles.apply(scene);
         dialog.setScene(scene);
-        dialog.showAndWait();
+        showTracked(dialog);
         return result[0];
     }
 
@@ -877,7 +882,7 @@ final class GameController
         dialog.setHeaderText(null);
         dialog.setContentText(Messages.get("pegasus_ambiguous_title"));
         Styles.apply(dialog.getDialogPane());
-        dialog.showAndWait().ifPresent(pegasusBridge::selectCandidate);
+        showTracked(dialog).ifPresent(pegasusBridge::selectCandidate);
     }
 
     // ---- DesktopPegasusGameBridge.Listener / DesktopChessnutGameBridge.Listener --------
@@ -1069,7 +1074,7 @@ final class GameController
         ButtonType black = new ButtonType(Messages.get("color_black"), ButtonBar.ButtonData.NO);
         alert.getButtonTypes().setAll(white, black, ButtonType.CANCEL);
         Styles.apply(alert.getDialogPane());
-        alert.showAndWait()
+        showTracked(alert)
                 .ifPresent(
                         choice -> {
                             if (choice == white) {
@@ -1189,10 +1194,65 @@ final class GameController
         updatePegasusMismatchLabel();
     }
 
-    /** Chessnut only: the board's NEW GAME button opens the same setup dialog as the button. */
+    /**
+     * Chessnut only: the board's NEW GAME button restarts whatever was last played - the same
+     * training line once more, or a fresh game against the same opponent (Stockfish or Maia) with
+     * the same colours - so a rematch never needs the mouse. Changing the setup stays with the "New
+     * Game" menu. An open modal dialog (game over, training complete, game setup, promotion, ...)
+     * is closed first so it cannot act on the game it was shown for; its showAndWait then returns
+     * empty (or, for the promotion prompt, no piece).
+     */
     @Override
     public void onNewGameButton() {
-        openGameSetupDialog();
+        if (closeCurrentModal != null) {
+            closeCurrentModal.run();
+        }
+        restartLastActivity();
+    }
+
+    /** Same recipe as the training-complete dialog's "Repeat", generalised to every mode. */
+    private void restartLastActivity() {
+        switch (mode) {
+            case TRAINING -> {
+                if (trainingSession != null) {
+                    startTraining(
+                            trainingSession.line(),
+                            trainingSession.humanSide(),
+                            trainingSession.hintsEnabled());
+                } else {
+                    startHumanVsHuman();
+                }
+            }
+            case HUMAN_VS_STOCKFISH -> startStockfishGame(humanSide);
+            case HUMAN_VS_MAIA -> startMaiaGame(humanSide, currentMaiaRating);
+            case HUMAN_VS_HUMAN -> startHumanVsHuman();
+        }
+    }
+
+    /**
+     * Runs a modal dialog, remembering how to close it in {@link #closeCurrentModal} for as long as
+     * it blocks so {@link #onNewGameButton} can dismiss it from the board. Every modal in this
+     * controller goes through here (or the {@link Stage} overload) for that reason.
+     */
+    private <T> Optional<T> showTracked(Dialog<T> dialog) {
+        Runnable previous = closeCurrentModal;
+        closeCurrentModal = dialog::close;
+        try {
+            return dialog.showAndWait();
+        } finally {
+            closeCurrentModal = previous;
+        }
+    }
+
+    /** {@link #showTracked(Dialog)} for a hand-built modal {@link Stage} (the promotion prompt). */
+    private void showTracked(Stage modal) {
+        Runnable previous = closeCurrentModal;
+        closeCurrentModal = modal::close;
+        try {
+            modal.showAndWait();
+        } finally {
+            closeCurrentModal = previous;
+        }
     }
 
     /**
@@ -1609,7 +1669,7 @@ final class GameController
         reportArea.setPrefSize(420, 320);
         alert.getDialogPane().setContent(reportArea);
         Styles.apply(alert.getDialogPane());
-        alert.showAndWait();
+        showTracked(alert);
     }
 
     /**
@@ -1702,7 +1762,7 @@ final class GameController
      * stays out of it: it's a live sidebar slider on desktop, not a one-time setup choice.
      */
     private void openGameSetupDialog() {
-        GameSetupDialog.show(stage).ifPresent(this::applyGameSetupChoice);
+        showTracked(GameSetupDialog.create(stage)).ifPresent(this::applyGameSetupChoice);
     }
 
     private void applyGameSetupChoice(GameSetupDialog.Choice choice) {
@@ -2189,7 +2249,7 @@ final class GameController
         alert.setHeaderText(null);
         alert.setContentText(statusText());
         Styles.apply(alert.getDialogPane());
-        alert.showAndWait();
+        showTracked(alert);
     }
 
     // ---- opening trainer ------------------------------------------------------
@@ -2340,7 +2400,7 @@ final class GameController
         closeButton.setVisible(false);
         closeButton.setManaged(false);
 
-        Optional<ButtonType> result = alert.showAndWait();
+        Optional<ButtonType> result = showTracked(alert);
         if (result.isEmpty() || result.get() == ButtonType.CLOSE) {
             return;
         }
@@ -2381,7 +2441,7 @@ final class GameController
         dialog.setHeaderText(null);
         dialog.setContentText(Messages.get("continue_free_play_prompt"));
         Styles.apply(dialog.getDialogPane());
-        Optional<OpponentOption> choice = dialog.showAndWait();
+        Optional<OpponentOption> choice = showTracked(dialog);
         if (choice.isEmpty()) {
             return;
         }
@@ -2510,7 +2570,7 @@ final class GameController
         dialog.setHeaderText(null);
         dialog.setContentText(Messages.get("pgn_select_game_message"));
         Styles.apply(dialog.getDialogPane());
-        dialog.showAndWait().ifPresent(option -> finishPgnImport(games.get(option.index())));
+        showTracked(dialog).ifPresent(option -> finishPgnImport(games.get(option.index())));
     }
 
     private void finishPgnImport(String pgnText) {
@@ -2581,7 +2641,7 @@ final class GameController
         alert.setHeaderText(null);
         alert.setContentText(message);
         Styles.apply(alert.getDialogPane());
-        alert.showAndWait();
+        showTracked(alert);
     }
 
     // ---- engine lifecycle -----------------------------------------------------

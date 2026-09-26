@@ -1024,10 +1024,35 @@ public class MainActivity extends AppCompatActivity
         updatePegasusMismatchText();
     }
 
-    /** Chessnut only: the board's NEW GAME button opens the same dialog as the on-screen one. */
+    /**
+     * Chessnut only: the board's NEW GAME button restarts whatever was last played - the same
+     * training line once more, or a fresh game against the same opponent (Stockfish or Maia) with
+     * the same colours - so a rematch never needs the phone in hand. Changing the setup stays with
+     * the on-screen New Game button. Any open dialog (training complete, new game, ...) is
+     * dismissed first so it cannot act on the game it was shown for.
+     */
     @Override
     public void onNewGameButton() {
-        showNewGameDialog();
+        if (currentDialog != null && currentDialog.isShowing()) {
+            currentDialog.dismiss();
+        }
+        restartLastActivity();
+    }
+
+    /** Same recipe as the training-complete dialog's "Repeat", generalised to every mode. */
+    private void restartLastActivity() {
+        if (mode == GameMode.TRAINING && trainingSession != null) {
+            startNewGame(
+                    GameMode.TRAINING,
+                    trainingSession.humanSide(),
+                    engineElo,
+                    currentMaiaRating,
+                    trainingSession.line(),
+                    trainingSession.hintsEnabled());
+        } else {
+            GameMode restartMode = mode == GameMode.TRAINING ? GameMode.HUMAN : mode;
+            startNewGame(restartMode, engineSide, engineElo, currentMaiaRating, null, false);
+        }
     }
 
     // ---- New game setup ----------------------------------------------------

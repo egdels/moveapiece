@@ -11,7 +11,6 @@ import de.schliweb.moveapiece.training.OpeningRepository;
 import de.schliweb.moveapiece.training.OpeningSearch;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.scene.Node;
@@ -54,7 +53,11 @@ final class GameSetupDialog {
 
     private GameSetupDialog() {}
 
-    static Optional<Choice> show(Stage owner) {
+    /**
+     * Builds the dialog without showing it; the caller runs {@code showAndWait()} so it can keep
+     * track of the open dialog (see {@code GameController#showTracked}).
+     */
+    static Dialog<Choice> create(Stage owner) {
         List<OpeningLine> allLines = OpeningRepository.ALL;
         List<String> allDisplayNames = new ArrayList<>();
         for (OpeningLine line : allLines) {
@@ -201,6 +204,6 @@ final class GameSetupDialog {
                     return new Choice(opponent, side, opening, hintsBox.isSelected());
                 });
 
-        return dialog.showAndWait();
+        return dialog;
     }
 }
