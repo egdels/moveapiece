@@ -28,6 +28,7 @@ import android.os.Looper;
 import android.os.ParcelUuid;
 import android.util.Log;
 import androidx.core.location.LocationManagerCompat;
+import de.schliweb.pegasus.core.transport.BleProfile;
 import de.schliweb.pegasus.core.transport.ConnectionState;
 import de.schliweb.pegasus.core.transport.DeviceRegistry;
 import de.schliweb.pegasus.core.transport.DiscoveredDevice;
@@ -48,6 +49,11 @@ import java.util.concurrent.ScheduledExecutorService;
  * Android implementation of {@link PegasusTransport} on top of the official BLE APIs. Raw bytes
  * only — no DGT message interpretation (phase 1 boundary).
  *
+ * <p>Which characteristics to write to and subscribe to comes from a {@link BleProfile}; the
+ * no-argument constructor keeps the original Pegasus behaviour, the Chessnut Air passes its own
+ * profile with two subscriptions. The transport reports CONNECTED once every subscription of the
+ * profile is enabled.
+ *
  * <p>Uses the application context only; no Activity references are kept (lifecycle notes:
  * docs/ANDROID_BLE.md).
  */
@@ -59,6 +65,7 @@ public final class AndroidPegasusBleTransport implements PegasusTransport {
     private static final int REQUESTED_MTU = 247;
 
     private final Context context;
+    private final BleProfile profile;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
     private final GattOperationQueue operationQueue = new GattOperationQueue(scheduler);
@@ -71,15 +78,26 @@ public final class AndroidPegasusBleTransport implements PegasusTransport {
 
     private BluetoothGatt gatt;
     private BluetoothGattCharacteristic writeCharacteristic;
-    private BluetoothGattCharacteristic notifyCharacteristic;
+    private List<BluetoothGattCharacteristic> notifyCharacteristics = new ArrayList<>();
+    private int subscribedCount;
     private String currentAddress;
     private ScanCallback activeScanCallback;
     private Runnable scanTimeoutRunnable;
     private Runnable connectTimeoutRunnable;
     private final List<String> gattDiagnostics = new ArrayList<>();
 
+    /** Transport for a DGT Pegasus ({@link BleProfile#PEGASUS}). */
     public AndroidPegasusBleTransport(Context context) {
+        this(context, BleProfile.PEGASUS);
+    }
+
+    /** Transport for whichever board {@code profile} describes. */
+    public AndroidPegasusBleTransport(Context context, BleProfile profile) {
+        if (profile == null) {
+            throw new IllegalArgumentException("profile must not be null");
+        }
         this.context = context.getApplicationContext();
+        this.profile = profile;
     }
 
     @Override
@@ -383,33 +401,53 @@ public final class AndroidPegasusBleTransport implements PegasusTransport {
                         return;
                     }
                     logGattStructure(g);
-                    BluetoothGattService uart =
-                            g.getService(UUID.fromString(PegasusUuids.UART_SERVICE));
-                    if (uart == null) {
+                    BluetoothGattService writeService =
+                            g.getService(UUID.fromString(profile.writeServiceUuid()));
+                    if (writeService == null) {
                         emitError(
                                 TransportError.SERVICE_NOT_FOUND,
-                                "Nordic UART service not present on this device");
+                                profile.displayName()
+                                        + " service "
+                                        + profile.writeServiceUuid()
+                                        + " not present on this device");
                         handleUnexpectedDisconnect();
                         return;
                     }
                     writeCharacteristic =
-                            uart.getCharacteristic(
-                                    UUID.fromString(PegasusUuids.UART_WRITE_CHARACTERISTIC));
-                    notifyCharacteristic =
-                            uart.getCharacteristic(
-                                    UUID.fromString(PegasusUuids.UART_NOTIFY_CHARACTERISTIC));
-                    if (writeCharacteristic == null || notifyCharacteristic == null) {
+                            writeService.getCharacteristic(
+                                    UUID.fromString(profile.writeCharacteristicUuid()));
+                    List<BluetoothGattCharacteristic> notifies = new ArrayList<>();
+                    for (BleProfile.Subscription sub : profile.subscriptions()) {
+                        BluetoothGattService service =
+                                g.getService(UUID.fromString(sub.serviceUuid()));
+                        BluetoothGattCharacteristic ch =
+                                service == null
+                                        ? null
+                                        : service.getCharacteristic(
+                                                UUID.fromString(sub.characteristicUuid()));
+                        if (ch != null) {
+                            notifies.add(ch);
+                        }
+                    }
+                    if (writeCharacteristic == null
+                            || notifies.size() != profile.subscriptions().size()) {
                         emitError(
                                 TransportError.CHARACTERISTIC_NOT_FOUND,
                                 "write="
                                         + (writeCharacteristic != null)
                                         + " notify="
-                                        + (notifyCharacteristic != null));
+                                        + notifies.size()
+                                        + "/"
+                                        + profile.subscriptions().size());
                         handleUnexpectedDisconnect();
                         return;
                     }
+                    notifyCharacteristics = notifies;
+                    subscribedCount = 0;
                     setState(ConnectionState.SUBSCRIBING);
-                    enableNotifications(g, notifyCharacteristic);
+                    for (BluetoothGattCharacteristic ch : notifies) {
+                        enableNotifications(g, ch);
+                    }
                 }
 
                 @Override
@@ -418,7 +456,17 @@ public final class AndroidPegasusBleTransport implements PegasusTransport {
                     operationQueue.operationCompleted();
                     if (PegasusUuids.CCCD.equalsIgnoreCase(descriptor.getUuid().toString())) {
                         if (status == BluetoothGatt.GATT_SUCCESS) {
-                            Log.i(TAG, "Notifications enabled");
+                            subscribedCount++;
+                            Log.i(
+                                    TAG,
+                                    "Notifications enabled ("
+                                            + subscribedCount
+                                            + "/"
+                                            + notifyCharacteristics.size()
+                                            + ")");
+                            if (subscribedCount < notifyCharacteristics.size()) {
+                                return; // the queue starts the next subscription
+                            }
                             cancelConnectTimeout();
                             reconnectPolicy.onConnected();
                             setState(ConnectionState.CONNECTED);
@@ -618,7 +666,8 @@ public final class AndroidPegasusBleTransport implements PegasusTransport {
 
     private void closeGattQuietly() {
         writeCharacteristic = null;
-        notifyCharacteristic = null;
+        notifyCharacteristics = new ArrayList<>();
+        subscribedCount = 0;
         if (gatt != null) {
             try {
                 gatt.close();
