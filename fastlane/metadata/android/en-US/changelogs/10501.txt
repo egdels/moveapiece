@@ -1,0 +1,4 @@
+Smaller app, no functional changes.
+
+* The release build now removes unused library code (R8 shrinking),
+  as requested in the F-Droid review.

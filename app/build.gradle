@@ -99,7 +99,12 @@ android {
 
     buildTypes {
         release {
-            minifyEnabled false
+            // R8 as a shrinker only (see proguard-rules.pro: -dontobfuscate):
+            // unused dependency code is dropped, names stay readable, and
+            // the code that round-trips enum names (Settings, chesslib's
+            // Square.valueOf) keeps working. Requested by F-Droid review.
+            minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             // Deterministic-build hygiene: strip VCS metadata so the APK does not
             // depend on checkout details (dirty state, remote URL, etc.) that could
