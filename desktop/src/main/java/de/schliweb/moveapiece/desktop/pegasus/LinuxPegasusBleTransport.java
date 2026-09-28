@@ -64,14 +64,14 @@ import org.freedesktop.dbus.types.Variant;
  * characteristics, and this transport is not yet hardware-verified.
  *
  * <p>Connect attempts are numbered ({@link #connectGeneration}): {@link #doConnect} runs on the
- * worker long after Java may have given the attempt up (BlueZ's {@code Connected=false} signal,
- * the connect timeout, a manual disconnect, or the reconnect that follows any of those), and the
+ * worker long after Java may have given the attempt up (BlueZ's {@code Connected=false} signal, the
+ * connect timeout, a manual disconnect, or the reconnect that follows any of those), and the
  * blocking {@code ServicesResolved} poll alone can keep it busy for up to {@link
  * #servicesResolvedTimeoutMs}. A superseded attempt must neither report anything - its
- * SERVICE_NOT_FOUND would be counted as yet another failed reconnect - nor hold the worker
- * longer than one poll interval, since the next attempt queues behind it. The equivalent guard in
- * {@code PegasusBleWin.cpp} covers the same race on Windows, where it additionally protected the
- * shared device handle; here the single-thread worker already prevents that part.
+ * SERVICE_NOT_FOUND would be counted as yet another failed reconnect - nor hold the worker longer
+ * than one poll interval, since the next attempt queues behind it. The equivalent guard in {@code
+ * PegasusBleWin.cpp} covers the same race on Windows, where it additionally protected the shared
+ * device handle; here the single-thread worker already prevents that part.
  */
 public final class LinuxPegasusBleTransport implements PegasusTransport {
 
@@ -82,8 +82,10 @@ public final class LinuxPegasusBleTransport implements PegasusTransport {
     private static final long SCAN_POLL_INTERVAL_MS = 1000;
 
     private final BlueZAccess blueZ;
+
     /** Where every state/listener update runs: the JavaFX Application Thread in production. */
     private final Executor uiThread;
+
     private final long connectTimeoutMs;
     private final long servicesResolvedTimeoutMs;
     private final AbstractPropertiesChangedHandler propertiesHandler =
@@ -121,6 +123,7 @@ public final class LinuxPegasusBleTransport implements PegasusTransport {
     private final BleProfile profile;
     private ScheduledFuture<?> connectTimeoutTask;
     private ScheduledFuture<?> reconnectTask;
+
     /** See the class Javadoc; bumped on every new attempt and whenever one is given up. */
     private final AtomicInteger connectGeneration = new AtomicInteger();
 
@@ -221,8 +224,7 @@ public final class LinuxPegasusBleTransport implements PegasusTransport {
         try {
             while (scanning && System.currentTimeMillis() < deadline) {
                 blueZ.findBtDevicesByIntrospection(adapter);
-                for (BluetoothDevice device :
-                        blueZ.getDevices(adapter.getAddress(), true)) {
+                for (BluetoothDevice device : blueZ.getDevices(adapter.getAddress(), true)) {
                     if (reported.add(device.getAddress())) {
                         DiscoveredDevice found =
                                 new DiscoveredDevice(

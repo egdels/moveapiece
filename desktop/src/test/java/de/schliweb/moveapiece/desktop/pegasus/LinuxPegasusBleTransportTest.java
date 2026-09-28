@@ -89,8 +89,9 @@ public class LinuxPegasusBleTransportTest {
         // Services never resolve on the first link; the board drops it mid-discovery.
         device.resolveServicesOnConnect = false;
         transport.connect(ADDRESS);
-        await("DISCOVERING_SERVICES", () -> transport.getConnectionState()
-                == ConnectionState.DISCOVERING_SERVICES);
+        await(
+                "DISCOVERING_SERVICES",
+                () -> transport.getConnectionState() == ConnectionState.DISCOVERING_SERVICES);
         assertEquals(1, device.connectCalls.get());
 
         device.resolveServicesOnConnect = true; // the next link will be fine
@@ -120,8 +121,9 @@ public class LinuxPegasusBleTransportTest {
     public void manualDisconnectDuringDiscoveryEndsTheAttemptSilently() throws Exception {
         device.resolveServicesOnConnect = false;
         transport.connect(ADDRESS);
-        await("DISCOVERING_SERVICES", () -> transport.getConnectionState()
-                == ConnectionState.DISCOVERING_SERVICES);
+        await(
+                "DISCOVERING_SERVICES",
+                () -> transport.getConnectionState() == ConnectionState.DISCOVERING_SERVICES);
 
         transport.disconnect();
         assertEquals(ConnectionState.DISCONNECTED, transport.getConnectionState());
@@ -129,7 +131,8 @@ public class LinuxPegasusBleTransportTest {
         Thread.sleep(SERVICES_RESOLVED_TIMEOUT_MS + 200);
         assertTrue("no error at all, got " + listener.errors, listener.errors.isEmpty());
         assertEquals(ConnectionState.DISCONNECTED, transport.getConnectionState());
-        assertFalse("nothing reported CONNECTED", listener.states.contains(ConnectionState.CONNECTED));
+        assertFalse(
+                "nothing reported CONNECTED", listener.states.contains(ConnectionState.CONNECTED));
         assertFalse("link released", device.connected.get());
         assertEquals(1, device.connectCalls.get());
     }
@@ -271,7 +274,8 @@ public class LinuxPegasusBleTransportTest {
             super(null, null, "/org/bluez/hci0/dev_" + address.replace(':', '_'), null);
             this.address = address;
             List<BleProfile.Subscription> subs = profile.subscriptions();
-            serviceFor(profile.writeServiceUuid()).addCharacteristic(profile.writeCharacteristicUuid());
+            serviceFor(profile.writeServiceUuid())
+                    .addCharacteristic(profile.writeCharacteristicUuid());
             for (BleProfile.Subscription sub : subs) {
                 serviceFor(sub.serviceUuid()).addCharacteristic(sub.characteristicUuid());
             }
