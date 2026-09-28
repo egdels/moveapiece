@@ -265,6 +265,10 @@ public final class WindowsPegasusBleTransport implements PegasusTransport {
         emitError(TransportError.DISCONNECTED_UNEXPECTEDLY, "state=" + state);
         if (currentAddress != null && reconnectPolicy.shouldReconnect()) {
             setState(ConnectionState.RECONNECTING);
+            // A second DISCONNECTED while already RECONNECTING (WinRT can
+            // report one natively on top of our own explicit one) must not
+            // leave two timers racing to nativeConnect the same address.
+            cancelReconnectTask();
             reconnectTask =
                     scheduler.schedule(
                             () ->
