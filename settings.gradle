@@ -5,6 +5,12 @@ pluginManagement {
         gradlePluginPortal()
     }
 }
+plugins {
+    // Lets Gradle auto-download a JDK when a task asks for a toolchain
+    // version that isn't installed (see the `run` pin in desktop/build.gradle).
+    id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
+}
+
 dependencyResolutionManagement {
     repositoriesMode = RepositoriesMode.FAIL_ON_PROJECT_REPOS
     repositories {

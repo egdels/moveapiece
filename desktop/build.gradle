@@ -24,13 +24,18 @@ application {
 // The javafx plugin makes `run` launch via --module-path, and the module
 // system enforces the module descriptor's version strictly, so `run` fails
 // under JDK <22 with "Unsupported major.minor version 66.0" even before
-// any class gets loaded. Pin just this task to a JDK new enough for that;
-// jpackageAppImage doesn't need this pin since it packages in classpath
-// mode (see packaging.gradle) and never touches the module path - it just
-// needs *a* JDK >=22 to build with, which desktop.yml's setup-java provides.
-tasks.named('run', JavaExec) {
-    javaLauncher = javaToolchains.launcherFor {
-        languageVersion = JavaLanguageVersion.of(23)
+// any class gets loaded. If the JVM running Gradle is already new enough,
+// `run` just uses it (JavaExec's default); otherwise pin the task to a
+// JDK 23 toolchain, which the Foojay resolver in settings.gradle can
+// auto-provision when none is installed. jpackageAppImage doesn't need
+// any of this since it packages in classpath mode (see packaging.gradle)
+// and never touches the module path - it just needs *a* JDK >=22 to build
+// with, which desktop.yml's setup-java provides.
+if (JavaVersion.current() < JavaVersion.VERSION_22) {
+    tasks.named('run', JavaExec) {
+        javaLauncher = javaToolchains.launcherFor {
+            languageVersion = JavaLanguageVersion.of(23)
+        }
     }
 }
 
