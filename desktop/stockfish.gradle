@@ -12,13 +12,15 @@
  * built binary; DesktopApp points Stockfish at them via
  * "setoption name EvalFile/EvalFileSmall value <path>", same as Android.
  *
- * Host coverage: only the macOS branch below has actually been built and
- * run in this project so far. The Linux and Windows branches follow the
- * same pattern (see app/stockfish.gradle's ABI table for the analogous
- * Android mapping) but are unverified - building/testing them on those
- * hosts (and adding CI coverage) is explicit follow-up work, not done here.
- * Windows in particular needs a MinGW toolchain (COMP=mingw) that this
- * script does not attempt to locate.
+ * Host coverage: macOS, Linux and Windows are all built in CI
+ * (.github/workflows/desktop.yml). macOS/Linux expect make, the system
+ * compiler and xz on PATH. Windows drives the Makefile with COMP=mingw and
+ * needs GNU make, MinGW-w64 g++ (x86_64-w64-mingw32-c++) plus the MSYS
+ * shell utilities the Makefile shells out to (uname, which, ...). CI runs
+ * Gradle inside an msys2 shell so those are on PATH already; a build
+ * launched from an IDE or a plain terminal on a dev box normally has none
+ * of them, so when `make` is not on PATH this script locates the MSYS2
+ * install itself (see the toolchain lookup below).
  *
  * Concurrency note: this shares the *same* Stockfish source checkout as
  * app/stockfish.gradle (object files, linked executable live in that one
@@ -51,10 +53,70 @@ def sha256Of = { File f ->
     md.digest().collect { String.format('%02x', it) }.join()
 }
 
+// Native toolchain lookup (see the "Host coverage" note above). On Windows,
+// when `make` is not already on PATH, find an MSYS2 install - in order:
+// -Pmsys2.root=<dir>, the MSYS2_ROOT environment variable, the default
+// C:\msys64 - and run make/xz from there with its MINGW64 and MSYS bin dirs
+// put first on PATH so g++/x86_64-w64-mingw32-c++/uname/which resolve.
+// CreateProcess resolves a bare program name against the *parent* process's
+// PATH, not the child environment set below, hence the absolute paths
+// returned by resolveTool.
+def os = org.gradle.internal.os.OperatingSystem.current()
+def exeSuffix = os.isWindows() ? '.exe' : ''
+def onPath = { String name ->
+    (System.getenv('PATH') ?: '').split(java.util.regex.Pattern.quote(File.pathSeparator))
+        .any { dir -> dir && new File(dir, name + exeSuffix).isFile() }
+}
+def msys2Candidates = [findProperty('msys2.root'), System.getenv('MSYS2_ROOT'), 'C:\\msys64']
+    .findAll { it }.collect { file(it.toString()) }
+def toolBinDirs = []
+def toolEnv = [:]
+if (os.isWindows() && !onPath('make')) {
+    def msys2Root = msys2Candidates.find { new File(it, 'usr/bin/make.exe').isFile() }
+    if (msys2Root != null) {
+        toolBinDirs = [new File(msys2Root, 'mingw64/bin'), new File(msys2Root, 'usr/bin')]
+        toolEnv = [
+            PATH: (toolBinDirs*.absolutePath + [System.getenv('PATH') ?: '']).join(File.pathSeparator),
+            MSYSTEM: 'MINGW64',
+        ]
+    }
+}
+// The Gradle daemon can leave both "Path" and "PATH" in the environment it
+// hands to ProcessBuilder (the JDK's case-insensitive map is replaced when
+// the daemon adopts the connecting client's environment). A plain put()
+// would then update only one of them and the child may read the other, so
+// drop every case variant before setting ours.
+def applyToolEnv = { ProcessBuilder pb ->
+    def env = pb.environment()
+    toolEnv.each { k, v ->
+        env.keySet().removeAll { it.equalsIgnoreCase(k.toString()) }
+        env.put(k.toString(), v.toString())
+    }
+}
+def resolveTool = { String name ->
+    def found = toolBinDirs.collect { new File(it, name + exeSuffix) }.find { it.isFile() }
+    found != null ? found.absolutePath : name
+}
+def toolchainHint = { String name ->
+    if (!os.isWindows()) {
+        return "'${name}' was not found on PATH; install it (macOS: Xcode command line tools + xz, Linux: build-essential + xz-utils)."
+    }
+    "'${name}' was not found on PATH and no MSYS2 install was found at " +
+        "${msys2Candidates*.absolutePath.join(', ')}. Install MSYS2 (https://www.msys2.org) and run " +
+        "'pacman -S mingw-w64-x86_64-toolchain make xz' in it, or point -Pmsys2.root=<dir> / MSYS2_ROOT at an existing install."
+}
+
 def decompressXz = { File src, File dest ->
-    def pb = new ProcessBuilder(['xz', '-dc', src.absolutePath])
+    def xz = resolveTool('xz')
+    def pb = new ProcessBuilder([xz, '-dc', src.absolutePath])
+    applyToolEnv(pb)
     pb.redirectOutput(dest)
-    Process proc = pb.start()
+    Process proc
+    try {
+        proc = pb.start()
+    } catch (IOException e) {
+        throw new GradleException("Cannot run '${xz}': ${e.message}. ${toolchainHint('xz')}", e)
+    }
     int exitCode = proc.waitFor()
     if (exitCode != 0) {
         throw new GradleException("xz decompression failed for ${src.name} (exit ${exitCode})")
@@ -64,9 +126,16 @@ def decompressXz = { File src, File dest ->
 def runProcess = { List<String> cmd, File workDir, Map<String, String> env ->
     def pb = new ProcessBuilder(cmd.collect { it.toString() })
     pb.directory(workDir)
+    applyToolEnv(pb)
     env.each { k, v -> pb.environment().put(k.toString(), v.toString()) }
     pb.redirectErrorStream(true)
-    Process proc = pb.start()
+    Process proc
+    try {
+        proc = pb.start()
+    } catch (IOException e) {
+        def tool = new File(cmd[0].toString()).name - exeSuffix
+        throw new GradleException("Cannot run '${cmd[0]}': ${e.message}. ${toolchainHint(tool)}", e)
+    }
     proc.inputStream.eachLine { logger.lifecycle(it) }
     int exitCode = proc.waitFor()
     if (exitCode != 0) {
@@ -110,7 +179,6 @@ tasks.register('downloadNnueNets') {
 
 // Host OS/arch -> Stockfish ARCH value (see stockfishSrcDir/Makefile's
 // `help` target for the full list) and output directory naming.
-def os = org.gradle.internal.os.OperatingSystem.current()
 def hostArch = System.getProperty('os.arch')
 def isArm = hostArch == 'aarch64' || hostArch == 'arm64'
 
@@ -143,7 +211,16 @@ project.ext.stockfishExeName = exeName
 
 tasks.register('buildStockfishHost') {
     dependsOn 'downloadNnueNets'
-    inputs.dir(stockfishSrcDir)
+    // Only the actual sources, not the whole directory: the build itself
+    // drops files into src/ that survive `make objclean` (the copied NNUE
+    // nets, .depend, and on MinGW the LTO link's -save-temps residue such as
+    // stockfish.ltrans*/stockfish.res, which differs on every build).
+    // Snapshotting those as inputs made the task never up to date, so
+    // Stockfish was recompiled on every :desktop:run.
+    inputs.files(fileTree(stockfishSrcDir) {
+        include '**/*.cpp', '**/*.h', 'Makefile'
+    }).withPropertyName('stockfishSources').withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.dir(file("$rootDir/app/src/main/cpp/stockfish/scripts")).withPropertyName('stockfishScripts')
     inputs.property('sfArch', sfArch)
     inputs.property('compVar', compVar ?: '')
     outputs.file(outFile)
@@ -157,13 +234,17 @@ tasks.register('buildStockfishHost') {
         }
 
         def env = [:]
-        def makeArgs = ['make', '-j4', "ARCH=${sfArch}".toString(), 'EXTRACXXFLAGS=-DNNUE_EMBEDDING_OFF']
+        def make = resolveTool('make')
+        if (toolBinDirs) {
+            logger.lifecycle("Using MSYS2 toolchain from ${toolBinDirs*.absolutePath.join(File.pathSeparator)}")
+        }
+        def makeArgs = [make, '-j4', "ARCH=${sfArch}".toString(), 'EXTRACXXFLAGS=-DNNUE_EMBEDDING_OFF']
         if (compVar) {
             makeArgs << "COMP=${compVar}".toString()
         }
         makeArgs << 'build'
 
-        runProcess(['make', 'objclean'], stockfishSrcDir, env)
+        runProcess([make, 'objclean'], stockfishSrcDir, env)
         runProcess(makeArgs, stockfishSrcDir, env)
 
         def builtExe = new File(stockfishSrcDir, exeName)
@@ -180,7 +261,7 @@ tasks.register('buildStockfishHost') {
         }
 
         // Leave the shared src/ dir clean, see the concurrency note above.
-        runProcess(['make', 'objclean'], stockfishSrcDir, env)
+        runProcess([make, 'objclean'], stockfishSrcDir, env)
     }
 }
 
@@ -192,7 +273,11 @@ tasks.register('writeStockfishHomeProperties') {
     outputs.file(stockfishHomeProps)
     doLast {
         stockfishHomeProps.parentFile.mkdirs()
-        stockfishHomeProps.text = "stockfish.home=${outDir.absolutePath}\nstockfish.exe=${exeName}\n"
+        // Backslash is the escape character in .properties files, so a raw
+        // Windows path (C:\wc\...\native) would lose its separators (and
+        // "\n" would become a newline) in Properties.load.
+        def escaped = outDir.absolutePath.replace('\\', '\\\\')
+        stockfishHomeProps.text = "stockfish.home=${escaped}\nstockfish.exe=${exeName}\n"
     }
 }
 
