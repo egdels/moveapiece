@@ -16,9 +16,14 @@
  * Windows Runtime APIs from a classic desktop app), not the MinGW/MSYS2
  * toolchain desktop/stockfish.gradle already uses on Windows - raw
  * WinRT/COM interop via MinGW is comparatively unsupported and fragile.
- * `cl.exe` and `cppwinrt.exe` are expected on PATH already (a "Developer
- * Command Prompt for VS" locally, or the ilammy/msvc-dev-cmd GitHub Action
- * in CI - see .github/workflows/desktop.yml/release.yml's Windows leg).
+ * `cl.exe` and `cppwinrt.exe` are used from PATH when already there (a
+ * "Developer Command Prompt for VS" locally, or the ilammy/msvc-dev-cmd
+ * GitHub Action in CI - see .github/workflows/desktop.yml/release.yml's
+ * Windows leg). When they are not - a build launched from an IDE or a
+ * plain terminal - the script locates the newest Visual Studio (or Build
+ * Tools) install with the C++ workload via vswhere.exe, captures the
+ * environment its VsDevCmd.bat sets up for x64 and runs the tools with
+ * that, mirroring what stockfish.gradle does for MSYS2.
  *
  * Driven directly with ProcessBuilder, same rationale as stockfish.gradle's
  * header comment (Gradle 9's task execution model disallows calling back
@@ -41,9 +46,92 @@ if (os.isWindows()) {
     project.ext.pegasusBleWinDll = dllFile
     project.ext.pegasusBleWinDllName = dllName
 
+    // MSVC toolchain lookup (see the header comment). The developer
+    // environment is captured lazily, once per build, inside the first task
+    // action that needs it - VsDevCmd.bat takes a couple of seconds, which
+    // should not be paid at configuration time by builds that never touch
+    // the native tasks.
+    def findOnPath = { String name, String pathValue ->
+        (pathValue ?: '').split(java.util.regex.Pattern.quote(File.pathSeparator))
+            .collect { dir -> dir ? new File(dir, name + '.exe') : null }
+            .find { it != null && it.isFile() }
+    }
+    def readProcessOutput = { List<String> cmd ->
+        def pb = new ProcessBuilder(cmd)
+        pb.redirectErrorStream(true)
+        def proc = pb.start()
+        def text = proc.inputStream.getText('UTF-8')
+        if (proc.waitFor() != 0) {
+            throw new GradleException("Command failed (${proc.exitValue()}): ${cmd.join(' ')}\n${text}")
+        }
+        text
+    }
+    def msvcEnvHolder = [null]
+    def msvcEnv = { ->
+        if (msvcEnvHolder[0] != null) {
+            return msvcEnvHolder[0]
+        }
+        def parentPath = System.getenv('PATH')
+        if (findOnPath('cl', parentPath) && findOnPath('cppwinrt', parentPath)) {
+            msvcEnvHolder[0] = [:]
+            return msvcEnvHolder[0]
+        }
+        def hint = "cl.exe/cppwinrt.exe are not on PATH. Run the build from a 'Developer Command Prompt for VS', " +
+            "or install Visual Studio / Build Tools 2022 with the 'Desktop development with C++' workload " +
+            "(including a Windows 10/11 SDK) so the build can locate it via vswhere.exe."
+        def vswhere = new File(System.getenv('ProgramFiles(x86)') ?: 'C:\\Program Files (x86)',
+            'Microsoft Visual Studio/Installer/vswhere.exe')
+        if (!vswhere.isFile()) {
+            throw new GradleException("${hint} (${vswhere} does not exist)")
+        }
+        def vsRoot = readProcessOutput([vswhere.absolutePath, '-latest', '-products', '*',
+            '-requires', 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64',
+            '-property', 'installationPath']).trim()
+        def devCmd = vsRoot ? new File(vsRoot, 'Common7/Tools/VsDevCmd.bat') : null
+        if (devCmd == null || !devCmd.isFile()) {
+            throw new GradleException("${hint} (vswhere found no install with the C++ tools)")
+        }
+        logger.lifecycle("Using MSVC toolchain from ${vsRoot}")
+        // `set` prints KEY=VALUE lines (in UTF-8 thanks to the chcp, instead
+        // of the console's OEM code page); the batch file's own banner is
+        // suppressed with -no_logo. Split at the first '=' only - values
+        // (PATH entries, INCLUDE, ...) can contain '=' themselves.
+        def dump = readProcessOutput(['cmd.exe', '/d', '/c',
+            "chcp 65001 >nul && call \"${devCmd.absolutePath}\" -no_logo -arch=x64 -host_arch=x64 && set".toString()])
+        def env = [:]
+        dump.readLines().each { line ->
+            int eq = line.indexOf('=')
+            if (eq > 0) {
+                env.put(line.substring(0, eq), line.substring(eq + 1))
+            }
+        }
+        if (!findOnPath('cl', env['Path'] ?: env['PATH']) || !findOnPath('cppwinrt', env['Path'] ?: env['PATH'])) {
+            throw new GradleException("${hint} (VsDevCmd.bat from ${vsRoot} did not put cl.exe and cppwinrt.exe on PATH)")
+        }
+        msvcEnvHolder[0] = env
+        env
+    }
+
     def runTool = { List<String> cmd, File workDir ->
-        def pb = new ProcessBuilder(cmd.collect { it.toString() })
+        def env = msvcEnv()
+        def exe = cmd[0].toString()
+        if (env) {
+            // CreateProcess resolves a bare program name against the parent
+            // process's PATH, not the child environment set below, so use the
+            // absolute path from the captured environment.
+            exe = findOnPath(exe, env['Path'] ?: env['PATH']).absolutePath
+        }
+        def pb = new ProcessBuilder(([exe] + cmd.drop(1)).collect { it.toString() })
         pb.directory(workDir)
+        // Replace the whole inherited environment with the captured one. The
+        // Gradle daemon can hand ProcessBuilder both "Path" and "PATH" keys
+        // (its case-insensitive map gets replaced when the daemon adopts the
+        // client's environment), so a per-key put() could leave a stale
+        // duplicate behind that the child then reads instead.
+        if (env) {
+            pb.environment().clear()
+            pb.environment().putAll(env)
+        }
         pb.redirectErrorStream(true)
         Process proc = pb.start()
         proc.inputStream.eachLine { logger.lifecycle(it) }
@@ -111,8 +199,12 @@ if (os.isWindows()) {
         outputs.file(pegasusBleWinHomeProps)
         doLast {
             pegasusBleWinHomeProps.parentFile.mkdirs()
+            // Backslash is the escape character in .properties files, so a
+            // raw Windows path would lose its separators in Properties.load
+            // (and "\native" would even turn into a newline + "ative").
+            def escaped = nativeOutDir.absolutePath.replace('\\', '\\\\')
             pegasusBleWinHomeProps.text =
-                    "pegasusBleWin.home=${nativeOutDir.absolutePath}\npegasusBleWin.lib=${dllName}\n"
+                    "pegasusBleWin.home=${escaped}\npegasusBleWin.lib=${dllName}\n"
         }
     }
 

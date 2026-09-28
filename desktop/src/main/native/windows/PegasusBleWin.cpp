@@ -44,6 +44,7 @@
 #include <winrt/Windows.Devices.Bluetooth.GenericAttributeProfile.h>
 #include <winrt/Windows.Storage.Streams.h>
 #include <jni.h>
+#include <atomic>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -133,6 +134,16 @@ IBuffer ToBuffer(std::vector<uint8_t> const& data) {
     return writer.DetachBuffer();
 }
 
+wchar_t const* StatusName(GattCommunicationStatus status) {
+    switch (status) {
+        case GattCommunicationStatus::Success: return L"Success";
+        case GattCommunicationStatus::Unreachable: return L"Unreachable";
+        case GattCommunicationStatus::ProtocolError: return L"ProtocolError";
+        case GattCommunicationStatus::AccessDenied: return L"AccessDenied";
+        default: return L"Unknown";
+    }
+}
+
 }  // namespace
 
 /* One notify subscription of the profile: the characteristic and the service holding it. */
@@ -191,11 +202,33 @@ class PegasusBleBridge {
     }
 
     void Connect(std::wstring const& deviceId) {
+        // Supersede whatever attempt may still be in flight (see
+        // connectGeneration_) and drop its device without reporting
+        // DISCONNECTED for it: Java has already moved on to a fresh
+        // CONNECTING, so the old attempt's outcome is of no interest.
+        uint32_t generation = ++connectGeneration_;
+        Teardown();
         ReportConnectionState(L"CONNECTING");
-        ConnectAsync(ParseAddress(deviceId));
+        ConnectAsync(ParseAddress(deviceId), generation);
     }
 
     void Disconnect() {
+        ++connectGeneration_;
+        Teardown();
+        // Reported explicitly rather than relying solely on
+        // ConnectionStatusChanged, which is not guaranteed to fire from a
+        // disconnect we ourselves initiated by closing our own reference -
+        // see this file's header comment. Harmless if it also fires
+        // natively afterward: WindowsPegasusBleTransport.handleNativeDisconnected()
+        // already tolerates a duplicate DISCONNECTED report.
+        ReportConnectionState(L"DISCONNECTED");
+    }
+
+    void Write(std::vector<uint8_t> const& data) { WriteAsync(data); }
+
+   private:
+    // Releases the current device and everything hung off it, silently.
+    void Teardown() {
         if (connectionStatusToken_ && device_) {
             device_.ConnectionStatusChanged(connectionStatusToken_);
             connectionStatusToken_ = {};
@@ -212,43 +245,72 @@ class PegasusBleBridge {
             device_.Close();
             device_ = nullptr;
         }
-        // Reported explicitly rather than relying solely on
-        // ConnectionStatusChanged, which is not guaranteed to fire from a
-        // disconnect we ourselves initiated by closing our own reference -
-        // see this file's header comment. Harmless if it also fires
-        // natively afterward: WindowsPegasusBleTransport.handleNativeDisconnected()
-        // already tolerates a duplicate DISCONNECTED report.
-        ReportConnectionState(L"DISCONNECTED");
     }
 
-    void Write(std::vector<uint8_t> const& data) { WriteAsync(data); }
-
-   private:
-    winrt::fire_and_forget ConnectAsync(uint64_t address) {
+    // Every co_await below resumes on some thread-pool thread at an
+    // unpredictable later time, by which point Java may already have given
+    // up on this attempt (connect timeout, native disconnect event ->
+    // RECONNECTING -> a second nativeConnect 2 s later, or a manual
+    // disconnect). Without this check the stale coroutine would carry on
+    // against a device_ that now belongs to the *next* attempt - tearing
+    // that one down on its own failure path, which surfaced as a cascade of
+    // SERVICE_NOT_FOUND / CONNECT_FAILED ("operation aborted") reports and
+    // RECONNECT_GIVEN_UP. A superseded attempt just silently ends instead.
+    winrt::fire_and_forget ConnectAsync(uint64_t address, uint32_t generation) {
         auto lifetime = shared_from_this_workaround();
+        auto superseded = [this, generation] { return generation != connectGeneration_.load(); };
         try {
-            auto dev = co_await BluetoothLEDevice::FromBluetoothAddressAsync(address);
+            // Pass the address type seen in the advertisement when we have
+            // it: peripherals with a random (static) address cannot be
+            // connected as a public one, and the single-argument overload
+            // leaves that to whatever the OS happens to have cached.
+            BluetoothLEDevice dev{nullptr};
+            auto typeIt = knownAddressTypes_.find(address);
+            if (typeIt != knownAddressTypes_.end()) {
+                dev = co_await BluetoothLEDevice::FromBluetoothAddressAsync(address, typeIt->second);
+            } else {
+                dev = co_await BluetoothLEDevice::FromBluetoothAddressAsync(address);
+            }
+            if (superseded()) co_return;
             if (!dev) {
                 ReportError(L"CONNECT_FAILED", L"Device not found - rescan required");
                 ReportConnectionState(L"DISCONNECTED");
                 co_return;
             }
             device_ = dev;
-            connectionStatusToken_ =
-                    device_.ConnectionStatusChanged({this, &PegasusBleBridge::OnConnectionStatusChanged});
+            connectionStatusToken_ = device_.ConnectionStatusChanged(
+                    [this, generation](BluetoothLEDevice const& sender, winrt::Windows::Foundation::IInspectable const&) {
+                        if (generation != connectGeneration_.load()) {
+                            return;  // event from a device we have already let go of
+                        }
+                        OnConnectionStatusChanged(sender);
+                    });
 
             ReportConnectionState(L"DISCOVERING_SERVICES");
             auto writeServiceResult = co_await device_.GetGattServicesForUuidAsync(
                     writeServiceUuid_, BluetoothCacheMode::Uncached);
+            if (superseded()) co_return;
+            if (writeServiceResult.Status() == GattCommunicationStatus::Unreachable) {
+                // The link itself failed or dropped before/while discovering,
+                // not a device lacking the service - a different remedy
+                // (board still connected elsewhere, out of range, ...).
+                ReportError(L"CONNECT_FAILED", L"Device unreachable during service discovery");
+                Disconnect();
+                co_return;
+            }
             if (writeServiceResult.Status() != GattCommunicationStatus::Success
                 || writeServiceResult.Services().Size() == 0) {
-                ReportError(L"SERVICE_NOT_FOUND", L"Write service not present on this device");
+                std::wstring detail = L"Write service not present on this device (status=";
+                detail += StatusName(writeServiceResult.Status());
+                detail += L")";
+                ReportError(L"SERVICE_NOT_FOUND", detail.c_str());
                 Disconnect();
                 co_return;
             }
             auto writeService = writeServiceResult.Services().GetAt(0);
             auto writeCharsResult = co_await writeService.GetCharacteristicsForUuidAsync(
                     writeCharUuid_, BluetoothCacheMode::Uncached);
+            if (superseded()) co_return;
             bool haveWrite = writeCharsResult.Status() == GattCommunicationStatus::Success
                               && writeCharsResult.Characteristics().Size() > 0;
 
@@ -256,12 +318,14 @@ class PegasusBleBridge {
             for (auto const& sub : subscriptions_) {
                 auto serviceResult = co_await device_.GetGattServicesForUuidAsync(
                         sub.serviceUuid, BluetoothCacheMode::Uncached);
+                if (superseded()) co_return;
                 if (serviceResult.Status() != GattCommunicationStatus::Success
                     || serviceResult.Services().Size() == 0) {
                     continue;
                 }
                 auto charsResult = co_await serviceResult.Services().GetAt(0).GetCharacteristicsForUuidAsync(
                         sub.charUuid, BluetoothCacheMode::Uncached);
+                if (superseded()) co_return;
                 if (charsResult.Status() == GattCommunicationStatus::Success
                     && charsResult.Characteristics().Size() > 0) {
                     notifies.push_back(charsResult.Characteristics().GetAt(0));
@@ -280,8 +344,12 @@ class PegasusBleBridge {
             for (size_t i = 0; i < notifies.size(); i++) {
                 auto notifyStatus = co_await notifies[i].WriteClientCharacteristicConfigurationDescriptorAsync(
                         GattClientCharacteristicConfigurationDescriptorValue::Notify);
+                if (superseded()) co_return;
                 if (notifyStatus != GattCommunicationStatus::Success) {
-                    ReportError(L"NOTIFICATION_SETUP_FAILED", L"CCCD write failed");
+                    std::wstring detail = L"CCCD write failed (status=";
+                    detail += StatusName(notifyStatus);
+                    detail += L")";
+                    ReportError(L"NOTIFICATION_SETUP_FAILED", detail.c_str());
                     Disconnect();
                     co_return;
                 }
@@ -296,6 +364,7 @@ class PegasusBleBridge {
 
             ReportConnectionState(L"CONNECTED");
         } catch (winrt::hresult_error const& e) {
+            if (superseded()) co_return;  // typically E_ABORT from our own Teardown() closing the device
             ReportError(L"CONNECT_FAILED", e.message().c_str());
             Disconnect();
         }
@@ -348,6 +417,8 @@ class PegasusBleBridge {
         // `name ?: peripheral.name` fallback (CoreBluetooth keeps that cache
         // for us; WinRT does not, so it's kept here).
         uint64_t address = args.BluetoothAddress();
+        // Remembered for ConnectAsync's FromBluetoothAddressAsync (see there).
+        knownAddressTypes_[address] = args.BluetoothAddressType();
         winrt::hstring packetName = args.Advertisement().LocalName();
         std::wstring name(packetName.c_str(), packetName.size());
         if (!name.empty()) {
@@ -361,7 +432,7 @@ class PegasusBleBridge {
         ReportDeviceFound(FormatAddress(address), name, args.RawSignalStrengthInDBm());
     }
 
-    void OnConnectionStatusChanged(BluetoothLEDevice const& sender, winrt::Windows::Foundation::IInspectable const&) {
+    void OnConnectionStatusChanged(BluetoothLEDevice const& sender) {
         if (sender.ConnectionStatus() == BluetoothConnectionStatus::Disconnected) {
             ReportConnectionState(L"DISCONNECTED");
         }
@@ -505,6 +576,13 @@ class PegasusBleBridge {
     BluetoothLEAdvertisementWatcher watcher_{nullptr};
     winrt::event_token receivedToken_{};
     std::unordered_map<uint64_t, std::wstring> knownNames_;
+    // Address type per advertised address, kept across scans so a reconnect
+    // by address alone (no scan in between) still has it.
+    std::unordered_map<uint64_t, BluetoothAddressType> knownAddressTypes_;
+    // Bumped by every Connect()/Disconnect(); a ConnectAsync coroutine (and
+    // the ConnectionStatusChanged handler it registers) only acts while its
+    // captured generation is still the current one - see ConnectAsync.
+    std::atomic<uint32_t> connectGeneration_{0};
     BluetoothLEDevice device_{nullptr};
     winrt::event_token connectionStatusToken_{};
     GattCharacteristic writeChar_{nullptr};

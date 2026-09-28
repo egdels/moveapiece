@@ -257,6 +257,10 @@ public final class MacosPegasusBleTransport implements PegasusTransport {
         emitError(TransportError.DISCONNECTED_UNEXPECTEDLY, "state=" + state);
         if (currentAddress != null && reconnectPolicy.shouldReconnect()) {
             setState(ConnectionState.RECONNECTING);
+            // Keep in step with WindowsPegasusBleTransport: a second
+            // DISCONNECTED while already RECONNECTING must not leave two
+            // timers racing to reconnect the same address.
+            cancelReconnectTask();
             reconnectTask =
                     scheduler.schedule(
                             () ->

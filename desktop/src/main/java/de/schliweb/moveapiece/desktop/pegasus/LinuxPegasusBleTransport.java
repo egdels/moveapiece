@@ -5,7 +5,6 @@
 
 package de.schliweb.moveapiece.desktop.pegasus;
 
-import com.github.hypfvieh.bluetooth.DeviceManager;
 import com.github.hypfvieh.bluetooth.wrapper.BluetoothAdapter;
 import com.github.hypfvieh.bluetooth.wrapper.BluetoothDevice;
 import com.github.hypfvieh.bluetooth.wrapper.BluetoothGattCharacteristic;
@@ -24,11 +23,13 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javafx.application.Platform;
@@ -61,15 +62,30 @@ import org.freedesktop.dbus.types.Variant;
  * MacosPegasusBleTransport}/{@link WindowsPegasusBleTransport}. Deliberately not shared as a common
  * base class with those two (same reasoning as between them): different failure/threading
  * characteristics, and this transport is not yet hardware-verified.
+ *
+ * <p>Connect attempts are numbered ({@link #connectGeneration}): {@link #doConnect} runs on the
+ * worker long after Java may have given the attempt up (BlueZ's {@code Connected=false} signal,
+ * the connect timeout, a manual disconnect, or the reconnect that follows any of those), and the
+ * blocking {@code ServicesResolved} poll alone can keep it busy for up to {@link
+ * #servicesResolvedTimeoutMs}. A superseded attempt must neither report anything - its
+ * SERVICE_NOT_FOUND would be counted as yet another failed reconnect - nor hold the worker
+ * longer than one poll interval, since the next attempt queues behind it. The equivalent guard in
+ * {@code PegasusBleWin.cpp} covers the same race on Windows, where it additionally protected the
+ * shared device handle; here the single-thread worker already prevents that part.
  */
 public final class LinuxPegasusBleTransport implements PegasusTransport {
 
     private static final Logger LOG = Logger.getLogger(LinuxPegasusBleTransport.class.getName());
-    private static final long CONNECT_TIMEOUT_MS = 15000;
-    private static final long SERVICES_RESOLVED_TIMEOUT_MS = 10000;
+    static final long DEFAULT_CONNECT_TIMEOUT_MS = 15000;
+    static final long DEFAULT_SERVICES_RESOLVED_TIMEOUT_MS = 10000;
+    private static final long SERVICES_RESOLVED_POLL_MS = 200;
     private static final long SCAN_POLL_INTERVAL_MS = 1000;
 
-    private final DeviceManager deviceManager;
+    private final BlueZAccess blueZ;
+    /** Where every state/listener update runs: the JavaFX Application Thread in production. */
+    private final Executor uiThread;
+    private final long connectTimeoutMs;
+    private final long servicesResolvedTimeoutMs;
     private final AbstractPropertiesChangedHandler propertiesHandler =
             new AbstractPropertiesChangedHandler() {
                 @Override
@@ -92,7 +108,7 @@ public final class LinuxPegasusBleTransport implements PegasusTransport {
                         t.setDaemon(true);
                         return t;
                     });
-    private final ReconnectPolicy reconnectPolicy = new ReconnectPolicy();
+    private final ReconnectPolicy reconnectPolicy;
 
     private volatile TransportListener listener;
     private volatile ScanListener scanListener;
@@ -105,6 +121,8 @@ public final class LinuxPegasusBleTransport implements PegasusTransport {
     private final BleProfile profile;
     private ScheduledFuture<?> connectTimeoutTask;
     private ScheduledFuture<?> reconnectTask;
+    /** See the class Javadoc; bumped on every new attempt and whenever one is given up. */
+    private final AtomicInteger connectGeneration = new AtomicInteger();
 
     /** Transport for a DGT Pegasus ({@link BleProfile#PEGASUS}). */
     public LinuxPegasusBleTransport() {
@@ -113,15 +131,48 @@ public final class LinuxPegasusBleTransport implements PegasusTransport {
 
     /** Transport for whichever board {@code profile} describes; CONNECTED once all subscribed. */
     public LinuxPegasusBleTransport(BleProfile profile) {
+        this(
+                profile,
+                openSystemBus(),
+                Platform::runLater,
+                new ReconnectPolicy(),
+                DEFAULT_CONNECT_TIMEOUT_MS,
+                DEFAULT_SERVICES_RESOLVED_TIMEOUT_MS);
+    }
+
+    private static BlueZAccess openSystemBus() {
+        try {
+            return BlueZAccess.systemBus();
+        } catch (DBusException e) {
+            throw new IllegalStateException("Could not connect to the system D-Bus / BlueZ", e);
+        }
+    }
+
+    /**
+     * Test seam: every collaborator the connect/reconnect state machine depends on, injectable.
+     * {@code uiThread} stands in for the JavaFX Application Thread and must execute tasks one at a
+     * time, in order, like it does.
+     */
+    LinuxPegasusBleTransport(
+            BleProfile profile,
+            BlueZAccess blueZ,
+            Executor uiThread,
+            ReconnectPolicy reconnectPolicy,
+            long connectTimeoutMs,
+            long servicesResolvedTimeoutMs) {
         if (profile == null) {
             throw new IllegalArgumentException("profile must not be null");
         }
         this.profile = profile;
+        this.blueZ = blueZ;
+        this.uiThread = uiThread;
+        this.reconnectPolicy = reconnectPolicy;
+        this.connectTimeoutMs = connectTimeoutMs;
+        this.servicesResolvedTimeoutMs = servicesResolvedTimeoutMs;
         try {
-            deviceManager = DeviceManager.createInstance(false);
-            deviceManager.registerPropertyHandler(propertiesHandler);
+            blueZ.registerPropertyHandler(propertiesHandler);
         } catch (DBusException e) {
-            throw new IllegalStateException("Could not connect to the system D-Bus / BlueZ", e);
+            throw new IllegalStateException("Could not subscribe to BlueZ property changes", e);
         }
     }
 
@@ -140,7 +191,7 @@ public final class LinuxPegasusBleTransport implements PegasusTransport {
     private void doScan(long timeoutMs) {
         BluetoothAdapter adapter;
         try {
-            adapter = deviceManager.getAdapter();
+            adapter = blueZ.getAdapter();
         } catch (RuntimeException e) {
             reportScanFailed(TransportError.SCAN_FAILED, e.getMessage());
             return;
@@ -169,9 +220,9 @@ public final class LinuxPegasusBleTransport implements PegasusTransport {
         long deadline = System.currentTimeMillis() + timeoutMs;
         try {
             while (scanning && System.currentTimeMillis() < deadline) {
-                deviceManager.findBtDevicesByIntrospection(adapter);
+                blueZ.findBtDevicesByIntrospection(adapter);
                 for (BluetoothDevice device :
-                        deviceManager.getDevices(adapter.getAddress(), true)) {
+                        blueZ.getDevices(adapter.getAddress(), true)) {
                     if (reported.add(device.getAddress())) {
                         DiscoveredDevice found =
                                 new DiscoveredDevice(
@@ -179,7 +230,7 @@ public final class LinuxPegasusBleTransport implements PegasusTransport {
                                         device.getAddress(),
                                         device.getRssi() == null ? 0 : device.getRssi(),
                                         List.of());
-                        Platform.runLater(
+                        uiThread.execute(
                                 () -> {
                                     ScanListener l = scanListener;
                                     if (l != null) {
@@ -198,7 +249,7 @@ public final class LinuxPegasusBleTransport implements PegasusTransport {
                 adapter.stopDiscovery();
             } catch (RuntimeException ignored) {
             }
-            Platform.runLater(
+            uiThread.execute(
                     () -> {
                         ScanListener l = scanListener;
                         if (l != null) {
@@ -209,7 +260,7 @@ public final class LinuxPegasusBleTransport implements PegasusTransport {
     }
 
     private void reportScanFailed(TransportError error, String detail) {
-        Platform.runLater(
+        uiThread.execute(
                 () -> {
                     ScanListener l = scanListener;
                     if (l != null) {
@@ -233,13 +284,14 @@ public final class LinuxPegasusBleTransport implements PegasusTransport {
         scanning = false;
         cancelConnectTimeout();
         currentAddress = deviceAddress;
+        int generation = connectGeneration.incrementAndGet();
         setState(ConnectionState.CONNECTING);
         connectTimeoutTask =
                 scheduler.schedule(
-                        () -> Platform.runLater(this::onConnectTimeout),
-                        CONNECT_TIMEOUT_MS,
+                        () -> uiThread.execute(this::onConnectTimeout),
+                        connectTimeoutMs,
                         TimeUnit.MILLISECONDS);
-        worker.execute(() -> doConnect(deviceAddress));
+        worker.execute(() -> doConnect(deviceAddress, generation));
     }
 
     private void onConnectTimeout() {
@@ -249,47 +301,77 @@ public final class LinuxPegasusBleTransport implements PegasusTransport {
             LOG.log(Level.WARNING, "Connect timeout");
             emitError(
                     TransportError.CONNECT_TIMEOUT,
-                    "No connection within " + CONNECT_TIMEOUT_MS + " ms");
+                    "No connection within " + connectTimeoutMs + " ms");
             worker.execute(() -> doDisconnectQuiet(connectedDevice));
-            Platform.runLater(this::handleDisconnected);
+            uiThread.execute(this::handleDisconnected);
         }
     }
 
-    private void doConnect(String deviceAddress) {
+    private boolean superseded(int generation) {
+        return generation != connectGeneration.get();
+    }
+
+    private void doConnect(String deviceAddress, int generation) {
         BluetoothDevice device;
         try {
-            BluetoothAdapter adapter = deviceManager.getAdapter();
+            if (superseded(generation)) {
+                return;
+            }
+            BluetoothAdapter adapter = blueZ.getAdapter();
             device = findDeviceByAddress(adapter, deviceAddress);
             if (device == null) {
-                Platform.runLater(
+                if (superseded(generation)) {
+                    return;
+                }
+                uiThread.execute(
                         () ->
                                 emitError(
                                         TransportError.CONNECT_FAILED,
                                         "Device not found - rescan required"));
-                Platform.runLater(this::handleDisconnected);
+                uiThread.execute(this::handleDisconnected);
                 return;
             }
             if (!device.connect()) {
-                Platform.runLater(
+                if (superseded(generation)) {
+                    return;
+                }
+                uiThread.execute(
                         () -> emitError(TransportError.CONNECT_FAILED, "BlueZ Connect failed"));
-                Platform.runLater(this::handleDisconnected);
+                uiThread.execute(this::handleDisconnected);
                 return;
             }
         } catch (RuntimeException e) {
-            Platform.runLater(
+            if (superseded(generation)) {
+                return;
+            }
+            uiThread.execute(
                     () -> emitError(TransportError.CONNECT_FAILED, String.valueOf(e.getMessage())));
-            Platform.runLater(this::handleDisconnected);
+            uiThread.execute(this::handleDisconnected);
+            return;
+        }
+        if (superseded(generation)) {
+            // Given up while Connect() was blocking; nobody else knows about
+            // the link we just opened, so release it ourselves.
+            doDisconnectQuiet(device);
             return;
         }
         connectedDevice = device;
-        Platform.runLater(() -> setState(ConnectionState.DISCOVERING_SERVICES));
+        uiThread.execute(() -> setState(ConnectionState.DISCOVERING_SERVICES));
         try {
             // BlueZ resolves GATT services asynchronously after Connect() returns;
             // ServicesResolved flips true once ready.
-            long deadline = System.currentTimeMillis() + SERVICES_RESOLVED_TIMEOUT_MS;
+            long deadline = System.currentTimeMillis() + servicesResolvedTimeoutMs;
             while (!Boolean.TRUE.equals(device.isServicesResolved())
                     && System.currentTimeMillis() < deadline) {
-                Thread.sleep(200);
+                if (superseded(generation)) {
+                    doDisconnectQuiet(device);
+                    return;
+                }
+                Thread.sleep(SERVICES_RESOLVED_POLL_MS);
+            }
+            if (superseded(generation)) {
+                doDisconnectQuiet(device);
+                return;
             }
             BluetoothGattService writeService =
                     device.getGattServiceByUuid(profile.writeServiceUuid());
@@ -299,9 +381,9 @@ public final class LinuxPegasusBleTransport implements PegasusTransport {
                                 + " service "
                                 + profile.writeServiceUuid()
                                 + " not present on this device";
-                Platform.runLater(() -> emitError(TransportError.SERVICE_NOT_FOUND, detail));
+                uiThread.execute(() -> emitError(TransportError.SERVICE_NOT_FOUND, detail));
                 doDisconnectQuiet(device);
-                Platform.runLater(this::handleDisconnected);
+                uiThread.execute(this::handleDisconnected);
                 return;
             }
             BluetoothGattCharacteristic write =
@@ -325,26 +407,38 @@ public final class LinuxPegasusBleTransport implements PegasusTransport {
                                 + notifies.size()
                                 + "/"
                                 + profile.subscriptions().size();
-                Platform.runLater(() -> emitError(TransportError.CHARACTERISTIC_NOT_FOUND, detail));
+                uiThread.execute(() -> emitError(TransportError.CHARACTERISTIC_NOT_FOUND, detail));
                 doDisconnectQuiet(device);
-                Platform.runLater(this::handleDisconnected);
+                uiThread.execute(this::handleDisconnected);
                 return;
             }
-            Platform.runLater(() -> setState(ConnectionState.SUBSCRIBING));
+            uiThread.execute(() -> setState(ConnectionState.SUBSCRIBING));
             for (BluetoothGattCharacteristic ch : notifies) {
+                if (superseded(generation)) {
+                    doDisconnectQuiet(device);
+                    return;
+                }
                 ch.startNotify();
+            }
+            if (superseded(generation)) {
+                doDisconnectQuiet(device);
+                return;
             }
             writeChar = write;
             notifyChars = List.copyOf(notifies);
-            Platform.runLater(() -> setState(ConnectionState.CONNECTED));
+            uiThread.execute(() -> setState(ConnectionState.CONNECTED));
         } catch (Exception e) {
-            Platform.runLater(
+            if (superseded(generation)) {
+                doDisconnectQuiet(device);
+                return;
+            }
+            uiThread.execute(
                     () ->
                             emitError(
                                     TransportError.NOTIFICATION_SETUP_FAILED,
                                     String.valueOf(e.getMessage())));
             doDisconnectQuiet(device);
-            Platform.runLater(this::handleDisconnected);
+            uiThread.execute(this::handleDisconnected);
         }
     }
 
@@ -352,7 +446,7 @@ public final class LinuxPegasusBleTransport implements PegasusTransport {
         if (adapter == null) {
             return null;
         }
-        for (BluetoothDevice device : deviceManager.getDevices(adapter.getAddress(), true)) {
+        for (BluetoothDevice device : blueZ.getDevices(adapter.getAddress(), true)) {
             if (address.equalsIgnoreCase(device.getAddress())) {
                 return device;
             }
@@ -365,6 +459,7 @@ public final class LinuxPegasusBleTransport implements PegasusTransport {
         reconnectPolicy.onManualDisconnect();
         cancelConnectTimeout();
         cancelReconnectTask();
+        connectGeneration.incrementAndGet();
         BluetoothDevice device = connectedDevice;
         worker.execute(() -> doDisconnectQuiet(device));
         setState(ConnectionState.DISCONNECTED);
@@ -389,10 +484,10 @@ public final class LinuxPegasusBleTransport implements PegasusTransport {
         scheduler.shutdownNow();
         worker.shutdownNow();
         try {
-            deviceManager.unRegisterPropertyHandler(propertiesHandler);
+            blueZ.unRegisterPropertyHandler(propertiesHandler);
         } catch (DBusException ignored) {
         }
-        deviceManager.closeConnection();
+        blueZ.closeConnection();
     }
 
     @Override
@@ -410,7 +505,7 @@ public final class LinuxPegasusBleTransport implements PegasusTransport {
                         // PegasusBleWin.cpp (captured from the official DGT app via
                         // HCI snoop on real hardware).
                         ch.writeValue(data, Map.of("type", "command"));
-                        Platform.runLater(
+                        uiThread.execute(
                                 () -> {
                                     TransportListener l = listener;
                                     if (l != null) {
@@ -418,7 +513,7 @@ public final class LinuxPegasusBleTransport implements PegasusTransport {
                                     }
                                 });
                     } catch (Exception e) {
-                        Platform.runLater(
+                        uiThread.execute(
                                 () ->
                                         emitError(
                                                 TransportError.WRITE_FAILED,
@@ -441,7 +536,7 @@ public final class LinuxPegasusBleTransport implements PegasusTransport {
                 && "org.bluez.Device1".equals(signal.getInterfaceName())) {
             Variant<?> connected = signal.getPropertiesChanged().get("Connected");
             if (connected != null && Boolean.FALSE.equals(connected.getValue())) {
-                Platform.runLater(this::handleDisconnected);
+                uiThread.execute(this::handleDisconnected);
             }
             return;
         }
@@ -456,7 +551,7 @@ public final class LinuxPegasusBleTransport implements PegasusTransport {
             if (value != null) {
                 byte[] data = toByteArray(value.getValue());
                 String uuid = notify.getUuid().toLowerCase(Locale.ROOT);
-                Platform.runLater(
+                uiThread.execute(
                         () -> {
                             TransportListener l = listener;
                             if (l != null) {
@@ -496,12 +591,21 @@ public final class LinuxPegasusBleTransport implements PegasusTransport {
             return;
         }
         emitError(TransportError.DISCONNECTED_UNEXPECTEDLY, "state=" + state);
+        // Whatever doConnect() is still doing for this attempt is moot now
+        // (see the class Javadoc): let it exit at its next check instead of
+        // polling ServicesResolved to the deadline and then reporting a
+        // SERVICE_NOT_FOUND that would count as one more failed reconnect.
+        connectGeneration.incrementAndGet();
         if (currentAddress != null && reconnectPolicy.shouldReconnect()) {
             setState(ConnectionState.RECONNECTING);
+            // Keep in step with the Windows/macOS transports: a second
+            // DISCONNECTED while already RECONNECTING must not leave two
+            // timers racing to reconnect the same address.
+            cancelReconnectTask();
             reconnectTask =
                     scheduler.schedule(
                             () ->
-                                    Platform.runLater(
+                                    uiThread.execute(
                                             () -> {
                                                 if (state == ConnectionState.RECONNECTING) {
                                                     connectInternal(currentAddress);
