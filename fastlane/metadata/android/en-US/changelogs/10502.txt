@@ -1,0 +1,16 @@
+Desktop only: more robust board connections on Windows and Linux.
+No changes in the Android app.
+
+* Windows: a board that drops the link while its services are still
+  being looked up no longer triggers a cascade of "service not found"
+  / "connect failed" reports and a given-up reconnect; the next
+  attempt starts clean. Boards advertising a random address now
+  connect reliably. Error messages name the Bluetooth status.
+* Linux: the same guard for the BlueZ transport. Still unverified on
+  real hardware.
+* Windows, macOS, Linux: a second disconnect while already
+  reconnecting no longer starts two reconnect attempts in parallel.
+* Building from source on Windows: Visual Studio and MSYS2 are found
+  automatically, so a plain terminal or IDE build works. Running the
+  desktop app from Gradle no longer needs a separately installed
+  JDK 23.
