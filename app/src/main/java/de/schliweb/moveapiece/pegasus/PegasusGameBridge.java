@@ -7,6 +7,7 @@ package de.schliweb.moveapiece.pegasus;
 
 import android.os.Handler;
 import android.os.Looper;
+import android.os.Message;
 import android.util.Log;
 import de.schliweb.pegasus.core.chess.ChessPosition;
 import de.schliweb.pegasus.core.chess.Move;
@@ -160,6 +161,13 @@ public class PegasusGameBridge {
     private final PegasusFrameParser frameParser = new PegasusFrameParser();
     private final PegasusLedController ledController;
     private final Runnable keepalivePollRunnable = this::sendKeepalivePoll;
+
+    /**
+     * Tag on every delayed post of {@link #sendOfficialInitSequence} so the burst can be cancelled
+     * as a whole ({@link #cancelInitSequence}) when the link drops or is closed before it is over.
+     */
+    private final Object initSequenceToken = new Object();
+
     private final Runnable checkIndicatorRefreshRunnable = this::refreshCheckIndicator;
     private final Runnable guidedCaptureSettleRunnable = this::settleUnprovenGuidedCapture;
     private final Runnable guideLedReassertRunnable = this::reassertGuideLeds;
@@ -278,6 +286,11 @@ public class PegasusGameBridge {
                     public void onConnectionStateChanged(ConnectionState state) {
                         mainHandler.post(
                                 () -> {
+                                    // Whatever is left of an earlier burst must not run against
+                                    // a dropped link (write errors) or interleave with the burst
+                                    // for a new one (denser than the 1.5 s spacing the board
+                                    // tolerates).
+                                    cancelInitSequence();
                                     if (state == ConnectionState.CONNECTED) {
                                         // Reconnect-safe: drop transient parse/move state and
                                         // re-sync via the board dump in the init sequence,
@@ -348,6 +361,7 @@ public class PegasusGameBridge {
     }
 
     public void disconnect() {
+        cancelInitSequence();
         transport.disconnect();
     }
 
@@ -422,7 +436,13 @@ public class PegasusGameBridge {
         };
         for (int i = 0; i < seq.length; i++) {
             byte[] cmd = seq[i];
-            mainHandler.postDelayed(() -> transport.write(cmd), INIT_COMMAND_SPACING_MS * i);
+            postInitStep(
+                    () -> {
+                        if (transport.getConnectionState() == ConnectionState.CONNECTED) {
+                            transport.write(cmd);
+                        }
+                    },
+                    INIT_COMMAND_SPACING_MS * i);
         }
         // The first board dump (answer to the board-state request above) arrives
         // while the burst is still going, and a mismatch found in it lights LEDs
@@ -431,8 +451,24 @@ public class PegasusGameBridge {
         // on the board (init still in progress, or wiped by the update-mode
         // command). Re-assert whatever is currently lit once the burst is over;
         // a no-op when nothing is (or no longer) lit.
-        mainHandler.postDelayed(this::reassertLedsAfterInit, INIT_COMMAND_SPACING_MS * seq.length);
+        postInitStep(this::reassertLedsAfterInit, INIT_COMMAND_SPACING_MS * seq.length);
         mainHandler.postDelayed(keepalivePollRunnable, INIT_COMMAND_SPACING_MS * seq.length);
+    }
+
+    /**
+     * Schedules one step of the init burst, tagged with {@link #initSequenceToken}. Built from a
+     * {@link Message} because {@code Handler.postDelayed(Runnable, Object, long)} needs API 28 and
+     * the app supports 26.
+     */
+    private void postInitStep(Runnable step, long delayMs) {
+        Message message = Message.obtain(mainHandler, step);
+        message.obj = initSequenceToken;
+        mainHandler.sendMessageDelayed(message, delayMs);
+    }
+
+    /** Drops every not-yet-run step of the init burst; a no-op when none is pending. */
+    private void cancelInitSequence() {
+        mainHandler.removeCallbacksAndMessages(initSequenceToken);
     }
 
     /**
