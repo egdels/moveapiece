@@ -46,6 +46,9 @@
 @property(nonatomic, assign) NSUInteger subscribedCount;
 /* startScan was called before CoreBluetooth reported its power state; run it once it does. */
 @property(nonatomic, assign) BOOL scanPending;
+/* Device a connect was requested for before the central reported its first state, see
+ * connectToDeviceId:. */
+@property(nonatomic, strong) NSString *pendingConnectDeviceId;
 @property(nonatomic, assign) JavaVM *jvm;
 @property(nonatomic, assign) jobject javaTransport;
 
@@ -255,6 +258,29 @@ static void reportDataSent(PegasusBleBridge *bridge, NSData *data) {
     return env;
 }
 
+// Maps a CBCentralManager state other than poweredOn to the TransportError name and a detail
+// that says what the user can actually do about it: "unauthorized" (Bluetooth privacy setting
+// off for this app, or the system prompt dismissed) is a different problem from a powered-off
+// adapter, and macOS reports both through the same state property.
+static NSString *stateErrorCode(CBManagerState state) {
+    return state == CBManagerStateUnauthorized ? @"PERMISSION_DENIED" : @"BLUETOOTH_DISABLED";
+}
+
+static NSString *stateErrorDetail(CBManagerState state) {
+    switch (state) {
+        case CBManagerStateUnauthorized:
+            return @"Bluetooth access is not allowed for this app (System Settings > Privacy & "
+                   @"Security > Bluetooth)";
+        case CBManagerStateUnsupported:
+            return @"Bluetooth Low Energy is not supported on this machine";
+        case CBManagerStatePoweredOff:
+            return @"Bluetooth is powered off";
+        default:
+            return [NSString stringWithFormat:@"Bluetooth is not available (CoreBluetooth state %ld)",
+                                              (long) state];
+    }
+}
+
 - (void)startScan {
     if (self.central.state == CBManagerStateUnknown || self.central.state == CBManagerStateResetting) {
         // A freshly created CBCentralManager reports its state asynchronously; a scan
@@ -264,7 +290,7 @@ static void reportDataSent(PegasusBleBridge *bridge, NSData *data) {
         return;
     }
     if (self.central.state != CBManagerStatePoweredOn) {
-        reportScanFailed(self, @"BLUETOOTH_DISABLED", @"Bluetooth is not powered on");
+        reportScanFailed(self, stateErrorCode(self.central.state), stateErrorDetail(self.central.state));
         return;
     }
     [self.peripheralsById removeAllObjects];
@@ -282,11 +308,30 @@ static void reportDataSent(PegasusBleBridge *bridge, NSData *data) {
 }
 
 - (void)connectToDeviceId:(NSString *)deviceId {
+    if (self.central.state == CBManagerStateUnknown || self.central.state == CBManagerStateResetting) {
+        // Same situation as in startScan: a transport created a moment ago (the app switched the
+        // board type and connects with the new type's transport right away) has a central whose
+        // state is still pending. Defer to centralManagerDidUpdateState: instead of refusing.
+        self.pendingConnectDeviceId = deviceId;
+        return;
+    }
     if (self.central.state != CBManagerStatePoweredOn) {
-        reportError(self, @"BLUETOOTH_DISABLED", @"Bluetooth is not powered on");
+        reportError(self, stateErrorCode(self.central.state), stateErrorDetail(self.central.state));
         return;
     }
     CBPeripheral *peripheral = self.peripheralsById[deviceId];
+    if (peripheral == nil) {
+        // Not discovered by this central: the scan ran on another transport instance (board type
+        // switched between scan and connect). CoreBluetooth keeps peripherals the process has
+        // seen, so look it up by identifier instead of demanding a rescan.
+        NSUUID *uuid = [[NSUUID alloc] initWithUUIDString:deviceId];
+        if (uuid != nil) {
+            peripheral = [self.central retrievePeripheralsWithIdentifiers:@[ uuid ]].firstObject;
+        }
+        if (peripheral != nil) {
+            self.peripheralsById[deviceId] = peripheral;
+        }
+    }
     if (peripheral == nil) {
         reportError(self, @"CONNECT_FAILED", @"Device not found - rescan required");
         return;
@@ -303,6 +348,7 @@ static void reportDataSent(PegasusBleBridge *bridge, NSData *data) {
 }
 
 - (void)disconnect {
+    self.pendingConnectDeviceId = nil;
     if (self.connectedPeripheral != nil) {
         [self.central cancelPeripheralConnection:self.connectedPeripheral];
     }
@@ -329,9 +375,17 @@ static void reportDataSent(PegasusBleBridge *bridge, NSData *data) {
 - (void)centralManagerDidUpdateState:(CBCentralManager *)central {
     // startScan/connectToDeviceId check central.state synchronously themselves;
     // only a scan requested before the first state report is deferred to here.
-    if (self.scanPending && central.state != CBManagerStateUnknown && central.state != CBManagerStateResetting) {
+    if (central.state == CBManagerStateUnknown || central.state == CBManagerStateResetting) {
+        return;
+    }
+    if (self.scanPending) {
         self.scanPending = NO;
         [self startScan];
+    }
+    if (self.pendingConnectDeviceId != nil) {
+        NSString *deviceId = self.pendingConnectDeviceId;
+        self.pendingConnectDeviceId = nil;
+        [self connectToDeviceId:deviceId];
     }
 }
 
