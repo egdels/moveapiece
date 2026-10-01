@@ -52,6 +52,7 @@ import de.schliweb.moveapiece.engine.NnueAssets;
 import de.schliweb.moveapiece.engine.StockfishEngine;
 import de.schliweb.moveapiece.engine.UciInfoParser;
 import de.schliweb.moveapiece.logic.BoardType;
+import de.schliweb.moveapiece.logic.BoardTypeDetection;
 import de.schliweb.moveapiece.logic.ChessGame;
 import de.schliweb.moveapiece.logic.GameSetup;
 import de.schliweb.moveapiece.logic.Opponent;
@@ -162,6 +163,13 @@ public class MainActivity extends AppCompatActivity
     private PhysicalBoardBridge board;
 
     private BoardType boardType;
+
+    /**
+     * In progress while a device picked from the scan list is being probed for its type, see {@link
+     * #connectWithDetection}; null otherwise.
+     */
+    private BoardTypeDetection detection;
+
     private ActivityResultLauncher<String[]> blePermissionLauncher;
     private ActivityResultLauncher<String> pgnImportLauncher;
 
@@ -500,6 +508,7 @@ public class MainActivity extends AppCompatActivity
     }
 
     private void showPegasusScanDialog() {
+        detection = null;
         List<DiscoveredDevice> found = new ArrayList<>();
         ArrayAdapter<String> adapter =
                 new ArrayAdapter<>(this, android.R.layout.simple_list_item_1);
@@ -514,7 +523,7 @@ public class MainActivity extends AppCompatActivity
                                 adapter,
                                 (dialog, which) -> {
                                     board.stopScan();
-                                    board.connect(found.get(which).getAddress());
+                                    connectWithDetection(found.get(which));
                                 })
                         .setNegativeButton(
                                 R.string.action_cancel, (dialog, which) -> board.stopScan())
@@ -624,7 +633,7 @@ public class MainActivity extends AppCompatActivity
         String[] labels = new String[types.length];
         int checked = 0;
         for (int i = 0; i < types.length; i++) {
-            labels[i] = types[i].displayName();
+            labels[i] = types[i].chooserLabel();
             if (types[i] == boardType) {
                 checked = i;
             }
@@ -643,24 +652,58 @@ public class MainActivity extends AppCompatActivity
                         .show();
     }
 
+    /** {@link #applyBoardType} for a choice made in the board-type dialog; reopens the scan. */
+    private void switchBoardType(BoardType type) {
+        applyBoardType(type);
+        showPegasusScanDialog();
+    }
+
     /**
      * Replaces the current bridge with one for {@code type}: the old one is disconnected and shut
-     * down (recording included), the choice is persisted, and the scan dialog reopens.
+     * down (recording included) and the choice is persisted. No-op if {@code type} is current.
      */
-    private void switchBoardType(BoardType type) {
-        if (type != boardType) {
-            // Detach first: a late callback from the old bridge must not be attributed to the
-            // new board (toasts and button label use boardType).
-            board.detachListener();
-            board.shutdown();
-            boardType = type;
-            settings.setBoardType(type);
-            board = createBoardBridge(type);
-            maybeStartPegasusRecording();
-            updatePegasusButtonLabel(board.getConnectionState());
-            updatePegasusMismatchText();
+    private void applyBoardType(BoardType type) {
+        if (type == boardType) {
+            return;
         }
-        showPegasusScanDialog();
+        // Detach first: a late callback from the old bridge must not be attributed to the
+        // new board (toasts and button label use boardType).
+        board.detachListener();
+        board.shutdown();
+        boardType = type;
+        settings.setBoardType(type);
+        board = createBoardBridge(type);
+        maybeStartPegasusRecording();
+        updatePegasusButtonLabel(board.getConnectionState());
+        updatePegasusMismatchText();
+    }
+
+    /**
+     * Connects to a device picked from the scan list, working out its type on the way: the bridge
+     * of the most likely type (advertised name, else the configured type) connects first; if its
+     * transport then reports the type's GATT service missing, {@link #onTransportError} switches to
+     * the next type and connects again. The type that succeeds is persisted by {@link
+     * #applyBoardType}, so the board-type dialog only matters for devices with unknown names.
+     */
+    private void connectWithDetection(DiscoveredDevice device) {
+        detection = BoardTypeDetection.start(device.getAddress(), device.getName(), boardType);
+        Log.i(
+                TAG,
+                "Board type detection for '"
+                        + (device.getName() == null ? "" : device.getName().trim())
+                        + "': trying "
+                        + detection.current()
+                        + " (configured "
+                        + boardType
+                        + ")");
+        applyBoardType(detection.current());
+        board.connect(device.getAddress());
+    }
+
+    /** True for the errors a transport raises when the connected device lacks the profile. */
+    private static boolean isWrongProfileError(TransportError error) {
+        return error == TransportError.SERVICE_NOT_FOUND
+                || error == TransportError.CHARACTERISTIC_NOT_FOUND;
     }
 
     /**
@@ -734,6 +777,7 @@ public class MainActivity extends AppCompatActivity
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         }
         if (state == ConnectionState.CONNECTED) {
+            detection = null; // the type that connected is the right one
             // The bridge only replays moves it actually observed (physical
             // moves, guided engine moves); on-screen play while the board
             // was disconnected leaves its own position stale. Push MoveAPiece's
@@ -989,6 +1033,22 @@ public class MainActivity extends AppCompatActivity
 
     @Override
     public void onTransportError(TransportError error, String detail) {
+        if (detection != null && isWrongProfileError(error)) {
+            BoardType next = detection.next();
+            if (next != null) {
+                // Not this type: the old bridge is shut down by applyBoardType (which also
+                // stops its automatic reconnect attempts), the next candidate connects.
+                Log.i(TAG, "Not a " + boardType + " (" + error + "), trying " + next);
+                applyBoardType(next);
+                board.connect(detection.address());
+                return;
+            }
+            // No supported board answered; leave the user's configured type in place.
+            BoardType configured = detection.configured();
+            detection = null;
+            Log.w(TAG, "No board type matched (" + error + "); keeping " + configured);
+            applyBoardType(configured);
+        }
         Toast.makeText(
                         this,
                         getString(R.string.board_error_format, boardType.displayName(), error),

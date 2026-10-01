@@ -191,11 +191,11 @@ labels, separately verified against real Pegasus hardware:
 No binaries from either project are included in this repository or in the
 built app; nothing beyond the protocol facts above was reused.
 
-## Chessnut Air board integration
+## Chessnut board integration
 
 `chessnut-core/` and the `chessnut/` packages in `app/` and `desktop/` are
-MoveAPiece's own code (GPLv3, same as the rest). The Chessnut Air BLE
-protocol implementation (`ChessnutUuids`, `ChessnutCommands`,
+MoveAPiece's own code (GPLv3, same as the rest). The Chessnut BLE
+protocol implementation (Air family: Air, Air+, Pro, Go) (`ChessnutUuids`, `ChessnutCommands`,
 `ChessnutFrameParser`, `ChessnutBoardReport`, `ChessnutPieceCodes`,
 `ChessnutDevice`) was written from publicly known facts about the board's
 BLE interface — service/characteristic UUIDs, the enable-reports, LED, beep

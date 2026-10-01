@@ -6,8 +6,9 @@
 package de.schliweb.chessnut.core.protocol;
 
 /**
- * Message type bytes of the Chessnut Air protocol. Every message is {@code <type> <length>
- * <payload[length]>} in both directions; all values VERIFIED on hardware.
+ * Message type bytes of the Chessnut protocol (Air family: Air, Air+, Pro, Go). Every message is
+ * {@code <type> <length> <payload[length]>} in both directions; all values VERIFIED on a Chessnut
+ * Air.
  */
 public final class ChessnutMessageType {
 

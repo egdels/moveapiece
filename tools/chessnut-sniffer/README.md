@@ -1,7 +1,11 @@
-# Chessnut Air BLE sniffer
+# Chessnut BLE sniffer
 
-Hardware verification tool: records what a Chessnut Air actually sends over
-BLE so the protocol module can be written against captured bytes.
+Hardware verification tool: records what a Chessnut board actually sends
+over BLE so the protocol module can be written against captured bytes.
+Verified so far with a Chessnut Air; if you own an Air+, Pro or Go, a
+capture of the start position, a few moves and each button press is what
+is needed to confirm those models (see "Other models" in
+`CHESSNUT_PROTOCOL.md`).
 
 ```
 python3 -m venv .venv && .venv/bin/pip install bleak

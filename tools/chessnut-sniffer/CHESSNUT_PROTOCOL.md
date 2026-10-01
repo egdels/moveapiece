@@ -113,6 +113,37 @@ promotion without a UI prompt.
 index 8*i + j, the same numbering as the board report. `0a 08 01 00 00 00
 00 00 00 00` lit h8. All zeros switches everything off.
 
+## Other models
+
+Not verified on our hardware; collected from public sources on 2026-09-30.
+
+- **Air+, Pro, Go** share the GATT layout, the commands and the board
+  report above. The vendor's EasyLink SDK tells the models apart only by
+  USB product ID (Air `0x80xx`, Pro `0x81xx`, Air+ `0x82xx`, Evo `0x83xx`,
+  Go `0x85xx`, all vendor `0x2d80`), and the independent implementations
+  eChessGw (Air/Go/Pro), EasyLinkSwiftSDK ("classic" profile: Air, Air+,
+  Go, Pro) and BoardKit drive all of them with one profile. MoveAPiece
+  therefore lists them as supported, with the caveat that only the Air has
+  been tested. Points to confirm with a capture:
+  - Advertised name. eChessGw also matches `smart chess`, so some
+    firmware may not start with `Chessnut`. MoveAPiece does not filter by
+    name, the user picks the device from the scan list.
+  - Button codes on the Go, which has several front buttons. MoveAPiece
+    acts only on `0f 01 02` (NEW GAME) and logs any other code as an
+    unknown frame. A Go button other than NEW GAME sending `02` would
+    restart the game; a NEW GAME button sending another code would do
+    nothing. Third parties report unspecified "Air/Go differences" without
+    documenting them.
+- **Move** uses the same services, `21 01 00` and the same board report,
+  but different LED (`43 20` + 32 colour nibble bytes) and battery
+  (`41 01 0c`, reply `41 03 0c <charging> <level>`) commands plus motorised
+  auto-move (`42 21` + board + force flag); documented by the vendor in
+  `chessnutech/chess_move_api`. No button event is documented; its reset
+  button moves all pieces back to the start position. Not supported.
+- **Evo** is an Android device that runs chess apps itself; third-party
+  software connects to it over Wi-Fi (DGT emulation), not BLE. Out of
+  scope.
+
 ## Still open
 
 - Battery flag semantics while charging.

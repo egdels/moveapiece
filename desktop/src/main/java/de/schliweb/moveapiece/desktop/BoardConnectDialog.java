@@ -35,9 +35,9 @@ import javafx.stage.Stage;
  * once closed either way - mirrors the Android app's {@code MainActivity.showPegasusScanDialog},
  * minus the runtime-permission step (macOS has no Android-style BLE permission prompt).
  *
- * <p>A choice box switches the board type (DGT Pegasus / Chessnut Air); {@code switcher} is asked
- * for the bridge of the chosen type, which the dialog then scans with. The address returned belongs
- * to whichever bridge the switcher last returned.
+ * <p>A choice box switches the board type (DGT Pegasus / Chessnut); {@code switcher} is asked for
+ * the bridge of the chosen type, which the dialog then scans with. The address returned belongs to
+ * whichever bridge the switcher last returned.
  */
 final class BoardConnectDialog {
 
@@ -45,7 +45,7 @@ final class BoardConnectDialog {
 
     private BoardConnectDialog() {}
 
-    static Optional<String> show(
+    static Optional<DiscoveredDevice> show(
             Stage owner, BoardType current, Function<BoardType, PhysicalBoardBridge> switcher) {
         ObservableList<DiscoveredDevice> items = FXCollections.observableArrayList();
         ListView<DiscoveredDevice> listView = new ListView<>(items);
@@ -79,7 +79,7 @@ final class BoardConnectDialog {
                 new javafx.util.StringConverter<>() {
                     @Override
                     public String toString(BoardType type) {
-                        return type == null ? "" : type.displayName();
+                        return type == null ? "" : type.chooserLabel();
                     }
 
                     @Override
@@ -91,7 +91,7 @@ final class BoardConnectDialog {
         typeRow.setStyle("-fx-alignment: center-left;");
         VBox content = new VBox(8, typeRow, listView);
 
-        Dialog<String> dialog = new Dialog<>();
+        Dialog<DiscoveredDevice> dialog = new Dialog<>();
         dialog.initOwner(owner);
         dialog.setTitle(Messages.get("dialog_board_connect_format", current.displayName()));
         dialog.getDialogPane().setContent(content);
@@ -173,11 +173,10 @@ final class BoardConnectDialog {
                     if (buttonType != connectType) {
                         return null;
                     }
-                    DiscoveredDevice selected = listView.getSelectionModel().getSelectedItem();
-                    return selected == null ? null : selected.getAddress();
+                    return listView.getSelectionModel().getSelectedItem();
                 });
 
-        Optional<String> result = dialog.showAndWait();
+        Optional<DiscoveredDevice> result = dialog.showAndWait();
         if (bridge[0] != null) {
             bridge[0].stopScan();
         }

@@ -10,8 +10,9 @@ the JDK's own `jpackage`.
 
 Optionally connects to a physical chess board over Bluetooth LE — a
 [DGT Pegasus](https://digitalgametechnology.com/) or a
-[Chessnut Air](https://www.chessnutech.com/) (Android and all three desktop
-OSes), so you can play Stockfish on a real board instead of tapping the screen.
+[Chessnut](https://www.chessnutech.com/) Air, Air+, Pro or Go (Android and
+all three desktop OSes), so you can play Stockfish on a real board instead of
+tapping the screen.
 
 ## Features
 
@@ -55,14 +56,25 @@ OSes), so you can play Stockfish on a real board instead of tapping the screen.
     banner hint (lift the piece once). Hardware-verified on Android, macOS
     (Apple Silicon and Intel) and Windows; the Linux transport is
     implementation-complete but not yet hardware-verified.
-  - **Chessnut Air** identifies every piece, so captures and promotions
-    are recognised directly (set the promoted piece down, no dialog), a
-    position set up on the board can be taken over into the game (tap the
-    mismatch banner), move sounds play on the board's own speaker, and its
-    NEW GAME button restarts what was last played (the same training line,
-    or a fresh game against the same opponent). Hardware-verified on Android
-    and macOS; Windows and Linux share the same transports and are
-    expected to work but are not yet verified.
+  - **Chessnut Air, Air+, Pro, Go** identify every piece, so captures and
+    promotions are recognised directly (set the promoted piece down, no
+    dialog), a position set up on the board can be taken over into the game
+    (tap the mismatch banner), move sounds play on the board's own speaker,
+    and the NEW GAME button restarts what was last played (the same training
+    line, or a fresh game against the same opponent). Hardware-verified with
+    a Chessnut Air on Android and macOS; Windows and Linux share the same
+    transports and are expected to work but are not yet verified. The Air+,
+    Pro and Go speak the same BLE protocol according to the vendor's
+    EasyLink SDK and independent implementations, but have not been tested
+    with MoveAPiece yet — reports (and captures made with
+    `tools/chessnut-sniffer/`) are welcome. The Chessnut Move uses a
+    different command set and is not supported; the Evo connects to
+    third-party software over Wi-Fi rather than BLE.
+  - **Board type detection**: pick the board from the scan list and the app
+    works out whether it is a Pegasus or a Chessnut by probing its GATT
+    services (advertised name as a first guess, then the remaining types),
+    remembering the answer. The board-type chooser stays as a fallback for
+    devices with unknown names.
 
 ## Tech stack
 
@@ -74,7 +86,7 @@ OSes), so you can play Stockfish on a real board instead of tapping the screen.
 | Chess rules | [chesslib](https://github.com/bhlangonijr/chesslib) (MIT) |
 | Engine | [Stockfish](https://github.com/official-stockfish/Stockfish) (GPLv3), built from source, driven over UCI through `ProcessBuilder` — via the NDK on Android, via the host's native toolchain (Makefile `COMP=gcc`/`clang`/`mingw`) on desktop |
 | Human-like opponent | [Maia](https://github.com/CSSLab/maia-chess) (GPLv3, original lc0-based weights, not the newer AGPL-3.0 Maia-3), 9 bundled rating levels (1100–1900), run in-process via [ONNX Runtime](https://github.com/microsoft/onnxruntime) (MIT) — a single forward pass per move, no subprocess/UCI involved unlike Stockfish |
-| Physical boards | DGT Pegasus: vendored from a companion project's `core`/BLE-transport modules (GPLv3, own code — see [Third-Party Notices](THIRD-PARTY-NOTICES.md)). Chessnut Air: `chessnut-core`, own implementation of the board's BLE protocol, verified byte by byte against real hardware with the capture tool in `tools/chessnut-sniffer/` (protocol notes there), plus piece-identity-based move detection on top of `pegasus-core`'s chess model. Transport implementations (shared by both boards through a per-board GATT profile): Android (`android.bluetooth.*`), desktop/macOS (CoreBluetooth via a small in-house Objective-C/JNI bridge, `desktop/src/main/native/macos/`), desktop/Windows (Windows Runtime `Windows.Devices.Bluetooth` via a small in-house C++/WinRT/JNI bridge, `desktop/src/main/native/windows/`, MSVC-built), desktop/Linux ([bluez-dbus](https://github.com/hypfvieh/bluez-dbus)/[dbus-java](https://github.com/hypfvieh/dbus-java), both MIT — pure Java, no native code, since BlueZ's GATT client API is fully reachable over D-Bus). No third-party dependency for macOS/Windows: the one mature cross-platform BLE library (SimpleBLE) is BUSL-1.1-licensed, not GPL/FOSS |
+| Physical boards | DGT Pegasus: vendored from a companion project's `core`/BLE-transport modules (GPLv3, own code — see [Third-Party Notices](THIRD-PARTY-NOTICES.md)). Chessnut (Air family): `chessnut-core`, own implementation of the board's BLE protocol, verified byte by byte against a real Chessnut Air with the capture tool in `tools/chessnut-sniffer/` (protocol notes there), plus piece-identity-based move detection on top of `pegasus-core`'s chess model. Transport implementations (shared by both boards through a per-board GATT profile): Android (`android.bluetooth.*`), desktop/macOS (CoreBluetooth via a small in-house Objective-C/JNI bridge, `desktop/src/main/native/macos/`), desktop/Windows (Windows Runtime `Windows.Devices.Bluetooth` via a small in-house C++/WinRT/JNI bridge, `desktop/src/main/native/windows/`, MSVC-built), desktop/Linux ([bluez-dbus](https://github.com/hypfvieh/bluez-dbus)/[dbus-java](https://github.com/hypfvieh/dbus-java), both MIT — pure Java, no native code, since BlueZ's GATT client API is fully reachable over D-Bus). No third-party dependency for macOS/Windows: the one mature cross-platform BLE library (SimpleBLE) is BUSL-1.1-licensed, not GPL/FOSS |
 | License | GPLv3 (required by the Stockfish dependency) |
 
 ## Building
@@ -206,7 +218,7 @@ app/                    Android application module
 │   ├── ui/               Board view, sound effects, opening library/preview screens
 │   ├── board/            PhysicalBoardBridge: one interface over both boards, adapters
 │   ├── pegasus/          Bridge between the DGT Pegasus and ChessGame
-│   ├── chessnut/         Bridge between the Chessnut Air and ChessGame (thin, logic in chessnut-core)
+│   ├── chessnut/         Bridge between a Chessnut board and ChessGame (thin, logic in chessnut-core)
 │   └── MainActivity.java
 ├── src/main/java/de/schliweb/pegasus/bluetooth/  BLE transport (vendored, profile-aware)
 ├── src/main/cpp/stockfish/                       Stockfish, pinned git submodule
@@ -221,7 +233,7 @@ desktop/                JavaFX desktop application module
 │   ├── board/            PhysicalBoardBridge: one interface over both boards, adapters
 │   ├── pegasus/          Bridge between the DGT Pegasus and ChessGame, plus the
 │   │                     per-OS BLE transports (macOS/Windows/Linux, profile-aware)
-│   ├── chessnut/         Bridge between the Chessnut Air and ChessGame
+│   ├── chessnut/         Bridge between a Chessnut board and ChessGame
 │   ├── Messages.java          Localized strings (i18n/Messages*.properties)
 │   └── DesktopApp.java, Launcher.java, Styles.java, MoveSoundPlayer.java, ...
 ├── src/main/native/macos/, src/main/native/windows/   Objective-C/JNI and C++/WinRT/JNI
@@ -242,7 +254,7 @@ pegasus-core/            DGT Pegasus protocol + chess-rules/move-detection
                          :chessnut-core (chess model, BoardState, BLE
                          profile) and by :core's own tests
 
-chessnut-core/           Chessnut Air protocol (frames, board reports with
+chessnut-core/           Chessnut protocol, Air family (frames, board reports with
                          piece identity, LEDs, beep, battery, button) and
                          the identity-based move detection/game flow shared
                          by :app and :desktop

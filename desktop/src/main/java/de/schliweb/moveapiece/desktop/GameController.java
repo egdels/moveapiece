@@ -26,6 +26,7 @@ import de.schliweb.moveapiece.engine.NnueAssets;
 import de.schliweb.moveapiece.engine.StockfishEngine;
 import de.schliweb.moveapiece.engine.UciInfoParser;
 import de.schliweb.moveapiece.logic.BoardType;
+import de.schliweb.moveapiece.logic.BoardTypeDetection;
 import de.schliweb.moveapiece.logic.ChessGame;
 import de.schliweb.moveapiece.logic.GameSetup;
 import de.schliweb.moveapiece.logic.Opponent;
@@ -36,6 +37,7 @@ import de.schliweb.moveapiece.training.TrainingSession;
 import de.schliweb.pegasus.core.protocol.BoardState;
 import de.schliweb.pegasus.core.transport.BleProfile;
 import de.schliweb.pegasus.core.transport.ConnectionState;
+import de.schliweb.pegasus.core.transport.DiscoveredDevice;
 import de.schliweb.pegasus.core.transport.PegasusTransport;
 import de.schliweb.pegasus.core.transport.TransportError;
 import java.io.FileNotFoundException;
@@ -330,11 +332,17 @@ final class GameController
     private final TrainingFlow trainingFlow =
             new TrainingFlow(game, new TrainingBoardAdapter(), new TrainingHostAdapter());
 
-    // ---- Physical board (DGT Pegasus or Chessnut Air) ----------------------------
+    // ---- Physical board (DGT Pegasus or Chessnut) --------------------------------
     /** The selected board's bridge; null on hosts without a transport (see createBoardBridge). */
     private PhysicalBoardBridge pegasusBridge;
 
     private BoardType boardType;
+
+    /**
+     * In progress while a device picked from the scan list is being probed for its type, see {@link
+     * #connectWithDetection}; null otherwise.
+     */
+    private BoardTypeDetection detection;
 
     /**
      * Whether an engine reply applied to the game still owes its move sound: with a Pegasus board
@@ -820,13 +828,30 @@ final class GameController
             pegasusBridge.disconnect();
             return;
         }
+        detection = null;
         BoardConnectDialog.show(stage, boardType, this::switchBoardType)
-                .ifPresent(
-                        address -> {
-                            if (pegasusBridge != null) {
-                                pegasusBridge.connect(address);
-                            }
-                        });
+                .ifPresent(this::connectWithDetection);
+    }
+
+    /**
+     * Connects to a device picked from the scan list, working out its type on the way: the bridge
+     * of the most likely type (advertised name, else the configured type) connects first; if its
+     * transport then reports the type's GATT service missing, {@link #onTransportError} switches to
+     * the next type and connects again. The type that succeeds is persisted by {@link
+     * #switchBoardType}, so the dialog's type box only matters for devices with unknown names.
+     */
+    private void connectWithDetection(DiscoveredDevice device) {
+        detection = BoardTypeDetection.start(device.getAddress(), device.getName(), boardType);
+        PhysicalBoardBridge bridge = switchBoardType(detection.current());
+        if (bridge != null) {
+            bridge.connect(device.getAddress());
+        }
+    }
+
+    /** True for the errors a transport raises when the connected device lacks the profile. */
+    private static boolean isWrongProfileError(TransportError error) {
+        return error == TransportError.SERVICE_NOT_FOUND
+                || error == TransportError.CHARACTERISTIC_NOT_FOUND;
     }
 
     /**
@@ -904,6 +929,7 @@ final class GameController
         updatePegasusButtonState(state);
         updatePegasusMismatchLabel();
         if (state == ConnectionState.CONNECTED) {
+            detection = null; // the type that connected is the right one
             // The bridge only replays moves it actually observed (physical moves,
             // guided engine moves); on-screen play while the board was disconnected
             // leaves its own position stale. Push the authoritative position on
@@ -1162,6 +1188,23 @@ final class GameController
     @Override
     public void onTransportError(TransportError error, String detail) {
         LOG.log(Level.WARNING, "Board transport error {0}: {1}", new Object[] {error, detail});
+        if (detection != null && isWrongProfileError(error)) {
+            BoardType next = detection.next();
+            if (next != null) {
+                // Not this type: switchBoardType shuts the old bridge down (which also stops
+                // its automatic reconnect attempts), the next candidate connects.
+                LOG.log(Level.INFO, "Not a {0}, trying {1}", new Object[] {boardType, next});
+                PhysicalBoardBridge bridge = switchBoardType(next);
+                if (bridge != null) {
+                    bridge.connect(detection.address());
+                    return;
+                }
+            }
+            // No supported board answered; leave the user's configured type in place.
+            BoardType configured = detection.configured();
+            detection = null;
+            switchBoardType(configured);
+        }
         showError(Messages.get("board_error_format", boardType.displayName(), error));
     }
 

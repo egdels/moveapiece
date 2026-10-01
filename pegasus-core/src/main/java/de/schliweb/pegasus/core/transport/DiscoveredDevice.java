@@ -60,11 +60,17 @@ public final class DiscoveredDevice {
 
     /**
      * Heuristic only: name matches the pattern observed on the reference implementation ({@code
-     * PCS-REVII-######}). Never the sole identification criterion; final verification happens after
-     * connect via GATT services.
+     * PCS-REVII-######}) or the default documented by DGT ({@code DGT_PEGASUS_<serial>}). The
+     * Pegasus name can be changed by any app holding a developer key (DGT_SET_BOARD_NAME), so this
+     * is never the sole identification criterion; final verification happens after connect via GATT
+     * services.
      */
     public boolean nameLooksLikePegasus() {
-        return name != null && name.toUpperCase().startsWith("PCS-REVII");
+        if (name == null) {
+            return false;
+        }
+        String upper = name.trim().toUpperCase(java.util.Locale.ROOT);
+        return upper.startsWith("PCS-REVII") || upper.startsWith("DGT_PEGASUS");
     }
 
     @Override

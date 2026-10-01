@@ -9,8 +9,11 @@ import de.schliweb.pegasus.core.transport.BleProfile;
 import java.util.Arrays;
 
 /**
- * BLE UUIDs of a Chessnut Air, VERIFIED on real hardware 2026-09-26 (see
- * tools/chessnut-sniffer/CHESSNUT_PROTOCOL.md).
+ * BLE UUIDs of the Chessnut Air family, VERIFIED on a Chessnut Air 2026-09-26 (see
+ * tools/chessnut-sniffer/CHESSNUT_PROTOCOL.md). The Air+, Pro and Go share this GATT layout and
+ * command set according to the vendor's EasyLink SDK and independent implementations, but none of
+ * them has been tested with MoveAPiece yet; the Chessnut Move uses different LED and battery
+ * commands and is not supported.
  *
  * <p>Unlike the Pegasus, commands and board reports live in two different services: the app writes
  * to {@link #COMMAND_WRITE_CHARACTERISTIC}, replies (acks, battery, button events) arrive on {@link
@@ -45,7 +48,7 @@ public final class ChessnutUuids {
     /** Transport wiring: write to the command service, subscribe to replies and board reports. */
     public static final BleProfile PROFILE =
             new BleProfile(
-                    "Chessnut Air",
+                    "Chessnut",
                     COMMAND_SERVICE,
                     COMMAND_WRITE_CHARACTERISTIC,
                     Arrays.asList(

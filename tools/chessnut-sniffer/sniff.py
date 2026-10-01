@@ -2,9 +2,10 @@
 # Copyright (C) 2026 Christian Kierdorf
 # SPDX-License-Identifier: GPL-3.0-or-later
 """
-Chessnut Air BLE sniffer — hardware verification tool for MoveAPiece.
+Chessnut BLE sniffer — hardware verification tool for MoveAPiece.
 
-Purpose: capture the real bytes a Chessnut Air sends over BLE so the
+Purpose: capture the real bytes a Chessnut board (verified: Air; same
+protocol expected on Air+, Pro and Go) sends over BLE so the
 protocol module can be written against recorded data rather than
 assumptions. Everything marked ASSUMED below comes from public
 reverse-engineering notes and must be confirmed on the board.
