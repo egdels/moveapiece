@@ -9,6 +9,9 @@ Pro and Go listed alongside the Air.
   device from the scan list and the app finds out whether it is a DGT
   Pegasus or a Chessnut by checking its Bluetooth services, then
   remembers the answer. The type chooser stays as a fallback.
+* DGT Pegasus: disconnecting right after connecting no longer leaves
+  stray "write failed" errors behind, and a reconnect during the
+  board's start-up sequence no longer confuses it.
 
 * Windows: a board that drops the link while its services are still
   being looked up no longer triggers a cascade of "service not found"
