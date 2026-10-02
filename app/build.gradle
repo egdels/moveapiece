@@ -65,9 +65,15 @@ android {
     // always resolves the one matching the device's ABI. universalApk stays
     // on too, for a single no-thinking-required download - e.g. the fat
     // APK release.yml attaches to a GitHub Release.
+    // -PabiSplits=false turns the splits off for one invocation. Needed for
+    // the App Bundle: with splits on, R8's resource shrinking emits one
+    // shrunk-resources set per split and buildReleasePreBundle refuses to
+    // pick ("Multiple shrunk-resources files found", AGP issue 402800800).
+    // The bundle carries every ABI anyway and Play serves per-device
+    // splits of its own, so nothing is lost. APK builds keep the default.
     splits {
         abi {
-            enable true
+            enable = (project.findProperty("abiSplits") ?: "true").toString().toBoolean()
             reset()
             include "armeabi-v7a", "arm64-v8a", "x86_64"
             universalApk true

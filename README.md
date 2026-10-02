@@ -138,9 +138,13 @@ when all four are set):
 ```sh
 RELEASE_KEYSTORE_PATH=/path/to/release.keystore \
 SIGNING_KEY_ALIAS=... SIGNING_KEY_PASSWORD=... SIGNING_STORE_PASSWORD=... \
-./gradlew :app:bundleRelease
+./gradlew -PabiSplits=false :app:bundleRelease
 # -> app/build/outputs/bundle/release/app-release.aab
 ```
+
+`-PabiSplits=false` switches the per-ABI splits off for that invocation;
+the bundle cannot be built with them on (see the `splits` block in
+`app/build.gradle`).
 
 ### Desktop
 

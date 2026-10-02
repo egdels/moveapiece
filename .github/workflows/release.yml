@@ -154,19 +154,24 @@ jobs:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
 
-      # One Gradle invocation for both: the per-ABI APKs plus the universal
-      # one (sideloading, F-Droid's reproducibility reference) and the App
-      # Bundle that Google Play requires for uploads. Both are signed with
-      # the same release key; on Play that key acts as the upload key and
-      # Play re-signs what it serves. The bundle has no ABI filter, so it
-      # keeps the base versionCode (appVersionCode), like the universal APK.
+      # The per-ABI APKs plus the universal one (sideloading, F-Droid's
+      # reproducibility reference), then the App Bundle that Google Play
+      # requires for uploads. Two Gradle invocations, because the bundle
+      # needs the ABI splits off (-PabiSplits=false, see app/build.gradle's
+      # splits block) and that is a configuration-time switch. Both are
+      # signed with the same release key; on Play that key acts as the
+      # upload key and Play re-signs what it serves. The bundle has no ABI
+      # filter, so it keeps the base versionCode (appVersionCode), like the
+      # universal APK.
       - name: Build signed release APKs and App Bundle
         env:
           RELEASE_KEYSTORE_PATH: ${{ runner.temp }}/release.keystore
           SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
-        run: ./gradlew --no-daemon :app:assembleRelease :app:bundleRelease
+        run: |
+          ./gradlew --no-daemon :app:assembleRelease
+          ./gradlew --no-daemon -PabiSplits=false :app:bundleRelease
 
       - name: Upload APKs to the release
         env:
