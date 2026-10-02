@@ -1,0 +1,28 @@
+Openen en spelen. MoveAPiece is een offline schaakapp die meteen start met een partij tegen de schaakengine Stockfish. Geen account, geen advertenties, geen internetverbinding, geen instellingenscherm. Eén dialoog „Nieuw spel” dekt alle keuzes (tegenstander, kleur, speelsterkte, opening), en de app onthoudt ze voor de volgende keer.
+
+SCHAKEN TEGEN DE COMPUTER
+• Stockfish, de bekende opensource-schaakengine, met instelbare speelsterkte van 1320 tot 3190 Elo, van beginner tot meesterniveau
+• Maia, een menselijk spelende schaak-AI: ze speelt de zetten die een speler met de gekozen rating (1100 tot 1900) doorgaans zou spelen, met natuurlijke bedenktijd. Een tegenstander die aanvoelt als een clubspeler, niet als een rekenmachine
+• Twee spelers op één telefoon of tablet
+
+SCHAAKOPENINGEN LEREN
+• Openingstraining met 20 bekende varianten, waaronder Spaans, Siciliaans Najdorf, Italiaanse partij, Damegambiet, Caro-Kann en Koningsindisch. De app speelt de boekkant en accepteert alleen het juiste antwoord
+• Openingsbibliotheek om elke variant zet voor zet door te nemen
+• Zetsuggesties tijdens het leren, uit te schakelen
+
+BETER WORDEN
+• Hintknop, optionele live-evaluatie, waarschuwing na een blunder
+• Partijanalyse die elke zet beoordeelt
+• Ongedaan maken, opnieuw, bord draaien, tik op een zet in de zettenlijst om ernaartoe te springen
+• PGN-import en -export om partijen te bestuderen of te delen
+
+ELEKTRONISCHE SCHAAKBORDEN
+Heb je een DGT Pegasus of een Chessnut Air, Air+, Pro of Go? Verbind het via Bluetooth en speel op het echte bord in plaats van op het scherm. Je zetten worden van de stukken afgelezen, de antwoorden van de tegenstander lichten op in de leds van het bord, en de app herkent zelf het bordtype. Het scherm blijft intussen bruikbaar, voor hints, evaluatie en de zettenlijst.
+
+OFFLINE EN PRIVÉ
+• Werkt volledig offline, niets verlaat je toestel
+• Geen account, geen advertenties, geen tracking, geen in-app-aankopen
+• De negen neurale netwerken van Maia zijn meegeleverd en draaien op het toestel
+• Vrij en open source (GPLv3), dezelfde app als op F-Droid
+
+Verder: zet-, slag- en schaakgeluiden; staand en liggend; lay-outs voor telefoon en tablet; Nederlands, Engels, Duits, Frans, Spaans en Italiaans.

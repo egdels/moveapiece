@@ -1,0 +1,28 @@
+Abre y juega. MoveAPiece es una app de ajedrez sin conexión que arranca directamente en una partida contra el motor de ajedrez Stockfish. Sin cuenta, sin anuncios, sin conexión a Internet, sin pantalla de ajustes. Un único diálogo «Partida nueva» cubre todas las decisiones (rival, color, fuerza, apertura), y la app lo recuerda para la próxima vez.
+
+JUGAR AL AJEDREZ CONTRA EL ORDENADOR
+• Stockfish, el conocido motor de ajedrez de código abierto, con fuerza de juego ajustable de 1320 a 3190 Elo, desde principiante hasta nivel de maestro
+• Maia, una IA de ajedrez de estilo humano: juega las jugadas que un jugador del rating elegido (1100 a 1900) haría normalmente, con pausas de reflexión naturales. Un rival que se siente como un jugador de club, no como una calculadora
+• Dos jugadores en el mismo teléfono o tableta
+
+APRENDER APERTURAS DE AJEDREZ
+• Entrenamiento de aperturas con 20 líneas conocidas, entre ellas la Apertura española, la Siciliana Najdorf, la Partida italiana, el Gambito de dama, la Caro-Kann y la India de rey. La app juega el lado del libro y solo acepta la respuesta correcta
+• Biblioteca de aperturas para repasar cada línea jugada a jugada
+• Sugerencias de jugada mientras aprendes, desactivables
+
+MEJORAR TU JUEGO
+• Botón de pista, evaluación en vivo opcional, aviso tras un error grave
+• Análisis de la partida que califica cada jugada
+• Deshacer, rehacer, girar el tablero, tocar cualquier jugada de la lista para saltar a ella
+• Importación y exportación PGN para estudiar o compartir tus partidas
+
+TABLEROS DE AJEDREZ ELECTRÓNICOS
+¿Tienes un DGT Pegasus o un Chessnut Air, Air+, Pro o Go? Conéctalo por Bluetooth y juega en el tablero real en lugar de la pantalla. Tus jugadas se detectan a partir de las piezas, las respuestas del rival se iluminan en los LED del tablero, y la app reconoce el tipo de tablero por sí sola. La pantalla sigue disponible al mismo tiempo, para pistas, evaluación y lista de jugadas.
+
+SIN CONEXIÓN Y PRIVADO
+• Funciona completamente sin conexión, nada sale de tu dispositivo
+• Sin cuenta, sin anuncios, sin rastreo, sin compras dentro de la app
+• Las nueve redes neuronales de Maia vienen incluidas y se ejecutan en el dispositivo
+• Libre y de código abierto (GPLv3), la misma app que en F-Droid
+
+Además: sonidos de jugada, captura y jaque; vertical y horizontal; diseños para teléfono y tableta; español, inglés, alemán, francés, italiano y neerlandés.

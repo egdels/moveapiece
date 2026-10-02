@@ -1,0 +1,1 @@
+Ajedrez sin conexión contra Stockfish o Maia, aperturas, DGT Pegasus y Chessnut

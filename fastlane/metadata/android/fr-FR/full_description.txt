@@ -1,0 +1,28 @@
+Ouvrez et jouez. MoveAPiece est une application d'échecs hors ligne qui démarre directement une partie contre le moteur d'échecs Stockfish. Pas de compte, pas de publicité, pas de connexion Internet, pas d'écran de réglages. Une seule boîte de dialogue « Nouvelle partie » couvre tous les choix (adversaire, couleur, force, ouverture), et l'application s'en souvient pour la prochaine fois.
+
+JOUER AUX ÉCHECS CONTRE L'ORDINATEUR
+• Stockfish, le célèbre moteur d'échecs open source, avec une force de jeu réglable de 1320 à 3190 Elo, du débutant au niveau maître
+• Maia, une IA d'échecs au jeu humain : elle joue les coups qu'un joueur du classement choisi (1100 à 1900) jouerait typiquement, avec des temps de réflexion naturels. Un adversaire qui ressemble à un joueur de club, pas à une calculatrice
+• Deux joueurs sur un même téléphone ou une même tablette
+
+APPRENDRE LES OUVERTURES D'ÉCHECS
+• Entraînement d'ouvertures avec 20 lignes connues, dont la Partie espagnole, la Sicilienne Najdorf, la Partie italienne, le Gambit dame, la Caro-Kann et l'Est-indienne. L'application joue le côté du livre et n'accepte que la bonne réponse
+• Bibliothèque d'ouvertures pour revoir chaque ligne coup par coup
+• Suggestions de coups pendant l'apprentissage, désactivables
+
+PROGRESSER
+• Bouton d'indice, évaluation en direct optionnelle, avertissement après une gaffe
+• Analyse de la partie qui note chaque coup
+• Annuler, rétablir, retourner l'échiquier, toucher un coup de la liste pour y revenir
+• Import et export PGN pour étudier ou partager vos parties
+
+ÉCHIQUIERS ÉLECTRONIQUES
+Vous possédez un DGT Pegasus ou un Chessnut Air, Air+, Pro ou Go ? Connectez-le en Bluetooth et jouez sur le vrai échiquier plutôt qu'à l'écran. Vos coups sont détectés à partir des pièces, les réponses de l'adversaire s'allument sur les LED de l'échiquier, et l'application reconnaît le type d'échiquier d'elle-même. L'écran reste utilisable en parallèle, pour les indices, l'évaluation et la liste des coups.
+
+HORS LIGNE ET PRIVÉ
+• Fonctionne entièrement hors ligne, rien ne quitte votre appareil
+• Pas de compte, pas de publicité, pas de pistage, pas d'achats intégrés
+• Les neuf réseaux neuronaux de Maia sont inclus et s'exécutent sur l'appareil
+• Libre et open source (GPLv3), la même application que sur F-Droid
+
+Et aussi : sons de coup, de prise et d'échec ; portrait et paysage ; mises en page téléphone et tablette ; français, anglais, allemand, espagnol, italien et néerlandais.

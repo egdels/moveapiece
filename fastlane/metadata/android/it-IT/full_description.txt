@@ -1,0 +1,28 @@
+Apri e gioca. MoveAPiece è un'app di scacchi offline che parte direttamente con una partita contro il motore scacchistico Stockfish. Nessun account, nessuna pubblicità, nessuna connessione Internet, nessuna schermata di impostazioni. Un'unica finestra «Nuova partita» copre tutte le scelte (avversario, colore, forza, apertura), e l'app se le ricorda per la volta successiva.
+
+GIOCARE A SCACCHI CONTRO IL COMPUTER
+• Stockfish, il noto motore scacchistico open source, con forza di gioco regolabile da 1320 a 3190 Elo, dal principiante al livello di maestro
+• Maia, un'IA scacchistica dallo stile umano: gioca le mosse che un giocatore del punteggio scelto (da 1100 a 1900) giocherebbe di solito, con pause di riflessione naturali. Un avversario che sembra un giocatore di circolo, non una calcolatrice
+• Due giocatori sullo stesso telefono o tablet
+
+IMPARARE LE APERTURE DI SCACCHI
+• Allenamento aperture con 20 linee note, tra cui Apertura spagnola, Siciliana Najdorf, Partita italiana, Gambetto di donna, Caro-Kann ed Est-Indiana. L'app gioca il lato del libro e accetta solo la risposta corretta
+• Libreria delle aperture per ripassare ogni linea mossa per mossa
+• Suggerimenti di mossa mentre impari, disattivabili
+
+MIGLIORARE IL PROPRIO GIOCO
+• Pulsante suggerimento, valutazione in tempo reale opzionale, avviso dopo un errore grave
+• Analisi della partita che valuta ogni mossa
+• Annulla, ripeti, ruota la scacchiera, tocca una mossa nell'elenco per tornarci
+• Importazione ed esportazione PGN per studiare o condividere le partite
+
+SCACCHIERE ELETTRONICHE
+Hai una DGT Pegasus o una Chessnut Air, Air+, Pro o Go? Collegala via Bluetooth e gioca sulla scacchiera vera invece che sullo schermo. Le tue mosse vengono rilevate dai pezzi, le risposte dell'avversario si accendono sui LED della scacchiera, e l'app riconosce da sola il tipo di scacchiera. Lo schermo resta utilizzabile nel frattempo, per suggerimenti, valutazione ed elenco delle mosse.
+
+OFFLINE E PRIVATA
+• Funziona completamente offline, nulla lascia il tuo dispositivo
+• Nessun account, nessuna pubblicità, nessun tracciamento, nessun acquisto in-app
+• Le nove reti neurali di Maia sono incluse e girano sul dispositivo
+• Libera e open source (GPLv3), la stessa app presente su F-Droid
+
+Inoltre: suoni di mossa, cattura e scacco; verticale e orizzontale; layout per telefono e tablet; italiano, inglese, tedesco, francese, spagnolo e olandese.
