@@ -66,12 +66,15 @@ jobs:
             exit 1
           fi
 
-      # Release notes come from the Fastlane changelog for this versionCode
-      # (the same file F-Droid shows as "What's new"), so the notes are
-      # written once. versionCode is gradle.properties' appVersionCode,
-      # verified against appVersion by the step above. Falls back to GitHub's
-      # generated commit list only if no changelog exists for this version
-      # (pre-releases).
+      # Release notes are this version's section of CHANGELOG.md (between its
+      # "## [X.Y.Z]" heading and the next "## " heading), which covers Android
+      # and desktop alike - the release ships both. If CHANGELOG.md has no such
+      # section yet (a pre-release tagged while the section is still
+      # "Unreleased"), the Fastlane changelog for this versionCode - the
+      # Android-only "What's new" text F-Droid shows - is used instead, and
+      # only if that is missing too, GitHub's generated commit list. version
+      # and versionCode come from gradle.properties, verified against the tag
+      # by the step above.
       #
       # Idempotent on purpose: if the release for this tag already exists
       # (the tag was moved and force-pushed to re-release), its notes are
@@ -82,8 +85,24 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="${{ github.ref_name }}"
+          VERSION=$(grep '^appVersion=' gradle.properties | cut -d= -f2)
           VERSION_CODE=$(grep '^appVersionCode=' gradle.properties | cut -d= -f2)
-          NOTES="fastlane/metadata/android/en-US/changelogs/${VERSION_CODE}.txt"
+          NOTES="$RUNNER_TEMP/release-notes.md"
+          # Section body without its heading (the release title is the tag),
+          # leading and trailing blank lines stripped.
+          awk -v v="$VERSION" '
+            /^## / { if (found) exit; found = (index($0, "## [" v "]") == 1); next }
+            found
+          ' CHANGELOG.md | sed -e '/./,$!d' | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}' > "$NOTES"
+          if [[ -s "$NOTES" ]]; then
+            echo "release notes: CHANGELOG.md section [$VERSION]"
+          elif [[ -f "fastlane/metadata/android/en-US/changelogs/${VERSION_CODE}.txt" ]]; then
+            echo "::warning::CHANGELOG.md has no [$VERSION] section, using the Fastlane changelog ${VERSION_CODE}.txt"
+            cp "fastlane/metadata/android/en-US/changelogs/${VERSION_CODE}.txt" "$NOTES"
+          else
+            echo "::warning::neither a CHANGELOG.md section [$VERSION] nor a Fastlane changelog ${VERSION_CODE}.txt, using generated notes"
+            rm -f "$NOTES"
+          fi
           common_args=(--title "$TAG" --repo "${{ github.repository }}")
           if [[ "$TAG" == *-* ]]; then
             common_args+=(--prerelease)
@@ -99,7 +118,6 @@ jobs:
             if [[ -f "$NOTES" ]]; then
               common_args+=(--notes-file "$NOTES")
             else
-              echo "::warning::no changelog at $NOTES, using generated notes"
               common_args+=(--generate-notes)
             fi
             gh release create "$TAG" "${common_args[@]}"
