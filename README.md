@@ -274,7 +274,8 @@ tools/chessnut-sniffer/  Python/bleak capture tool used to verify the
 
 GPLv3 (see `LICENSE`), required by the Stockfish dependency. Third-party
 components and their licenses are listed in
-[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). The app collects no
+data; [PRIVACY.md](PRIVACY.md) spells that out.
 
 ## AI-assisted development
 
