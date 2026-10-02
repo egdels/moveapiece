@@ -8,9 +8,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versions follow [Semantic Versioning](https://semver.org/). Release
 candidates (`-rc`) and test tags are not listed.
 
-## [Unreleased]
-
-Version bumped to 1.5.2, not yet tagged.
+## [1.5.2] - 2026-10-02
 
 ### Changed
 
@@ -289,7 +287,7 @@ Linux .deb).
 - Windows: move sounds were silent because of a malformed ID3 tag in the
   mp3 files.
 
-[Unreleased]: https://github.com/egdels/moveapiece/compare/v1.5.1...HEAD
+[1.5.2]: https://github.com/egdels/moveapiece/compare/v1.5.1...v1.5.2
 [1.5.1]: https://github.com/egdels/moveapiece/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/egdels/moveapiece/compare/v1.4.1...v1.5.0
 [1.4.1]: https://github.com/egdels/moveapiece/compare/v1.4.0...v1.4.1
