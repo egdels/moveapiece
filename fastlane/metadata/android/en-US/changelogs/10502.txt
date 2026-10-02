@@ -1,24 +1,7 @@
-A tidier main screen, no board type to choose; Chessnut Air+, Pro and
-Go listed alongside the Air.
+Simpler main screen, boards detected automatically.
 
-* Main screen: six buttons for what you do every game (new game, undo,
-  redo, flip, hint, board) and a "more" menu for the rest (opening
-  library, PGN import/export, game analysis). Long-press any button to
-  see what it does. The texts above the board are down to one line:
-  training progress or engine strength, replaced briefly by the
-  blunder warning when there is one. The board button turns green
-  while a board is connected.
-* The evaluation display is now off until you switch it on; your
-  choice is remembered as before.
-* Boards: there is no board type to choose any more. "Connect board"
-  lists the devices in range, recognised boards first, and the app
-  finds out whether the one you pick is a DGT Pegasus or a Chessnut by
-  checking its Bluetooth services. A renamed Pegasus is still
-  recognised.
-* Chessnut: messages name the model the board announces, e.g.
-  "Chessnut Air connected". Air+, Pro and Go speak the same protocol
-  as the Air and should work as before; only the Air has been tested.
-  The Move is not supported.
-* DGT Pegasus: disconnecting right after connecting no longer leaves
-  stray "write failed" errors behind, and a reconnect during the
-  board's start-up sequence no longer confuses it.
+* Six buttons for everyday actions, the rest in a "more" menu; one info
+  line above the board; evaluation off by default.
+* No board type to choose: the app tells a DGT Pegasus from a Chessnut
+  itself. Chessnut Air+, Pro and Go listed too.
+* Pegasus: no stray errors when disconnecting early.
