@@ -23,6 +23,6 @@ OFFLINE EN PRIVÉ
 • Werkt volledig offline, niets verlaat je toestel
 • Geen account, geen advertenties, geen tracking, geen in-app-aankopen
 • De negen neurale netwerken van Maia zijn meegeleverd en draaien op het toestel
-• Vrij en open source (GPLv3), dezelfde app als op F-Droid
+• Vrij en open source (GPLv3)
 
 Verder: zet-, slag- en schaakgeluiden; staand en liggend; lay-outs voor telefoon en tablet; Nederlands, Engels, Duits, Frans, Spaans en Italiaans.

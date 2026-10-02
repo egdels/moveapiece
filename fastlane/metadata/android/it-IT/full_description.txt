@@ -23,6 +23,6 @@ OFFLINE E PRIVATA
 • Funziona completamente offline, nulla lascia il tuo dispositivo
 • Nessun account, nessuna pubblicità, nessun tracciamento, nessun acquisto in-app
 • Le nove reti neurali di Maia sono incluse e girano sul dispositivo
-• Libera e open source (GPLv3), la stessa app presente su F-Droid
+• Libera e open source (GPLv3)
 
 Inoltre: suoni di mossa, cattura e scacco; verticale e orizzontale; layout per telefono e tablet; italiano, inglese, tedesco, francese, spagnolo e olandese.

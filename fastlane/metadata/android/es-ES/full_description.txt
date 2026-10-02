@@ -23,6 +23,6 @@ SIN CONEXIÓN Y PRIVADO
 • Funciona completamente sin conexión, nada sale de tu dispositivo
 • Sin cuenta, sin anuncios, sin rastreo, sin compras dentro de la app
 • Las nueve redes neuronales de Maia vienen incluidas y se ejecutan en el dispositivo
-• Libre y de código abierto (GPLv3), la misma app que en F-Droid
+• Libre y de código abierto (GPLv3)
 
 Además: sonidos de jugada, captura y jaque; vertical y horizontal; diseños para teléfono y tableta; español, inglés, alemán, francés, italiano y neerlandés.

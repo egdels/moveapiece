@@ -23,6 +23,6 @@ HORS LIGNE ET PRIVÉ
 • Fonctionne entièrement hors ligne, rien ne quitte votre appareil
 • Pas de compte, pas de publicité, pas de pistage, pas d'achats intégrés
 • Les neuf réseaux neuronaux de Maia sont inclus et s'exécutent sur l'appareil
-• Libre et open source (GPLv3), la même application que sur F-Droid
+• Libre et open source (GPLv3)
 
 Et aussi : sons de coup, de prise et d'échec ; portrait et paysage ; mises en page téléphone et tablette ; français, anglais, allemand, espagnol, italien et néerlandais.

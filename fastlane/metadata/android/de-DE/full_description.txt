@@ -23,6 +23,6 @@ OFFLINE UND PRIVAT
 • Funktioniert vollständig offline, nichts verlässt dein Gerät
 • Kein Konto, keine Werbung, kein Tracking, keine In-App-Käufe
 • Maias neun neuronale Netze sind mitgeliefert und laufen auf dem Gerät
-• Frei und quelloffen (GPLv3), dieselbe App wie auf F-Droid
+• Frei und quelloffen (GPLv3)
 
 Außerdem: Zug-, Schlag- und Schachgeräusche; Hoch- und Querformat; Layouts für Handy und Tablet; Deutsch, Englisch, Französisch, Spanisch, Italienisch und Niederländisch.
