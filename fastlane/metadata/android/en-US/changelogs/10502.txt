@@ -1,7 +1,8 @@
 Simpler main screen, boards detected automatically.
 
-* Six buttons for everyday actions, the rest in a "more" menu; one info
-  line above the board; evaluation off by default.
+* Six buttons plus a "more" menu; one info line; evaluation off by
+  default.
 * No board type to choose: the app tells a DGT Pegasus from a Chessnut
   itself. Chessnut Air+, Pro and Go listed too.
+* Landscape: the New Game dialog fits on screen.
 * Pegasus: no stray errors when disconnecting early.

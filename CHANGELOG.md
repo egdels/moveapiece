@@ -38,6 +38,10 @@ Version bumped to 1.5.2, not yet tagged.
 
 ### Fixed
 
+- Android, landscape: the New Game dialog no longer hides the colour choice
+  and the strength slider below the fold on short screens (phones, 7-inch
+  tablets); it now lays out in two columns, opponent on the left and the
+  rest on the right.
 - Android, DGT Pegasus: disconnecting within the board's start-up sequence
   no longer leaves one "write failed" error per remaining init command
   behind, and a reconnect inside that sequence no longer starts a second,
