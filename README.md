@@ -274,3 +274,5 @@ package in CI and ship installers with every GitHub Release.
 Maia (human-like opponent) is feature-complete on both platforms, all 9
 bundled rating levels, hardware-verified (Android: real device via adb;
 desktop: `:desktop:test`'s golden tests against lc0's own native output).
+
+What changed in each release is recorded in [CHANGELOG.md](CHANGELOG.md).

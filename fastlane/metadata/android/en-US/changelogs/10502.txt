@@ -1,37 +1,24 @@
-A tidier main screen, more robust board connections on Windows and
-Linux; Chessnut Air+, Pro and Go listed alongside the Air.
+A tidier main screen, no board type to choose; Chessnut Air+, Pro and
+Go listed alongside the Air.
 
 * Main screen: six buttons for what you do every game (new game, undo,
   redo, flip, hint, board) and a "more" menu for the rest (opening
   library, PGN import/export, game analysis). Long-press any button to
   see what it does. The texts above the board are down to one line:
   training progress or engine strength, replaced briefly by the
-  blunder warning when there is one.
+  blunder warning when there is one. The board button turns green
+  while a board is connected.
 * The evaluation display is now off until you switch it on; your
   choice is remembered as before.
-
+* Boards: there is no board type to choose any more. "Connect board"
+  lists the devices in range, recognised boards first, and the app
+  finds out whether the one you pick is a DGT Pegasus or a Chessnut by
+  checking its Bluetooth services. A renamed Pegasus is still
+  recognised.
 * Chessnut: messages name the model the board announces, e.g.
   "Chessnut Air connected". Air+, Pro and Go speak the same protocol
   as the Air and should work as before; only the Air has been tested.
   The Move is not supported.
-* Boards: there is no board type to choose any more. "Connect board"
-  lists the devices in range, recognised boards first, and the app
-  finds out whether the one you pick is a DGT Pegasus or a Chessnut by
-  checking its Bluetooth services.
 * DGT Pegasus: disconnecting right after connecting no longer leaves
   stray "write failed" errors behind, and a reconnect during the
   board's start-up sequence no longer confuses it.
-
-* Windows: a board that drops the link while its services are still
-  being looked up no longer triggers a cascade of "service not found"
-  / "connect failed" reports and a given-up reconnect; the next
-  attempt starts clean. Boards advertising a random address now
-  connect reliably. Error messages name the Bluetooth status.
-* Linux: the same guard for the BlueZ transport. Still unverified on
-  real hardware.
-* Windows, macOS, Linux: a second disconnect while already
-  reconnecting no longer starts two reconnect attempts in parallel.
-* Building from source on Windows: Visual Studio and MSYS2 are found
-  automatically, so a plain terminal or IDE build works. Running the
-  desktop app from Gradle no longer needs a separately installed
-  JDK 23.
