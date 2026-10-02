@@ -6,6 +6,7 @@
     <string name="menu_flip_board">Ruota scacchiera</string>
     <string name="menu_opening_library">Libreria delle aperture</string>
     <string name="menu_hint">Suggerimento</string>
+    <string name="menu_more">Altro</string>
     <string name="menu_opponent">Avversario</string>
     <string name="menu_board_connect">Connetti scacchiera…</string>
     <string name="menu_board_connect_format">Connetti %1$s…</string>

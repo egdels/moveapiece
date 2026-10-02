@@ -6,6 +6,7 @@
     <string name="menu_flip_board">Retourner l\'échiquier</string>
     <string name="menu_opening_library">Bibliothèque d\'ouvertures</string>
     <string name="menu_hint">Indice</string>
+    <string name="menu_more">Plus</string>
     <string name="menu_opponent">Adversaire</string>
     <string name="menu_board_connect">Connecter l\'échiquier…</string>
     <string name="menu_board_connect_format">Connecter %1$s…</string>

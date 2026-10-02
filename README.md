@@ -1,80 +1,64 @@
 # MoveAPiece
 
-A native chess app for Android and desktop (Windows/macOS/Linux), written in
-Java, playing against a locally compiled Stockfish engine or against Maia, a
-human-like neural-network opponent that runs on-device — fully offline, no
-accounts, no network access, no proprietary services. The Android app is
-built for eventual distribution via [F-Droid](https://f-droid.org); the
-desktop app is packaged as a native, double-clickable application image via
-the JDK's own `jpackage`.
+Open it and play. MoveAPiece is a chess app for Android and desktop
+(Windows/macOS/Linux) that starts straight into a game against Stockfish,
+with no account, no network, no setup and no settings screen. One "New
+Game" dialog covers every choice there is - opponent, colour, strength,
+opening - and the app remembers it for next time.
 
-Optionally connects to a physical chess board over Bluetooth LE — a
-[DGT Pegasus](https://digitalgametechnology.com/) or a
-[Chessnut](https://www.chessnutech.com/) Air, Air+, Pro or Go (Android and
-all three desktop OSes), so you can play Stockfish on a real board instead of
-tapping the screen.
+If you own a [DGT Pegasus](https://digitalgametechnology.com/) or a
+[Chessnut](https://www.chessnutech.com/) Air, Air+, Pro or Go, connect it
+over Bluetooth LE and play on the real board instead of the screen. The app
+works out which board it is on its own.
 
-## Features
+Written in Java, GPLv3, fully offline, no proprietary services. The Android
+app is built for distribution via [F-Droid](https://f-droid.org); the
+desktop app is a native, double-clickable application image made with the
+JDK's own `jpackage`.
 
-- Local play: human vs. human, human vs. Stockfish, or human vs. Maia — a
-  human-like opponent that predicts what a player of a chosen rating would
-  play, instead of searching for the objectively strongest move (see the
-  Tech stack table)
-- Opening trainer: drill a fixed line from a built-in library of 20
-  well-known openings (Ruy Lopez, Italian, Sicilian Najdorf, Queen's Gambit
-  Declined, King's Indian, Catalan, Trompowsky, ...). The app plays out the
-  book side's moves and only accepts the trainee's correct move — matched
-  on-screen by tap/click, or (with a connected board) guided
-  physically via the same LED mechanism used for Stockfish's replies
-- Searchable opening library: a read-only, step-through reference viewer
-  over the same 20 lines, separate from the trainer
-- Adjustable Stockfish playing strength (UCI_LimitStrength / UCI_Elo,
-  1320–3190). Maia's rating (1100–1900 in steps of 100 - one of 9 separately
-  trained models, not a single tunable engine) is live-adjustable mid-game
-  on desktop; a one-time choice per game on Android, matching how Stockfish's
-  own strength already worked there
-- Move history in SAN notation, undo
-- Check / checkmate / stalemate / draw detection (repetition, 50-move rule,
-  insufficient material)
-- Evaluation display: optional live Stockfish evaluation (+/- score, or
-  mate-in-N) next to the board; off by default during opening-trainer
-  drills so it doesn't spoil the line
-- PGN import/export, including multi-game files (a picker lists each game
-  by White/Black/date so you can choose which one to import)
-- Move/capture/check sound effects
-- Localized UI: English (default), German, French, Spanish, Italian, Dutch
-- **Android and all three desktop OSes:** physical board support over BLE
-  for two boards, selectable in the connect dialog — physical moves are
-  detected and applied to the game; the opponent's replies are shown via
-  LEDs on the board. On-screen tap-to-move stays fully usable at the same
-  time — the board is a second, redundant input, not a replacement — and
-  picks back up correctly after a disconnect or a screen move made while
-  it was away. Portrait and landscape layouts on Android.
-  - **DGT Pegasus** senses occupancy only: moves are inferred from which
-    squares emptied and filled, promotions are asked on screen, and a
-    capture swapped too quickly on its destination is resolved with a
-    banner hint (lift the piece once). Hardware-verified on Android, macOS
-    (Apple Silicon and Intel) and Windows; the Linux transport is
-    implementation-complete but not yet hardware-verified.
-  - **Chessnut Air, Air+, Pro, Go** identify every piece, so captures and
-    promotions are recognised directly (set the promoted piece down, no
-    dialog), a position set up on the board can be taken over into the game
-    (tap the mismatch banner), move sounds play on the board's own speaker,
-    and the NEW GAME button restarts what was last played (the same training
-    line, or a fresh game against the same opponent). Hardware-verified with
-    a Chessnut Air on Android and macOS; Windows and Linux share the same
-    transports and are expected to work but are not yet verified. The Air+,
-    Pro and Go speak the same BLE protocol according to the vendor's
-    EasyLink SDK and independent implementations, but have not been tested
-    with MoveAPiece yet — reports (and captures made with
-    `tools/chessnut-sniffer/`) are welcome. The Chessnut Move uses a
-    different command set and is not supported; the Evo connects to
-    third-party software over Wi-Fi rather than BLE.
-  - **Board type detection**: pick the board from the scan list and the app
-    works out whether it is a Pegasus or a Chessnut by probing its GATT
-    services (advertised name as a first guess, then the remaining types),
-    remembering the answer. The board-type chooser stays as a fallback for
-    devices with unknown names.
+## What it does
+
+- Play against Stockfish (adjustable Elo 1320–3190), against Maia (a
+  human-like opponent that plays like a player of a chosen rating,
+  1100–1900, see the Tech stack table), or against another person
+- Drill an opening: pick one of 20 well-known lines, the app plays the
+  book side and accepts only the correct reply
+- Look an opening up in a step-through library
+- Ask for a hint, see a live evaluation if you switch it on, get a blunder
+  warning, analyse the finished game
+- Undo, redo, flip the board, import and export PGN (multi-game files
+  included)
+- Sound effects, six UI languages (English, German, French, Spanish,
+  Italian, Dutch), portrait and landscape on Android
+
+## Physical boards
+
+Moves made on the board are detected and applied to the game; the
+opponent's replies light up on the board's LEDs. The screen stays usable at
+the same time - the board is a second input, not a replacement - and picks
+back up correctly after a disconnect or a screen move made while it was
+away. Pick the board from the scan list and the app probes its GATT
+services to tell a Pegasus from a Chessnut, remembering the answer; a
+manual chooser remains as fallback for devices with unknown names.
+
+- **DGT Pegasus** senses occupancy only: moves are inferred from which
+  squares emptied and filled, promotions are asked on screen, and a capture
+  swapped too quickly on its destination is resolved with a banner hint.
+  Hardware-verified on Android, macOS (Apple Silicon and Intel) and
+  Windows; the Linux transport is implementation-complete but not yet
+  hardware-verified.
+- **Chessnut Air, Air+, Pro, Go** identify every piece, so captures and
+  promotions are recognised directly, a position set up on the board can be
+  taken over into the game, move sounds play on the board's speaker, and the
+  NEW GAME button restarts what was last played. Hardware-verified with a
+  Chessnut Air on Android and macOS; Windows and Linux share the same
+  transports and are expected to work but are not yet verified. The Air+,
+  Pro and Go speak the same BLE protocol according to the vendor's EasyLink
+  SDK and independent implementations, but have not been tested with
+  MoveAPiece yet - reports (and captures made with
+  `tools/chessnut-sniffer/`) are welcome. The Chessnut Move uses a
+  different command set and is not supported; the Evo connects to
+  third-party software over Wi-Fi rather than BLE.
 
 ## Tech stack
 
@@ -283,7 +267,7 @@ Air) are feature-complete and verified (automated tests + real-hardware
 testing). Desktop: covers the same feature set, including both boards on
 macOS, Windows, and Linux. Hardware-verified on macOS (Apple Silicon and
 Intel, both boards) and Windows (Pegasus); Linux is implementation-complete
-but not yet hardware-verified - see the Features section above. All five desktop CI
+but not yet hardware-verified - see the Physical boards section above. All five desktop CI
 legs (Linux x86-64/arm64, macOS Apple Silicon/Intel, Windows) build and
 package in CI and ship installers with every GitHub Release.
 

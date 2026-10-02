@@ -1,42 +1,29 @@
-MoveAPiece is a native Android chess app that plays against a locally
-bundled Stockfish engine or against Maia, a human-like opponent based on
-a bundled neural network – fully offline, without accounts, without
-network access, and without proprietary services.
+Open it and play. MoveAPiece starts straight into a game against
+Stockfish – no account, no network, no setup, no settings screen. One
+"New Game" dialog covers every choice there is (opponent, colour,
+strength, opening) and the app remembers it for next time.
 
-Optionally, MoveAPiece can connect via Bluetooth LE to a physical
-chess board – a DGT Pegasus or a Chessnut Air, Air+, Pro or Go – so you
-can play against Stockfish or Maia on a real board instead of on the
-screen.
+Play against Stockfish at an adjustable strength (Elo 1320–3190),
+against Maia – a human-like opponent that plays the moves a player of a
+chosen rating (1100–1900) would typically play – or against another
+person on the same phone.
 
-Features:
+If you own a DGT Pegasus or a Chessnut Air, Air+, Pro or Go, connect it
+over Bluetooth LE and play on the real board instead of the screen. The
+app works out which board it is on its own; your moves are picked up
+from the board and the opponent's replies light up on its LEDs. The
+screen stays usable at the same time.
 
-* Local play: human vs. human, human vs. Stockfish, or human vs. Maia
-* Maia: a human-like opponent that plays the moves a player of a chosen
-  rating (1100–1900) would typically play, instead of searching for the
-  strongest move. Nine pre-trained networks are bundled in the app and
-  run entirely on the device via ONNX Runtime (telemetry disabled) – no
-  network access
-* Opening training: practice fixed lines from a built-in library of 20
-  well-known openings
-* Adjustable Stockfish playing strength (UCI_LimitStrength / UCI_Elo,
-  1320–3190)
-* Move history in algebraic notation, take back a move
-* Evaluation display: optionally shows Stockfish's assessment of the
-  current position (can be toggled on/off)
-* PGN import/export: export games via the share dialog or load a game
-  from a PGN file and continue playing
-* Detection of check, checkmate, stalemate, and draws (repetition,
-  50-move rule, insufficient material)
-* Move, capture, and check sound effects
-* Portrait and landscape orientation
-* Available in German, English, French, Spanish, Italian, and Dutch
-* Support for physical boards (DGT Pegasus and Chessnut Air, Air+, Pro
-  and Go, BLE): moves on the board are automatically detected and
-  applied, and the opponent's replies are shown via LEDs on the board.
-  The Chessnut boards additionally recognise each piece, so promotions
-  need no dialog, a position set up on the board can be taken over into
-  the game, and move sounds come from the board's speaker. Tested with a
-  Chessnut Air; Air+, Pro and Go use the same protocol but have not been
-  tested yet. Full touchscreen control remains available at all times.
+Also there when you want it:
 
-MoveAPiece is licensed under the GPLv3.
+* Opening training: drill one of 20 well-known lines, the app plays the
+  book side and accepts only the correct reply; a step-through library
+  of the same lines
+* Hint, optional live evaluation, blunder warning, post-game analysis
+* Undo, redo, flip the board, PGN import and export
+* Move, capture and check sounds; portrait and landscape
+* English, German, French, Spanish, Italian, Dutch
+
+Maia's nine networks are bundled and run entirely on the device via
+ONNX Runtime (telemetry disabled). Everything is offline; nothing leaves
+your phone. MoveAPiece is licensed under the GPLv3.

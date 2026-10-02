@@ -1,1 +1,1 @@
-Offline chess against Stockfish, optionally with a real DGT Pegasus board
+Open and play: offline chess vs Stockfish or Maia, on screen or a real board

@@ -6,6 +6,7 @@
     <string name="menu_flip_board">Girar tablero</string>
     <string name="menu_opening_library">Biblioteca de aperturas</string>
     <string name="menu_hint">Pista</string>
+    <string name="menu_more">Más</string>
     <string name="menu_opponent">Rival</string>
     <string name="menu_board_connect">Conectar tablero…</string>
     <string name="menu_board_connect_format">Conectar %1$s…</string>

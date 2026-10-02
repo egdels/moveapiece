@@ -6,6 +6,7 @@
     <string name="menu_flip_board">Bord draaien</string>
     <string name="menu_opening_library">Openingsbibliotheek</string>
     <string name="menu_hint">Hint</string>
+    <string name="menu_more">Meer</string>
     <string name="menu_opponent">Tegenstander</string>
     <string name="menu_board_connect">Bord verbinden…</string>
     <string name="menu_board_connect_format">%1$s verbinden…</string>

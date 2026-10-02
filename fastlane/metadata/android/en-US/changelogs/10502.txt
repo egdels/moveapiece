@@ -1,5 +1,14 @@
-More robust board connections on Windows and Linux; Chessnut Air+,
-Pro and Go listed alongside the Air.
+A tidier main screen, more robust board connections on Windows and
+Linux; Chessnut Air+, Pro and Go listed alongside the Air.
+
+* Main screen: six buttons for what you do every game (new game, undo,
+  redo, flip, hint, board) and a "more" menu for the rest (opening
+  library, PGN import/export, game analysis). Long-press any button to
+  see what it does. The texts above the board are down to one line:
+  training progress or engine strength, replaced briefly by the
+  blunder warning when there is one.
+* The evaluation display is now off until you switch it on; your
+  choice is remembered as before.
 
 * Chessnut: the board-type chooser now reads "Chessnut (Air, Air+, Pro,
   Go)"; messages say "Chessnut". Air+, Pro and Go speak the same

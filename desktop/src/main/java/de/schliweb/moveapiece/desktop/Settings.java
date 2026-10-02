@@ -26,7 +26,7 @@ final class Settings {
     private static final String KEY_LAST_OPENING = "lastOpening";
     private static final String KEY_LAST_TRAINING_HINTS = "lastTrainingHints";
     private static final int DEFAULT_ENGINE_ELO = 2200;
-    private static final boolean DEFAULT_EVALUATION_ENABLED = true;
+    private static final boolean DEFAULT_EVALUATION_ENABLED = false;
     private static final int DEFAULT_MAIA_RATING = 1500;
 
     private Settings() {}

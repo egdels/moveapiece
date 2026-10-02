@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Everything a player needs rarely enough that it would only crowd the button row: opened
+     from the "more" button next to the everyday actions (new game, undo, redo, flip, hint,
+     board). Which items show and which are enabled is decided in MainActivity.showOverflowMenu
+     each time the menu opens. -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/menuOpeningLibrary"
+        android:title="@string/menu_opening_library" />
+    <item
+        android:id="@+id/menuImportPgn"
+        android:title="@string/action_import_pgn" />
+    <item
+        android:id="@+id/menuExportPgn"
+        android:title="@string/action_export_pgn" />
+    <item
+        android:id="@+id/menuAnalyzeGame"
+        android:title="@string/action_analyze_game" />
+</menu>

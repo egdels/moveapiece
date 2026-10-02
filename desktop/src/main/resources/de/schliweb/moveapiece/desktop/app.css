@@ -95,6 +95,22 @@
     -fx-fill: -primary-dark;
 }
 
+/* The overflow MenuButton shares the icon-button look: no label padding, and its
+   built-in drop-down arrow is hidden - the "more" glyph already says it opens a menu. */
+.icon-button.menu-button > .label {
+    -fx-padding: 0;
+}
+
+.icon-button.menu-button > .arrow-button {
+    -fx-padding: 0;
+}
+
+.icon-button.menu-button > .arrow-button > .arrow {
+    -fx-padding: 0;
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+}
+
 /* Toggled on the Pegasus board button while connected - carries state via
    color instead of visible text, like the Android app's icon swap. */
 .icon-button-active {

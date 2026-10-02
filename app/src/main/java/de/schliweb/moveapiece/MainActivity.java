@@ -8,6 +8,7 @@ package de.schliweb.moveapiece;
 import android.app.Dialog;
 import android.content.Context;
 import android.content.Intent;
+import android.content.res.ColorStateList;
 import android.content.res.Configuration;
 import android.net.Uri;
 import android.os.Bundle;
@@ -30,10 +31,14 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.PopupMenu;
+import androidx.appcompat.widget.TooltipCompat;
+import androidx.core.content.ContextCompat;
 import com.github.bhlangonijr.chesslib.Piece;
 import com.github.bhlangonijr.chesslib.PieceType;
 import com.github.bhlangonijr.chesslib.Side;
 import com.github.bhlangonijr.chesslib.Square;
+import com.google.android.material.button.MaterialButton;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import de.schliweb.chessnut.core.protocol.ChessnutUuids;
 import de.schliweb.moveapiece.board.ChessnutBoardAdapter;
@@ -192,7 +197,12 @@ public class MainActivity extends AppCompatActivity
     private volatile NnueAssets.Paths nnuePaths;
 
     // ---- Evaluation display state --------------------------------------------
-    private boolean evaluationEnabled = true;
+    /**
+     * Off until the player switches it on: a number next to the board is one more thing to read
+     * before the first move, and the switch is right there for anyone who wants it. Remembered
+     * across restarts once toggled ({@link Settings#isEvaluationDisplayEnabled}).
+     */
+    private boolean evaluationEnabled = false;
 
     /**
      * Who was to move in the position the most recent (engine-move or analysis) search was started
@@ -223,6 +233,34 @@ public class MainActivity extends AppCompatActivity
     private int moveQualityBaselineCp;
 
     private int moveQualityBaselineMoveCount = -1;
+
+    /**
+     * The move-quality verdict for the move just played ("Blunder (-3.2)"), or null when the last
+     * move was fine or has not been graded yet. Shown in {@link #updateInfoText}'s one line in
+     * place of the engine strength until the next move clears it.
+     */
+    private String moveQualityNote;
+
+    /**
+     * The "also good: ..." alternatives from the last hint, or null. Shown by {@link
+     * #updateNoteText} under the buttons unless an analysis is running.
+     */
+    private String hintAlternativesNote;
+
+    /** The overflow menu while open, so a rotation (see {@link #currentDialog}) can close it. */
+    private PopupMenu currentPopup;
+
+    /**
+     * The board button's theme-given icon tint and background, captured right after inflation so
+     * {@link #updatePegasusButtonLabel} can restore them on disconnect. The theme already tints
+     * every icon button's glyph brand green, so "connected" has to differ in more than the glyph
+     * colour (a MaterialButton's own iconTint overrides whatever tint the drawable declares
+     * anyway): while connected the button is filled green with a white glyph, the Android
+     * counterpart of the desktop's {@code icon-button-active}.
+     */
+    private ColorStateList boardButtonDefaultIconTint;
+
+    private ColorStateList boardButtonDefaultBackgroundTint;
 
     private static final int INACCURACY_CP_LOSS = 50;
     private static final int MISTAKE_CP_LOSS = 150;
@@ -415,15 +453,24 @@ public class MainActivity extends AppCompatActivity
         binding.undoButton.setOnClickListener(v -> undo());
         binding.redoButton.setOnClickListener(v -> redo());
         binding.flipBoardButton.setOnClickListener(v -> setBoardFlipped(!boardFlipped));
-        binding.openingLibraryButton.setOnClickListener(
-                v -> startActivity(new Intent(this, OpeningLibraryActivity.class)));
         binding.hintButton.setOnClickListener(v -> requestHint());
         binding.pegasusButton.setOnClickListener(v -> onPegasusButtonClicked());
         binding.pegasusMismatchText.setOnClickListener(v -> onMismatchBannerClicked());
+        boardButtonDefaultIconTint = binding.pegasusButton.getIconTint();
+        boardButtonDefaultBackgroundTint = binding.pegasusButton.getBackgroundTintList();
         updatePegasusButtonLabel(board.getConnectionState());
-        binding.exportPgnButton.setOnClickListener(v -> exportGamePgn());
-        binding.importPgnButton.setOnClickListener(v -> pgnImportLauncher.launch("*/*"));
-        binding.analyzeGameButton.setOnClickListener(v -> startPostGameAnalysis());
+        binding.moreButton.setOnClickListener(this::showOverflowMenu);
+        // Icon-only buttons: a long press shows the same text a screen reader announces.
+        for (MaterialButton button :
+                List.of(
+                        binding.newGameButton,
+                        binding.undoButton,
+                        binding.redoButton,
+                        binding.flipBoardButton,
+                        binding.hintButton,
+                        binding.moreButton)) {
+            TooltipCompat.setTooltipText(button, button.getContentDescription());
+        }
 
         binding.evaluationSwitch.setChecked(evaluationEnabled);
         binding.evaluationSwitch.setOnCheckedChangeListener(
@@ -445,6 +492,10 @@ public class MainActivity extends AppCompatActivity
         super.onConfigurationChanged(newConfig);
         if (currentDialog != null && currentDialog.isShowing()) {
             currentDialog.dismiss();
+        }
+        if (currentPopup != null) {
+            currentPopup.dismiss();
+            currentPopup = null;
         }
         bindViews();
     }
@@ -604,12 +655,60 @@ public class MainActivity extends AppCompatActivity
         boolean connected = state == ConnectionState.CONNECTED;
         binding.pegasusButton.setIconResource(
                 connected ? R.drawable.ic_pegasus_connected : R.drawable.ic_pegasus);
+        ColorStateList green =
+                ColorStateList.valueOf(ContextCompat.getColor(this, R.color.brand_primary));
+        ColorStateList white =
+                ColorStateList.valueOf(ContextCompat.getColor(this, android.R.color.white));
+        binding.pegasusButton.setBackgroundTintList(
+                connected ? green : boardButtonDefaultBackgroundTint);
+        binding.pegasusButton.setIconTint(connected ? white : boardButtonDefaultIconTint);
         binding.pegasusButton.setContentDescription(
                 getString(
                         connected
                                 ? R.string.menu_board_disconnect_format
                                 : R.string.menu_board_connect_format,
                         boardType.displayName()));
+        TooltipCompat.setTooltipText(
+                binding.pegasusButton, binding.pegasusButton.getContentDescription());
+    }
+
+    /**
+     * The actions a player needs rarely enough that they would only crowd the button row (see
+     * res/menu/main_overflow.xml). Built fresh on every open, so visibility and enabled state
+     * always reflect the current game: PGN and analysis make no sense inside a training drill,
+     * export and analysis need at least one move, and analysis needs the engine and must not
+     * already be running.
+     */
+    private void showOverflowMenu(View anchor) {
+        PopupMenu popup = new PopupMenu(this, anchor);
+        popup.getMenuInflater().inflate(R.menu.main_overflow, popup.getMenu());
+        boolean training = mode == GameMode.TRAINING;
+        boolean hasMoves = game.moveCount() > 0;
+        popup.getMenu().findItem(R.id.menuImportPgn).setVisible(!training);
+        popup.getMenu().findItem(R.id.menuExportPgn).setVisible(!training).setEnabled(hasMoves);
+        popup.getMenu()
+                .findItem(R.id.menuAnalyzeGame)
+                .setVisible(!training)
+                .setEnabled(postGameUciMoves == null && engineReady && hasMoves);
+        popup.setOnMenuItemClickListener(
+                item -> {
+                    int id = item.getItemId();
+                    if (id == R.id.menuOpeningLibrary) {
+                        startActivity(new Intent(this, OpeningLibraryActivity.class));
+                    } else if (id == R.id.menuImportPgn) {
+                        pgnImportLauncher.launch("*/*");
+                    } else if (id == R.id.menuExportPgn) {
+                        exportGamePgn();
+                    } else if (id == R.id.menuAnalyzeGame) {
+                        startPostGameAnalysis();
+                    } else {
+                        return false;
+                    }
+                    return true;
+                });
+        popup.setOnDismissListener(menu -> currentPopup = null);
+        currentPopup = popup;
+        popup.show();
     }
 
     /**
@@ -1434,23 +1533,12 @@ public class MainActivity extends AppCompatActivity
         binding.boardView.setCheckedKingSquare(findCheckedKingSquare());
         updateStatusText();
         updateMoveHistory();
-        updateTrainingProgressText();
+        updateInfoText();
         updatePegasusMismatchText();
-        updateEngineStrengthText();
         updateTrainingHintHighlight();
         maybeTriggerAnalysis();
-        updatePgnButtonsVisibility();
+        updateNoteText();
         updateHintButtonState();
-    }
-
-    private void updatePgnButtonsVisibility() {
-        int visibility =
-                mode == GameMode.TRAINING ? android.view.View.GONE : android.view.View.VISIBLE;
-        binding.exportPgnButton.setVisibility(visibility);
-        binding.importPgnButton.setVisibility(visibility);
-        binding.exportPgnButton.setEnabled(game.moveCount() > 0);
-        binding.analyzeGameButton.setVisibility(visibility);
-        updateAnalyzeGameButtonState();
     }
 
     private boolean isBoardInteractiveNow() {
@@ -1479,32 +1567,62 @@ public class MainActivity extends AppCompatActivity
         }
     }
 
-    private void updateTrainingProgressText() {
-        TextView progress = binding.trainingProgressText;
-        if (mode != GameMode.TRAINING || trainingSession == null) {
-            progress.setVisibility(android.view.View.GONE);
+    /**
+     * The single line under the status: what the player is up against (the training line and how
+     * far along it is, or the engine's strength), or - briefly, until the next move - how good the
+     * move just played was ({@link #moveQualityNote}). One always-present line instead of three
+     * optional ones keeps the board from shifting and the screen from filling up; empty in a
+     * human-vs-human game.
+     */
+    private void updateInfoText() {
+        if (binding == null) {
             return;
         }
-        progress.setVisibility(android.view.View.VISIBLE);
-        progress.setText(
-                getString(
-                        R.string.status_training_progress_format,
-                        OpeningNames.displayName(this, trainingSession.line()),
-                        Math.min(trainingSession.plyIndex() + 1, trainingSession.totalPlies()),
-                        trainingSession.totalPlies()));
+        TextView info = binding.infoText;
+        if (moveQualityNote != null) {
+            info.setText(moveQualityNote);
+        } else if (mode == GameMode.TRAINING && trainingSession != null) {
+            info.setText(
+                    getString(
+                            R.string.status_training_progress_format,
+                            OpeningNames.displayName(this, trainingSession.line()),
+                            Math.min(trainingSession.plyIndex() + 1, trainingSession.totalPlies()),
+                            trainingSession.totalPlies()));
+        } else if (mode == GameMode.ENGINE) {
+            info.setText(getString(R.string.status_engine_strength_format, engineElo));
+        } else if (mode == GameMode.MAIA) {
+            info.setText(getString(R.string.status_maia_strength_format, currentMaiaRating));
+        } else {
+            info.setText("");
+        }
     }
 
-    private void updateEngineStrengthText() {
-        TextView strength = binding.engineStrengthText;
-        if (!isPairedEngineMode()) {
-            strength.setVisibility(android.view.View.GONE);
+    private void clearMoveQualityNote() {
+        moveQualityNote = null;
+        updateInfoText();
+    }
+
+    /**
+     * The one optional line under the buttons: progress while a post-game analysis runs (it lives
+     * in the overflow menu, so there is no button label to carry it), otherwise the alternatives
+     * from the last hint, otherwise collapsed.
+     */
+    private void updateNoteText() {
+        if (binding == null) {
             return;
         }
-        strength.setVisibility(android.view.View.VISIBLE);
-        strength.setText(
-                mode == GameMode.ENGINE
-                        ? getString(R.string.status_engine_strength_format, engineElo)
-                        : getString(R.string.status_maia_strength_format, currentMaiaRating));
+        String text;
+        if (postGameUciMoves != null) {
+            text =
+                    getString(
+                            R.string.action_analyzing_format,
+                            postGamePositionEvals.size(),
+                            postGameUciMoves.size() + 1);
+        } else {
+            text = hintAlternativesNote;
+        }
+        binding.noteText.setText(text == null ? "" : text);
+        binding.noteText.setVisibility(text == null ? View.GONE : View.VISIBLE);
     }
 
     /**
@@ -1519,7 +1637,8 @@ public class MainActivity extends AppCompatActivity
                 || !trainingSession.isHumanTurnNow()
                 || !trainingSession.hintsEnabled()) {
             binding.boardView.setTrainingHint(null, null);
-            binding.hintAlternativesText.setVisibility(android.view.View.GONE);
+            hintAlternativesNote = null;
+            updateNoteText();
             return;
         }
         String uci = trainingSession.currentExpectedUci();
@@ -2045,13 +2164,12 @@ public class MainActivity extends AppCompatActivity
                             squares,
                             multiPvCpByRank[rank] / 100.0));
         }
-        if (alternatives.isEmpty()) {
-            binding.hintAlternativesText.setVisibility(android.view.View.GONE);
-            return;
-        }
-        binding.hintAlternativesText.setText(
-                getString(R.string.hint_alternatives_label, String.join(", ", alternatives)));
-        binding.hintAlternativesText.setVisibility(android.view.View.VISIBLE);
+        hintAlternativesNote =
+                alternatives.isEmpty()
+                        ? null
+                        : getString(
+                                R.string.hint_alternatives_label, String.join(", ", alternatives));
+        updateNoteText();
     }
 
     /**
@@ -2121,9 +2239,7 @@ public class MainActivity extends AppCompatActivity
         }
         moveQualityBaselineCp = lastPositionEvalCp;
         moveQualityBaselineMoveCount = game.moveCount();
-        // INVISIBLE, not GONE: keeps this row's height reserved so the board below it (see
-        // activity_main.xml) doesn't shift every time a move-quality label appears/disappears.
-        binding.moveQualityText.setVisibility(android.view.View.INVISIBLE);
+        clearMoveQualityNote();
     }
 
     /**
@@ -2162,12 +2278,12 @@ public class MainActivity extends AppCompatActivity
     private void showMoveQualityIfNotable(int cpLoss) {
         int labelRes = moveQualityLabelRes(cpLoss);
         if (labelRes == 0) {
-            binding.moveQualityText.setVisibility(android.view.View.INVISIBLE);
+            clearMoveQualityNote();
             return;
         }
-        binding.moveQualityText.setText(
-                getString(R.string.move_quality_format, getString(labelRes), -cpLoss / 100.0));
-        binding.moveQualityText.setVisibility(android.view.View.VISIBLE);
+        moveQualityNote =
+                getString(R.string.move_quality_format, getString(labelRes), -cpLoss / 100.0);
+        updateInfoText();
     }
 
     /**
@@ -2198,7 +2314,7 @@ public class MainActivity extends AppCompatActivity
         postGameUciMoves = java.util.Arrays.asList(game.toUciMoveList().split(" "));
         postGamePositionEvals = new ArrayList<>(postGameUciMoves.size() + 1);
         updateHintButtonState();
-        updateAnalyzeGameButtonState();
+        updateNoteText();
         engine.setFullStrength();
         requestPostGameEvalFor(0);
     }
@@ -2230,7 +2346,7 @@ public class MainActivity extends AppCompatActivity
     private void recordPostGameEval(int cp) {
         postGamePositionEvals.add(cp);
         int nextPositionIndex = postGamePositionEvals.size();
-        updateAnalyzeGameButtonState();
+        updateNoteText();
         if (nextPositionIndex <= postGameUciMoves.size()) {
             requestPostGameEvalFor(nextPositionIndex);
             return;
@@ -2243,7 +2359,7 @@ public class MainActivity extends AppCompatActivity
             engine.setStrength(engineElo);
         }
         updateHintButtonState();
-        updateAnalyzeGameButtonState();
+        updateNoteText();
         showPostGameReport(uciMoves, evals);
         if (!game.isGameOver()) {
             // The game was still live when analysis started (see startPostGameAnalysis) -
@@ -2253,27 +2369,6 @@ public class MainActivity extends AppCompatActivity
             // since refreshBoard() itself never starts one.
             refreshBoard();
             maybeTriggerEngineMove();
-        }
-    }
-
-    /**
-     * The icon-only Analyze button (see {@code secondaryButtonBar}) has no visible label to carry
-     * progress the way the old text button did - {@link #binding}.analysisProgressText fills that
-     * role instead, shown only while an analysis is actually running.
-     */
-    private void updateAnalyzeGameButtonState() {
-        boolean running = postGameUciMoves != null;
-        binding.analyzeGameButton.setEnabled(
-                !running && engineReady && mode != GameMode.TRAINING && game.moveCount() > 0);
-        if (running) {
-            binding.analysisProgressText.setText(
-                    getString(
-                            R.string.action_analyzing_format,
-                            postGamePositionEvals.size(),
-                            postGameUciMoves.size() + 1));
-            binding.analysisProgressText.setVisibility(android.view.View.VISIBLE);
-        } else {
-            binding.analysisProgressText.setVisibility(android.view.View.GONE);
         }
     }
 
@@ -2385,8 +2480,8 @@ public class MainActivity extends AppCompatActivity
         moveQualityBaselineMoveCount = -1;
         postGameUciMoves = null;
         postGamePositionEvals = null;
-        binding.moveQualityText.setVisibility(android.view.View.INVISIBLE);
-        updateAnalyzeGameButtonState();
+        clearMoveQualityNote();
+        updateNoteText();
     }
 
     /**
@@ -2779,7 +2874,7 @@ public class MainActivity extends AppCompatActivity
         maybeTriggerEngineMove();
         maybeTriggerAnalysis();
         updateHintButtonState();
-        updateAnalyzeGameButtonState();
+        updateNoteText();
     }
 
     @Override
@@ -2879,7 +2974,7 @@ public class MainActivity extends AppCompatActivity
         postGameUciMoves = null;
         postGamePositionEvals = null;
         updateHintButtonState();
-        updateAnalyzeGameButtonState();
+        updateNoteText();
         binding.statusText.setText(R.string.status_engine_unavailable);
     }
 

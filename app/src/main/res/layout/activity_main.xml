@@ -68,28 +68,14 @@
 
 
     <TextView
-        android:id="@+id/trainingProgressText"
+        android:id="@+id/infoText"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:gravity="center"
         android:textAppearance="?attr/textAppearanceBodyMedium"
-        android:visibility="gone"
-        tools:text="Italienische Partie – Zug 3 von 10"
-        tools:visibility="visible"
-        app:layout_constraintTop_toBottomOf="@id/pegasusMismatchText"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
-
-    <TextView
-        android:id="@+id/engineStrengthText"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:gravity="center"
-        android:textAppearance="?attr/textAppearanceBodyMedium"
-        android:visibility="gone"
+        android:minLines="1"
         tools:text="Stockfish (Elo 1500)"
-        tools:visibility="visible"
-        app:layout_constraintTop_toBottomOf="@id/trainingProgressText"
+        app:layout_constraintTop_toBottomOf="@id/pegasusMismatchText"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
@@ -100,7 +86,7 @@
         android:orientation="horizontal"
         android:gravity="center"
         android:paddingTop="4dp"
-        app:layout_constraintTop_toBottomOf="@id/engineStrengthText"
+        app:layout_constraintTop_toBottomOf="@id/infoText"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
@@ -120,34 +106,17 @@
 
     </LinearLayout>
 
-    <!-- INVISIBLE, not GONE: this row is reassigned VISIBLE/INVISIBLE (never GONE) after every
-         move in MainActivity, so its height stays reserved and the board below it never shifts
-         depending on whether a move-quality label happens to be showing. -->
-    <TextView
-        android:id="@+id/moveQualityText"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:gravity="center"
-        android:textAppearance="?attr/textAppearanceBodyMedium"
-        android:textStyle="bold"
-        android:visibility="invisible"
-        tools:text="Patzer (-3.2)"
-        tools:visibility="visible"
-        app:layout_constraintTop_toBottomOf="@id/evaluationRow"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
-
     <de.schliweb.moveapiece.ui.BoardView
         android:id="@+id/boardView"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_margin="12dp"
         android:contentDescription="@string/cd_chess_board"
-        app:layout_constraintTop_toBottomOf="@id/moveQualityText"
+        app:layout_constraintTop_toBottomOf="@id/evaluationRow"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <!-- All 9 action buttons in one Flow instead of two fixed LinearLayout rows: Flow packs them
+    <!-- The six everyday buttons plus the overflow menu in one Flow instead of two fixed LinearLayout rows: Flow packs them
          left-to-right and only wraps to a further row once a row actually runs out of horizontal
          space, so a wide board (large phone, tablet) gets a single row while a narrow one still
          wraps - unlike a fixed two-row split, this adapts to whatever width is actually available
@@ -165,7 +134,7 @@
         app:flow_horizontalStyle="packed"
         app:flow_horizontalBias="0.5"
         app:flow_wrapMode="chain"
-        app:constraint_referenced_ids="newGameButton,undoButton,redoButton,flipBoardButton,openingLibraryButton,hintButton,pegasusButton,exportPgnButton,importPgnButton,analyzeGameButton"
+        app:constraint_referenced_ids="newGameButton,undoButton,redoButton,flipBoardButton,hintButton,pegasusButton,moreButton"
         app:layout_constraintTop_toBottomOf="@id/boardView"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
@@ -215,17 +184,6 @@
         app:layout_constraintStart_toStartOf="parent" />
 
     <com.google.android.material.button.MaterialButton
-        android:id="@+id/openingLibraryButton"
-        style="@style/Widget.Material3.Button.IconButton.Outlined"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:contentDescription="@string/menu_opening_library"
-        app:icon="@drawable/ic_analyze"
-        app:iconPadding="0dp"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toStartOf="parent" />
-
-    <com.google.android.material.button.MaterialButton
         android:id="@+id/hintButton"
         style="@style/Widget.Material3.Button.IconButton.Outlined"
         android:layout_width="wrap_content"
@@ -248,40 +206,18 @@
         app:layout_constraintStart_toStartOf="parent" />
 
     <com.google.android.material.button.MaterialButton
-        android:id="@+id/exportPgnButton"
+        android:id="@+id/moreButton"
         style="@style/Widget.Material3.Button.IconButton.Outlined"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:contentDescription="@string/action_export_pgn"
-        app:icon="@drawable/ic_export"
-        app:iconPadding="0dp"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toStartOf="parent" />
-
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/importPgnButton"
-        style="@style/Widget.Material3.Button.IconButton.Outlined"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:contentDescription="@string/action_import_pgn"
-        app:icon="@drawable/ic_import"
-        app:iconPadding="0dp"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toStartOf="parent" />
-
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/analyzeGameButton"
-        style="@style/Widget.Material3.Button.IconButton.Outlined"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:contentDescription="@string/action_analyze_game"
-        app:icon="@drawable/ic_opening_library"
+        android:contentDescription="@string/menu_more"
+        app:icon="@drawable/ic_more_vert"
         app:iconPadding="0dp"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
 
     <TextView
-        android:id="@+id/hintAlternativesText"
+        android:id="@+id/noteText"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginBottom="4dp"
@@ -295,20 +231,6 @@
         app:layout_constraintEnd_toEndOf="parent" />
 
     <TextView
-        android:id="@+id/analysisProgressText"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="4dp"
-        android:gravity="center"
-        android:textAppearance="?attr/textAppearanceBodySmall"
-        android:visibility="gone"
-        tools:text="Analysiere… (2/7)"
-        tools:visibility="visible"
-        app:layout_constraintTop_toBottomOf="@id/hintAlternativesText"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
-
-    <TextView
         android:id="@+id/moveHistoryLabel"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
@@ -316,7 +238,7 @@
         android:layout_marginHorizontal="20dp"
         android:text="@string/move_history_title"
         android:textAppearance="?attr/textAppearanceLabelLarge"
-        app:layout_constraintTop_toBottomOf="@id/analysisProgressText"
+        app:layout_constraintTop_toBottomOf="@id/noteText"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 

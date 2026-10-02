@@ -72,6 +72,8 @@ import javafx.scene.control.CheckBox;
 import javafx.scene.control.ChoiceDialog;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
+import javafx.scene.control.MenuButton;
+import javafx.scene.control.MenuItem;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Slider;
 import javafx.scene.control.TextArea;
@@ -180,21 +182,24 @@ final class GameController
                     + "4.05,-5.5 7.6,-5.5 1.95,0 3.73,0.72 5.12,1.88L13,16h9v-9L18.4,10.6z";
     private static final String FLIP_BOARD_ICON_PATH =
             "M16,17.01V10h-2v7.01h-3L15,21l4,-3.99h-3zM9,3L5,6.99h3V14h2V6.99h3L9,3z";
-    private static final String OPENING_LIBRARY_ICON_PATH =
+    // Same Material "bar chart" glyph as the Android app's ic_analyze.xml.
+    private static final String ANALYZE_ICON_PATH =
             "M3,19H21V21H3Z M5,4H8V19H5Z M10,7H13V19H10Z M15,10H19V19H15Z";
     // Same Material "lightbulb" glyph as the Android app's ic_hint.xml.
     private static final String HINT_ICON_PATH =
             "M9,21c0,0.55 0.45,1 1,1h4c0.55,0 1,-0.45 1,-1v-1H9V21zM12,2C8.14,2 5,5.14 5,9c0,2.38 "
                     + "1.19,4.47 3,5.74V17c0,0.55 0.45,1 1,1h6c0.55,0 1,-0.45 1,-1v-2.26c1.81,-1.27 "
                     + "3,-3.36 3,-5.74C19,5.14 15.86,2 12,2z";
-    // Same Material "download"/"upload"/"search" glyphs as the Android app's ic_export.xml/
-    // ic_import.xml/ic_analyze.xml.
-    private static final String EXPORT_ICON_PATH = "M19,9h-4V3H9v6H5l7,7l7,-7zM5,18v2h14v-2H5z";
-    private static final String IMPORT_ICON_PATH = "M9,16h6v-6h4l-7,-7l-7,7h4v6zM5,18h14v2H5v-2z";
-    private static final String ANALYZE_ICON_PATH =
+    // Same Material "search" glyph as the Android app's ic_opening_library.xml.
+    private static final String OPENING_LIBRARY_ICON_PATH =
             "M15.5,14h-0.79l-0.28,-0.27C15.41,12.59 16,11.11 16,9.5C16,5.91 13.09,3 9.5,3S3,5.91 "
                     + "3,9.5S5.91,16 9.5,16c1.61,0 3.09,-0.59 4.23,-1.57l0.27,0.28v0.79l5,4.99L20.49,19"
                     + "L15.5,14zM9.5,14C7.01,14 5,11.99 5,9.5S7.01,5 9.5,5S14,7.01 14,9.5S11.99,14 9.5,14z";
+    // Same Material "more vert" glyph as the Android app's ic_more_vert.xml.
+    private static final String MORE_ICON_PATH =
+            "M12,8c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2zM12,10c-1.1,0 -2,0.9 -2,2"
+                    + "s0.9,2 2,2 2,-0.9 2,-2 -0.9,-2 -2,-2zM12,16c-1.1,0 -2,0.9 -2,2s0.9,2 2,2 2,-0.9 "
+                    + "2,-2 -0.9,-2 -2,-2z";
     // Same Material "bluetooth" glyph as the Android app's ic_pegasus.xml/ic_pegasus_connected.xml.
     private static final String PEGASUS_ICON_PATH =
             "M17.71,7.71L12,2h-1v7.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L11,14.41V22h1l5.71,-5.71"
@@ -205,14 +210,13 @@ final class GameController
     private final Button redoButton = iconButton(REDO_ICON_PATH, Messages.get("menu_redo"));
     private final Button newGameButton =
             iconButton(NEW_GAME_ICON_PATH, Messages.get("menu_new_game"));
-    private final Button importButton =
-            iconButton(IMPORT_ICON_PATH, Messages.get("action_import_pgn"));
-    private final Button exportButton =
-            iconButton(EXPORT_ICON_PATH, Messages.get("action_export_pgn"));
-    private final Button analyzeGameButton =
-            iconButton(OPENING_LIBRARY_ICON_PATH, Messages.get("action_analyze_game"));
-    private final Button openingLibraryButton =
-            iconButton(ANALYZE_ICON_PATH, Messages.get("menu_opening_library"));
+    // Everything a player needs rarely enough that it would only crowd the button row lives in
+    // the overflow menu behind moreButton; see updateOverflowMenuState for the enabled state.
+    private final MenuItem openingLibraryItem = new MenuItem(Messages.get("menu_opening_library"));
+    private final MenuItem importItem = new MenuItem(Messages.get("action_import_pgn"));
+    private final MenuItem exportItem = new MenuItem(Messages.get("action_export_pgn"));
+    private final MenuItem analyzeGameItem = new MenuItem(Messages.get("action_analyze_game"));
+    private final MenuButton moreButton = iconMenuButton(MORE_ICON_PATH, Messages.get("menu_more"));
     private final Button flipBoardButton =
             iconButton(FLIP_BOARD_ICON_PATH, Messages.get("menu_flip_board"));
     private final Button hintButton = iconButton(HINT_ICON_PATH, Messages.get("menu_hint"));
@@ -221,10 +225,23 @@ final class GameController
     private final CheckBox evaluationCheckbox =
             new CheckBox(Messages.get("evaluation_toggle_label"));
     private final Label evaluationLabel = new Label();
-    private final Label moveQualityLabel = new Label();
-    private final Label hintAlternativesLabel = new Label();
-    private final Label analysisProgressLabel = new Label();
-    private final Label trainingProgressLabel = new Label();
+
+    /**
+     * The single line under the status: the training line and how far along it is, or - briefly,
+     * until the next move - how good the move just played was ({@link #moveQualityNote}). One line
+     * instead of two optional ones; see {@link #updateInfoLabel}.
+     */
+    private final Label infoLabel = new Label();
+
+    /**
+     * The one optional line under the buttons: progress while a post-game analysis runs, otherwise
+     * the alternatives from the last hint ({@link #hintAlternativesNote}); see {@link
+     * #updateNoteLabel}.
+     */
+    private final Label noteLabel = new Label();
+
+    private String moveQualityNote;
+    private String hintAlternativesNote;
     private final MoveSoundPlayer soundPlayer = new MoveSoundPlayer();
 
     private StockfishEngine engine;
@@ -375,6 +392,18 @@ final class GameController
         return button;
     }
 
+    /** {@link #iconButton}'s look for a {@link MenuButton}; app.css hides the drop-down arrow. */
+    private static MenuButton iconMenuButton(String svgPathData, String tooltipText) {
+        SVGPath icon = new SVGPath();
+        icon.setContent(svgPathData);
+        icon.getStyleClass().add("icon-shape");
+        MenuButton button = new MenuButton();
+        button.setGraphic(icon);
+        button.getStyleClass().add("icon-button");
+        button.setTooltip(new Tooltip(tooltipText));
+        return button;
+    }
+
     GameController(Stage stage) {
         this.stage = stage;
         boardType = Settings.getBoardType();
@@ -515,8 +544,10 @@ final class GameController
         evaluationLabel.managedProperty().bind(evaluationLabel.visibleProperty());
         evaluationCheckbox.managedProperty().bind(evaluationCheckbox.visibleProperty());
 
-        trainingProgressLabel.setWrapText(true);
-        trainingProgressLabel.managedProperty().bind(trainingProgressLabel.visibleProperty());
+        infoLabel.setWrapText(true);
+        infoLabel.getStyleClass().add("training-progress-label");
+        infoLabel.setVisible(false);
+        infoLabel.managedProperty().bind(infoLabel.visibleProperty());
 
         strengthSlider.setShowTickLabels(false);
         strengthSlider
@@ -585,15 +616,16 @@ final class GameController
         pegasusMismatchLabel.setVisible(false);
         pegasusMismatchLabel.managedProperty().bind(pegasusMismatchLabel.visibleProperty());
         pegasusMismatchLabel.setOnMouseClicked(e -> onMismatchLabelClicked());
-        trainingProgressLabel.getStyleClass().add("training-progress-label");
 
         newGameButton.setOnAction(e -> openGameSetupDialog());
         undoButton.setOnAction(e -> undo());
         redoButton.setOnAction(e -> redo());
-        importButton.setOnAction(e -> importPgn());
-        exportButton.setOnAction(e -> exportPgn());
-        analyzeGameButton.setOnAction(e -> startPostGameAnalysis());
-        openingLibraryButton.setOnAction(e -> OpeningLibraryWindow.show(stage));
+        importItem.setOnAction(e -> importPgn());
+        exportItem.setOnAction(e -> exportPgn());
+        analyzeGameItem.setOnAction(e -> startPostGameAnalysis());
+        openingLibraryItem.setOnAction(e -> OpeningLibraryWindow.show(stage));
+        moreButton.getItems().addAll(openingLibraryItem, importItem, exportItem, analyzeGameItem);
+        moreButton.setOnShowing(e -> updateOverflowMenuState());
         hintButton.setOnAction(e -> requestHint());
         pegasusButton.setOnAction(e -> onPegasusButtonClicked());
         pegasusButton.setVisible(pegasusBridge != null);
@@ -601,16 +633,12 @@ final class GameController
         if (pegasusBridge != null) {
             updatePegasusButtonState(pegasusBridge.getConnectionState());
         }
-        hintAlternativesLabel.getStyleClass().add("training-progress-label");
-        hintAlternativesLabel.setWrapText(true);
-        hintAlternativesLabel.setVisible(false);
-        hintAlternativesLabel.managedProperty().bind(hintAlternativesLabel.visibleProperty());
-        analysisProgressLabel.getStyleClass().add("training-progress-label");
-        analysisProgressLabel.setVisible(false);
-        analysisProgressLabel.managedProperty().bind(analysisProgressLabel.visibleProperty());
+        noteLabel.getStyleClass().add("training-progress-label");
+        noteLabel.setWrapText(true);
+        noteLabel.setVisible(false);
+        noteLabel.managedProperty().bind(noteLabel.visibleProperty());
 
-        HBox pgnBox = new HBox(8, importButton, exportButton, analyzeGameButton);
-        pgnBox.setAlignment(Pos.CENTER_LEFT);
+        // The six everyday actions plus the overflow menu; everything else is in that menu.
         HBox actionBox =
                 new HBox(
                         8,
@@ -618,15 +646,12 @@ final class GameController
                         undoButton,
                         redoButton,
                         flipBoardButton,
-                        openingLibraryButton,
                         hintButton,
-                        pegasusButton);
+                        pegasusButton,
+                        moreButton);
         actionBox.setAlignment(Pos.CENTER_LEFT);
         HBox evalBox = new HBox(8, evaluationCheckbox, evaluationLabel);
         evalBox.setAlignment(Pos.CENTER_LEFT);
-        moveQualityLabel.getStyleClass().add("move-quality-label");
-        moveQualityLabel.setVisible(false);
-        moveQualityLabel.managedProperty().bind(moveQualityLabel.visibleProperty());
 
         Label movesHeading = new Label(Messages.get("move_history_title"));
         movesHeading.getStyleClass().add("section-label");
@@ -634,21 +659,18 @@ final class GameController
         VBox sidebar =
                 new VBox(
                         10,
+                        statusLabel,
+                        pegasusMismatchLabel,
+                        infoLabel,
                         strengthLabel,
                         strengthSlider,
                         maiaRatingLabel,
                         maiaRatingSlider,
                         actionBox,
-                        hintAlternativesLabel,
                         evalBox,
-                        moveQualityLabel,
-                        statusLabel,
-                        pegasusMismatchLabel,
-                        trainingProgressLabel,
+                        noteLabel,
                         movesHeading,
-                        moveListScroll,
-                        pgnBox,
-                        analysisProgressLabel);
+                        moveListScroll);
         sidebar.getStyleClass().addAll("card", "sidebar");
         sidebar.setPrefWidth(260);
         return sidebar;
@@ -1394,13 +1416,11 @@ final class GameController
             String cpLossText = String.format(Locale.ROOT, "%+.1f", multiPvCpByRank[rank] / 100.0);
             alternatives.add(Messages.get("hint_alternative_format", squares, cpLossText));
         }
-        if (alternatives.isEmpty()) {
-            hintAlternativesLabel.setVisible(false);
-            return;
-        }
-        hintAlternativesLabel.setText(
-                Messages.get("hint_alternatives_label", String.join(", ", alternatives)));
-        hintAlternativesLabel.setVisible(true);
+        hintAlternativesNote =
+                alternatives.isEmpty()
+                        ? null
+                        : Messages.get("hint_alternatives_label", String.join(", ", alternatives));
+        updateNoteLabel();
     }
 
     /**
@@ -1469,7 +1489,7 @@ final class GameController
         }
         moveQualityBaselineCp = lastPositionEvalCp;
         moveQualityBaselineMoveCount = game.moveCount();
-        moveQualityLabel.setVisible(false);
+        clearMoveQualityNote();
     }
 
     /**
@@ -1508,13 +1528,12 @@ final class GameController
     private void showMoveQualityIfNotable(int cpLoss) {
         String labelKey = moveQualityLabelKey(cpLoss);
         if (labelKey == null) {
-            moveQualityLabel.setVisible(false);
+            clearMoveQualityNote();
             return;
         }
         String cpLossText = String.format(Locale.ROOT, "%.1f", -cpLoss / 100.0);
-        moveQualityLabel.setText(
-                Messages.get("move_quality_format", Messages.get(labelKey), cpLossText));
-        moveQualityLabel.setVisible(true);
+        moveQualityNote = Messages.get("move_quality_format", Messages.get(labelKey), cpLossText);
+        updateInfoLabel();
     }
 
     /**
@@ -1545,7 +1564,7 @@ final class GameController
         postGameUciMoves = java.util.Arrays.asList(game.toUciMoveList().split(" "));
         postGamePositionEvals = new ArrayList<>(postGameUciMoves.size() + 1);
         updateHintButtonState();
-        updateAnalyzeGameButtonState();
+        updateNoteLabel();
         engine.setFullStrength();
         requestPostGameEvalFor(0);
     }
@@ -1577,7 +1596,7 @@ final class GameController
     private void recordPostGameEval(int cp) {
         postGamePositionEvals.add(cp);
         int nextPositionIndex = postGamePositionEvals.size();
-        updateAnalyzeGameButtonState();
+        updateNoteLabel();
         if (nextPositionIndex <= postGameUciMoves.size()) {
             requestPostGameEvalFor(nextPositionIndex);
             return;
@@ -1588,7 +1607,7 @@ final class GameController
         postGamePositionEvals = null;
         engine.setStrength((int) strengthSlider.getValue());
         updateHintButtonState();
-        updateAnalyzeGameButtonState();
+        updateNoteLabel();
         showPostGameReport(uciMoves, evals);
         if (!game.isGameOver()) {
             // The game was still live when analysis started (see startPostGameAnalysis) -
@@ -1602,24 +1621,30 @@ final class GameController
     }
 
     /**
-     * The icon-only Analyze button has no visible label to carry progress the way the old text
-     * button did - {@link #analysisProgressLabel} fills that role instead, shown only while an
-     * analysis is actually running.
+     * Enabled state of the overflow menu's items, computed as the menu opens so it always reflects
+     * the current game: export and analysis need at least one move, analysis also needs the engine,
+     * is not for training drills and must not already be running.
      */
-    private void updateAnalyzeGameButtonState() {
-        boolean running = postGameUciMoves != null;
-        analyzeGameButton.setDisable(
-                running || !engineReady || mode == Mode.TRAINING || game.moveCount() == 0);
-        if (running) {
-            analysisProgressLabel.setText(
+    private void updateOverflowMenuState() {
+        boolean hasMoves = game.moveCount() > 0;
+        exportItem.setDisable(!hasMoves);
+        analyzeGameItem.setDisable(
+                postGameUciMoves != null || !engineReady || mode == Mode.TRAINING || !hasMoves);
+    }
+
+    private void updateNoteLabel() {
+        String text;
+        if (postGameUciMoves != null) {
+            text =
                     Messages.get(
                             "action_analyzing_format",
                             postGamePositionEvals.size(),
-                            postGameUciMoves.size() + 1));
-            analysisProgressLabel.setVisible(true);
+                            postGameUciMoves.size() + 1);
         } else {
-            analysisProgressLabel.setVisible(false);
+            text = hintAlternativesNote;
         }
+        noteLabel.setText(text == null ? "" : text);
+        noteLabel.setVisible(text != null);
     }
 
     /**
@@ -1746,8 +1771,8 @@ final class GameController
         postGamePositionEvals = null;
         lastPositionEvalMoveCount = -1;
         moveQualityBaselineMoveCount = -1;
-        moveQualityLabel.setVisible(false);
-        updateAnalyzeGameButtonState();
+        clearMoveQualityNote();
+        updateNoteLabel();
     }
 
     /**
@@ -2032,15 +2057,16 @@ final class GameController
     }
 
     /**
-     * Shows exactly one of {@link #strengthSlider}/{@link #strengthLabel} (Stockfish) or {@link
-     * #maiaRatingLabel}/{@link #maiaRatingSlider} (Maia) depending on {@link #mode} - both pairs
-     * are live-adjustable for their running game, called from every place that changes {@link
-     * #mode}.
+     * Shows the {@link #strengthSlider}/{@link #strengthLabel} pair in a Stockfish game and the
+     * {@link #maiaRatingLabel}/{@link #maiaRatingSlider} pair in a Maia game, and neither otherwise
+     * (nothing to adjust against a human or inside a training drill) - both pairs are
+     * live-adjustable for their running game, called from every place that changes {@link #mode}.
      */
     private void updateStrengthControlsVisibility() {
+        boolean isStockfish = mode == Mode.HUMAN_VS_STOCKFISH;
         boolean isMaia = mode == Mode.HUMAN_VS_MAIA;
-        strengthLabel.setVisible(!isMaia);
-        strengthSlider.setVisible(!isMaia);
+        strengthLabel.setVisible(isStockfish);
+        strengthSlider.setVisible(isStockfish);
         maiaRatingLabel.setVisible(isMaia);
         maiaRatingSlider.setVisible(isMaia);
         if (isMaia) {
@@ -2106,12 +2132,12 @@ final class GameController
         } else if (game.isCheck()) {
             statusLabel.getStyleClass().add("check");
         }
-        updateTrainingProgressLabel();
+        updateInfoLabel();
         updatePegasusMismatchLabel();
         updateTrainingHint();
         maybeTriggerAnalysis();
         updateHintButtonState();
-        updateAnalyzeGameButtonState();
+        updateNoteLabel();
 
         if (game.isGameOver()) {
             showGameOverAlert();
@@ -2396,19 +2422,28 @@ final class GameController
         trainingFlow.redo();
     }
 
-    private void updateTrainingProgressLabel() {
-        if (mode != Mode.TRAINING || trainingSession == null) {
-            trainingProgressLabel.setVisible(false);
-            return;
+    private void updateInfoLabel() {
+        infoLabel.getStyleClass().remove("move-quality-label");
+        if (moveQualityNote != null) {
+            infoLabel.getStyleClass().add("move-quality-label");
+            infoLabel.setText(moveQualityNote);
+        } else if (mode == Mode.TRAINING && trainingSession != null) {
+            int shownPly = Math.min(trainingSession.plyIndex() + 1, trainingSession.totalPlies());
+            infoLabel.setText(
+                    Messages.get(
+                            "status_training_progress_format",
+                            OpeningNames.displayName(trainingSession.line()),
+                            shownPly,
+                            trainingSession.totalPlies()));
+        } else {
+            infoLabel.setText("");
         }
-        trainingProgressLabel.setVisible(true);
-        int shownPly = Math.min(trainingSession.plyIndex() + 1, trainingSession.totalPlies());
-        trainingProgressLabel.setText(
-                Messages.get(
-                        "status_training_progress_format",
-                        OpeningNames.displayName(trainingSession.line()),
-                        shownPly,
-                        trainingSession.totalPlies()));
+        infoLabel.setVisible(!infoLabel.getText().isEmpty());
+    }
+
+    private void clearMoveQualityNote() {
+        moveQualityNote = null;
+        updateInfoLabel();
     }
 
     /** On-screen highlight of the trainee's own next expected move, when hints are enabled. */
@@ -2419,7 +2454,8 @@ final class GameController
                 || !trainingSession.isHumanTurnNow()
                 || !trainingSession.hintsEnabled()) {
             boardCanvas.setTrainingHint(null, null);
-            hintAlternativesLabel.setVisible(false);
+            hintAlternativesNote = null;
+            updateNoteLabel();
             return;
         }
         String uci = trainingSession.currentExpectedUci();
@@ -2755,7 +2791,7 @@ final class GameController
         maybeStartEngineMove();
         maybeTriggerAnalysis();
         updateHintButtonState();
-        updateAnalyzeGameButtonState();
+        updateNoteLabel();
     }
 
     @Override
@@ -2851,7 +2887,7 @@ final class GameController
         postGameUciMoves = null;
         postGamePositionEvals = null;
         updateHintButtonState();
-        updateAnalyzeGameButtonState();
+        updateNoteLabel();
         statusLabel.setText(Messages.get("error_engine_generic") + ": " + error.getMessage());
     }
 
