@@ -70,9 +70,9 @@ import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ChoiceDialog;
+import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
-import javafx.scene.control.MenuButton;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Slider;
@@ -216,7 +216,10 @@ final class GameController
     private final MenuItem importItem = new MenuItem(Messages.get("action_import_pgn"));
     private final MenuItem exportItem = new MenuItem(Messages.get("action_export_pgn"));
     private final MenuItem analyzeGameItem = new MenuItem(Messages.get("action_analyze_game"));
-    private final MenuButton moreButton = iconMenuButton(MORE_ICON_PATH, Messages.get("menu_more"));
+    // A plain icon button that pops a ContextMenu rather than a MenuButton: a MenuButton's
+    // arrow region keeps its space even when hidden and pushes the glyph off-centre.
+    private final Button moreButton = iconButton(MORE_ICON_PATH, Messages.get("menu_more"));
+    private final ContextMenu moreMenu = new ContextMenu();
     private final Button flipBoardButton =
             iconButton(FLIP_BOARD_ICON_PATH, Messages.get("menu_flip_board"));
     private final Button hintButton = iconButton(HINT_ICON_PATH, Messages.get("menu_hint"));
@@ -392,18 +395,6 @@ final class GameController
         icon.setContent(svgPathData);
         icon.getStyleClass().add("icon-shape");
         Button button = new Button();
-        button.setGraphic(icon);
-        button.getStyleClass().add("icon-button");
-        button.setTooltip(new Tooltip(tooltipText));
-        return button;
-    }
-
-    /** {@link #iconButton}'s look for a {@link MenuButton}; app.css hides the drop-down arrow. */
-    private static MenuButton iconMenuButton(String svgPathData, String tooltipText) {
-        SVGPath icon = new SVGPath();
-        icon.setContent(svgPathData);
-        icon.getStyleClass().add("icon-shape");
-        MenuButton button = new MenuButton();
         button.setGraphic(icon);
         button.getStyleClass().add("icon-button");
         button.setTooltip(new Tooltip(tooltipText));
@@ -631,8 +622,16 @@ final class GameController
         exportItem.setOnAction(e -> exportPgn());
         analyzeGameItem.setOnAction(e -> startPostGameAnalysis());
         openingLibraryItem.setOnAction(e -> OpeningLibraryWindow.show(stage));
-        moreButton.getItems().addAll(openingLibraryItem, importItem, exportItem, analyzeGameItem);
-        moreButton.setOnShowing(e -> updateOverflowMenuState());
+        moreMenu.getItems().addAll(openingLibraryItem, importItem, exportItem, analyzeGameItem);
+        moreMenu.setOnShowing(e -> updateOverflowMenuState());
+        moreButton.setOnAction(
+                e -> {
+                    if (moreMenu.isShowing()) {
+                        moreMenu.hide();
+                    } else {
+                        moreMenu.show(moreButton, javafx.geometry.Side.BOTTOM, 0, 4);
+                    }
+                });
         hintButton.setOnAction(e -> requestHint());
         pegasusButton.setOnAction(e -> onPegasusButtonClicked());
         pegasusButton.setVisible(pegasusBridge != null);
