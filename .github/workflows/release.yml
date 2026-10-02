@@ -124,7 +124,7 @@ jobs:
           fi
 
   android:
-    name: Build & sign release APKs
+    name: Build & sign release APKs and App Bundle
     needs: create-release
     runs-on: ubuntu-latest
     steps:
@@ -154,18 +154,34 @@ jobs:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
 
-      - name: Build signed release APKs
+      # One Gradle invocation for both: the per-ABI APKs plus the universal
+      # one (sideloading, F-Droid's reproducibility reference) and the App
+      # Bundle that Google Play requires for uploads. Both are signed with
+      # the same release key; on Play that key acts as the upload key and
+      # Play re-signs what it serves. The bundle has no ABI filter, so it
+      # keeps the base versionCode (appVersionCode), like the universal APK.
+      - name: Build signed release APKs and App Bundle
         env:
           RELEASE_KEYSTORE_PATH: ${{ runner.temp }}/release.keystore
           SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
-        run: ./gradlew --no-daemon :app:assembleRelease
+        run: ./gradlew --no-daemon :app:assembleRelease :app:bundleRelease
 
       - name: Upload APKs to the release
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "${{ github.ref_name }}" app/build/outputs/apk/release/*.apk --clobber
+
+      # Named after the version so a downloaded file says what it is; the
+      # Play Console takes it as-is.
+      - name: Upload App Bundle to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(grep '^appVersion=' gradle.properties | cut -d= -f2)
+          cp app/build/outputs/bundle/release/app-release.aab "MoveAPiece-${VERSION}.aab"
+          gh release upload "${{ github.ref_name }}" "MoveAPiece-${VERSION}.aab" --clobber
 
   desktop:
     name: Build & package desktop (${{ matrix.asset }})

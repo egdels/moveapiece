@@ -124,6 +124,24 @@ differ between runners even when the app content is identical. This
 reproducibility requirement is Android-specific (driven by F-Droid's
 build process) and does not apply to the desktop app.
 
+#### Signed release builds (GitHub Release, Google Play)
+
+`.github/workflows/release.yml` builds the release variant on every
+version tag, signed with the release key held in the repository's
+secrets, and attaches the per-ABI and universal APKs plus the Android App
+Bundle (`MoveAPiece-<version>.aab`) to the GitHub Release. The bundle is
+what Google Play takes; the release key serves as the Play upload key.
+To build the same locally, point the build at a keystore through the
+environment (`app/build.gradle` only enables the release signing config
+when all four are set):
+
+```sh
+RELEASE_KEYSTORE_PATH=/path/to/release.keystore \
+SIGNING_KEY_ALIAS=... SIGNING_KEY_PASSWORD=... SIGNING_STORE_PASSWORD=... \
+./gradlew :app:bundleRelease
+# -> app/build/outputs/bundle/release/app-release.aab
+```
+
 ### Desktop
 
 ```sh
