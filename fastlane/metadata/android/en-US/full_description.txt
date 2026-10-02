@@ -1,29 +1,28 @@
-Open it and play. MoveAPiece starts straight into a game against
-Stockfish – no account, no network, no setup, no settings screen. One
-"New Game" dialog covers every choice there is (opponent, colour,
-strength, opening) and the app remembers it for next time.
+Open it and play. MoveAPiece is an offline chess app that starts straight into a game against the Stockfish chess engine. No account, no ads, no internet connection, no settings screen. One "New Game" dialog covers every choice there is (opponent, colour, strength, opening), and the app remembers it for next time.
 
-Play against Stockfish at an adjustable strength (Elo 1320–3190),
-against Maia – a human-like opponent that plays the moves a player of a
-chosen rating (1100–1900) would typically play – or against another
-person on the same phone.
+PLAY CHESS AGAINST THE COMPUTER
+• Stockfish, the well-known open-source chess engine, at an adjustable playing strength from Elo 1320 to 3190, from beginner to master level
+• Maia, a human-like chess AI: it plays the moves a player of a chosen rating (1100 to 1900) would typically play, with natural thinking pauses. An opponent that feels like a club player, not a calculator
+• Two players on one phone or tablet
 
-If you own a DGT Pegasus or a Chessnut Air, Air+, Pro or Go, connect it
-over Bluetooth LE and play on the real board instead of the screen. The
-app works out which board it is on its own; your moves are picked up
-from the board and the opponent's replies light up on its LEDs. The
-screen stays usable at the same time.
+LEARN CHESS OPENINGS
+• Opening trainer with 20 well-known lines, among them Ruy Lopez, Sicilian Najdorf, Italian Game, Queen's Gambit, Caro-Kann and King's Indian. The app plays the book side and accepts only the correct reply
+• Step-through opening library to review every line move by move
+• Optional move hints while you learn
 
-Also there when you want it:
+IMPROVE YOUR GAME
+• Hint button, optional live evaluation, blunder warning after a bad move
+• Post-game analysis that grades every move
+• Undo, redo, flip the board, tap any move in the move list to jump there
+• PGN import and export to study or share your games
 
-* Opening training: drill one of 20 well-known lines, the app plays the
-  book side and accepts only the correct reply; a step-through library
-  of the same lines
-* Hint, optional live evaluation, blunder warning, post-game analysis
-* Undo, redo, flip the board, PGN import and export
-* Move, capture and check sounds; portrait and landscape
-* English, German, French, Spanish, Italian, Dutch
+ELECTRONIC CHESS BOARDS
+Own a DGT Pegasus or a Chessnut Air, Air+, Pro or Go? Connect it over Bluetooth and play on the real board instead of the screen. Your moves are picked up from the pieces, the opponent's replies light up on the board's LEDs, and the app detects the board type on its own. The screen stays usable at the same time, for hints, evaluation and the move list.
 
-Maia's nine networks are bundled and run entirely on the device via
-ONNX Runtime (telemetry disabled). Everything is offline; nothing leaves
-your phone. MoveAPiece is licensed under the GPLv3.
+OFFLINE AND PRIVATE
+• Works completely offline, nothing leaves your device
+• No account, no ads, no tracking, no in-app purchases
+• Maia's nine neural networks are bundled and run on the device
+• Free and open source (GPLv3), the same app as on F-Droid
+
+Also there: move, capture and check sounds; portrait and landscape; phone and tablet layouts; English, German, French, Spanish, Italian and Dutch.

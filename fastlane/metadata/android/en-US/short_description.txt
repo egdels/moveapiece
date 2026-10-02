@@ -1,1 +1,1 @@
-Open and play: offline chess vs Stockfish or Maia, on screen or a real board
+Offline chess vs Stockfish or Maia, opening trainer, Pegasus & Chessnut boards

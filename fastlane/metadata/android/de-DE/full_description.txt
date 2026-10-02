@@ -1,0 +1,28 @@
+Öffnen und spielen. MoveAPiece ist eine Offline-Schach-App, die direkt in eine Partie gegen die Schachengine Stockfish startet. Kein Konto, keine Werbung, keine Internetverbindung, kein Einstellungsmenü. Ein einziger Dialog „Neues Spiel“ deckt alle Entscheidungen ab (Gegner, Farbe, Spielstärke, Eröffnung), und die App merkt sich die Wahl für das nächste Mal.
+
+SCHACH GEGEN DEN COMPUTER
+• Stockfish, die bekannte Open-Source-Schachengine, mit einstellbarer Spielstärke von Elo 1320 bis 3190, vom Anfänger bis zum Meisterniveau
+• Maia, eine menschenähnliche Schach-KI: Sie spielt die Züge, die ein Spieler der gewählten Wertung (1100 bis 1900) typischerweise spielen würde, mit natürlichen Bedenkpausen. Ein Gegner, der sich wie ein Vereinsspieler anfühlt, nicht wie ein Rechner
+• Zwei Spieler an einem Handy oder Tablet
+
+SCHACHERÖFFNUNGEN LERNEN
+• Eröffnungstrainer mit 20 bekannten Varianten, darunter Spanisch, Sizilianisch (Najdorf), Italienisch, Damengambit, Caro-Kann und Königsindisch. Die App spielt die Buchseite und akzeptiert nur die richtige Antwort
+• Eröffnungsbibliothek zum Durchblättern jeder Variante Zug für Zug
+• Zugvorschläge beim Lernen, abschaltbar
+
+BESSER WERDEN
+• Hinweis-Taste, optionale Live-Bewertung, Warnung nach einem groben Fehler
+• Partieanalyse nach dem Spiel, die jeden Zug bewertet
+• Zug zurück, Zug vor, Brett drehen, in der Zugliste auf jeden Zug springen
+• PGN-Import und -Export zum Nachspielen oder Teilen von Partien
+
+ELEKTRONISCHE SCHACHBRETTER
+Du hast ein DGT Pegasus oder ein Chessnut Air, Air+, Pro oder Go? Verbinde es per Bluetooth und spiele auf dem echten Brett statt auf dem Bildschirm. Deine Züge werden von den Figuren erkannt, die Antworten des Gegners leuchten auf den LEDs des Bretts, und die App erkennt den Bretttyp von selbst. Der Bildschirm bleibt dabei nutzbar, für Hinweise, Bewertung und Zugliste.
+
+OFFLINE UND PRIVAT
+• Funktioniert vollständig offline, nichts verlässt dein Gerät
+• Kein Konto, keine Werbung, kein Tracking, keine In-App-Käufe
+• Maias neun neuronale Netze sind mitgeliefert und laufen auf dem Gerät
+• Frei und quelloffen (GPLv3), dieselbe App wie auf F-Droid
+
+Außerdem: Zug-, Schlag- und Schachgeräusche; Hoch- und Querformat; Layouts für Handy und Tablet; Deutsch, Englisch, Französisch, Spanisch, Italienisch und Niederländisch.
