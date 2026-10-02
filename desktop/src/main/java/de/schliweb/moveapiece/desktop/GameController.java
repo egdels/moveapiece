@@ -362,6 +362,12 @@ final class GameController
     private BoardTypeDetection detection;
 
     /**
+     * Advertised name of the board last picked from the scan list, so messages can name a Chessnut
+     * by model ({@link BoardType#displayNameFor}); null until a board was picked this session.
+     */
+    private String boardDeviceName;
+
+    /**
      * Whether an engine reply applied to the game still owes its move sound: with a Pegasus board
      * connected the reply is applied silently and sounds once the guide reports it executed on the
      * board (same reasoning as the trainer's deferred book-move sound); {@code
@@ -468,9 +474,10 @@ final class GameController
     }
 
     /**
-     * Swaps the bridge for {@code type} (called by {@link BoardConnectDialog} when the choice box
-     * changes): the old one is detached and shut down, the choice persisted. Returns the bridge now
-     * in use, which may be the unchanged current one.
+     * Swaps the bridge for {@code type} (driven by {@link #connectWithDetection} and {@link
+     * #onTransportError} while the type is being worked out): the old one is detached and shut
+     * down, the type persisted. Returns the bridge now in use, which may be the unchanged current
+     * one.
      */
     private PhysicalBoardBridge switchBoardType(BoardType type) {
         if (type == boardType) {
@@ -851,8 +858,7 @@ final class GameController
             return;
         }
         detection = null;
-        BoardConnectDialog.show(stage, boardType, this::switchBoardType)
-                .ifPresent(this::connectWithDetection);
+        BoardConnectDialog.show(stage, pegasusBridge).ifPresent(this::connectWithDetection);
     }
 
     /**
@@ -860,14 +866,26 @@ final class GameController
      * of the most likely type (advertised name, else the configured type) connects first; if its
      * transport then reports the type's GATT service missing, {@link #onTransportError} switches to
      * the next type and connects again. The type that succeeds is persisted by {@link
-     * #switchBoardType}, so the dialog's type box only matters for devices with unknown names.
+     * #switchBoardType}; the stored type only decides which candidate is tried first for a device
+     * with an unknown name.
      */
     private void connectWithDetection(DiscoveredDevice device) {
-        detection = BoardTypeDetection.start(device.getAddress(), device.getName(), boardType);
+        boardDeviceName = device.getName();
+        detection =
+                BoardTypeDetection.start(
+                        device.getAddress(),
+                        device.getName(),
+                        device.getAdvertisedServiceUuids(),
+                        boardType);
         PhysicalBoardBridge bridge = switchBoardType(detection.current());
         if (bridge != null) {
             bridge.connect(device.getAddress());
         }
+    }
+
+    /** The board's name for messages: "Chessnut Air", "DGT Pegasus", ... */
+    private String boardLabel() {
+        return boardType.displayNameFor(boardDeviceName);
     }
 
     /** True for the errors a transport raises when the connected device lacks the profile. */
@@ -888,11 +906,9 @@ final class GameController
         }
         pegasusButton.setTooltip(
                 new Tooltip(
-                        Messages.get(
-                                connected
-                                        ? "menu_board_disconnect_format"
-                                        : "menu_board_connect_format",
-                                boardType.displayName())));
+                        connected
+                                ? Messages.get("menu_board_disconnect_format", boardLabel())
+                                : Messages.get("menu_board_connect")));
     }
 
     /**
@@ -1227,7 +1243,7 @@ final class GameController
             detection = null;
             switchBoardType(configured);
         }
-        showError(Messages.get("board_error_format", boardType.displayName(), error));
+        showError(Messages.get("board_error_format", boardLabel(), error));
     }
 
     /**
@@ -1241,9 +1257,9 @@ final class GameController
         if (low && boardType == BoardType.PEGASUS) {
             message = Messages.get("pegasus_battery_critical_format", percent);
         } else if (low) {
-            message = Messages.get("board_battery_low_format", boardType.displayName(), percent);
+            message = Messages.get("board_battery_low_format", boardLabel(), percent);
         } else {
-            message = Messages.get("board_battery_format", boardType.displayName(), percent);
+            message = Messages.get("board_battery_format", boardLabel(), percent);
         }
         showToast(message);
     }

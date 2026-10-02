@@ -48,10 +48,23 @@ public final class BoardTypeDetection {
      */
     public static BoardTypeDetection start(
             String address, String deviceName, BoardType configured) {
+        return start(address, deviceName, null, configured);
+    }
+
+    /**
+     * As {@link #start(String, String, BoardType)}, also taking the service UUIDs the device
+     * advertises: a renamed Pegasus is still tried first thanks to its UART service UUID (see
+     * {@link BoardType#guessFromAdvertisement}).
+     */
+    public static BoardTypeDetection start(
+            String address,
+            String deviceName,
+            List<String> advertisedServiceUuids,
+            BoardType configured) {
         if (address == null || configured == null) {
             throw new IllegalArgumentException("address and configured type must not be null");
         }
-        BoardType guess = BoardType.guessFromDeviceName(deviceName);
+        BoardType guess = BoardType.guessFromAdvertisement(deviceName, advertisedServiceUuids);
         return new BoardTypeDetection(address, configured, guess == null ? configured : guess);
     }
 

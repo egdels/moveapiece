@@ -225,6 +225,16 @@ public final class AndroidPegasusBleTransport implements PegasusTransport {
         }
         String name =
                 result.getScanRecord() == null ? null : result.getScanRecord().getDeviceName();
+        // What each device advertises, for checking whether a board can be told apart by its
+        // advertised services rather than its (changeable) name.
+        Log.d(
+                TAG,
+                "scan: '"
+                        + name
+                        + "' "
+                        + result.getDevice().getAddress()
+                        + " uuids="
+                        + serviceUuids);
         return new DiscoveredDevice(
                 name, result.getDevice().getAddress(), result.getRssi(), serviceUuids);
     }

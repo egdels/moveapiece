@@ -10,14 +10,14 @@ Linux; Chessnut Air+, Pro and Go listed alongside the Air.
 * The evaluation display is now off until you switch it on; your
   choice is remembered as before.
 
-* Chessnut: the board-type chooser now reads "Chessnut (Air, Air+, Pro,
-  Go)"; messages say "Chessnut". Air+, Pro and Go speak the same
-  protocol as the Air and should work as before; only the Air has been
-  tested. The Move is not supported.
-* Boards: the board type no longer has to be chosen by hand. Pick the
-  device from the scan list and the app finds out whether it is a DGT
-  Pegasus or a Chessnut by checking its Bluetooth services, then
-  remembers the answer. The type chooser stays as a fallback.
+* Chessnut: messages name the model the board announces, e.g.
+  "Chessnut Air connected". Air+, Pro and Go speak the same protocol
+  as the Air and should work as before; only the Air has been tested.
+  The Move is not supported.
+* Boards: there is no board type to choose any more. "Connect board"
+  lists the devices in range, recognised boards first, and the app
+  finds out whether the one you pick is a DGT Pegasus or a Chessnut by
+  checking its Bluetooth services.
 * DGT Pegasus: disconnecting right after connecting no longer leaves
   stray "write failed" errors behind, and a reconnect during the
   board's start-up sequence no longer confuses it.

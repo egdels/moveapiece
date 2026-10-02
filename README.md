@@ -38,8 +38,8 @@ opponent's replies light up on the board's LEDs. The screen stays usable at
 the same time - the board is a second input, not a replacement - and picks
 back up correctly after a disconnect or a screen move made while it was
 away. Pick the board from the scan list and the app probes its GATT
-services to tell a Pegasus from a Chessnut, remembering the answer; a
-manual chooser remains as fallback for devices with unknown names.
+services to tell a Pegasus from a Chessnut; there is no board type to
+choose.
 
 - **DGT Pegasus** senses occupancy only: moves are inferred from which
   squares emptied and filled, promotions are asked on screen, and a capture

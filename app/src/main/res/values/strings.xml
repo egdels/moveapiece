@@ -11,7 +11,6 @@
     <string name="menu_more">More</string>
     <string name="menu_opponent">Opponent</string>
     <string name="menu_board_connect">Connect board…</string>
-    <string name="menu_board_connect_format">Connect %1$s…</string>
     <string name="menu_board_disconnect_format">Disconnect %1$s</string>
 
     <string name="dialog_new_game_title">New Game</string>
@@ -87,7 +86,7 @@
     <string name="action_ok">OK</string>
     <string name="action_cancel">Cancel</string>
 
-    <string name="dialog_board_connect_format">Connect %1$s</string>
+    <string name="dialog_board_connect">Connect board</string>
     <string name="pegasus_scan_empty">Searching for devices…</string>
     <string name="pegasus_scan_failed">Bluetooth scan failed</string>
     <string name="board_connected_format">%1$s connected</string>
@@ -98,8 +97,6 @@
     <string name="board_battery_format">%1$s battery: %2$d %%</string>
     <string name="pegasus_battery_critical_format">Pegasus board battery critically low (%1$d %%) — it will shut down soon</string>
     <string name="board_battery_low_format">%1$s battery low (%2$d %%)</string>
-    <string name="board_type_button">Board type</string>
-    <string name="dialog_board_type_title">Which board?</string>
     <string name="pegasus_board_mismatch">Board does not match the position — fix the pieces as shown by the LEDs</string>
     <string name="pegasus_auto_move_held">The app\'s move is waiting until the board matches</string>
     <string name="pegasus_mismatch_squares_format">Squares: %1$s</string>

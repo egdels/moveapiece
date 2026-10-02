@@ -175,6 +175,12 @@ public class MainActivity extends AppCompatActivity
      */
     private BoardTypeDetection detection;
 
+    /**
+     * Advertised name of the board last picked from the scan list, so messages can name a Chessnut
+     * by model ({@link BoardType#displayNameFor}); null until a board was picked this session.
+     */
+    private String boardDeviceName;
+
     private ActivityResultLauncher<String[]> blePermissionLauncher;
     private ActivityResultLauncher<String> pgnImportLauncher;
 
@@ -561,15 +567,15 @@ public class MainActivity extends AppCompatActivity
     private void showPegasusScanDialog() {
         detection = null;
         List<DiscoveredDevice> found = new ArrayList<>();
+        // How many entries at the top of the list are recognised boards (by name).
+        int[] boardCount = {0};
         ArrayAdapter<String> adapter =
                 new ArrayAdapter<>(this, android.R.layout.simple_list_item_1);
 
+        // No board type to choose: connectWithDetection works it out from the device picked.
         currentDialog =
                 new MaterialAlertDialogBuilder(this)
-                        .setTitle(
-                                getString(
-                                        R.string.dialog_board_connect_format,
-                                        boardType.displayName()))
+                        .setTitle(R.string.dialog_board_connect)
                         .setAdapter(
                                 adapter,
                                 (dialog, which) -> {
@@ -578,9 +584,6 @@ public class MainActivity extends AppCompatActivity
                                 })
                         .setNegativeButton(
                                 R.string.action_cancel, (dialog, which) -> board.stopScan())
-                        .setNeutralButton(
-                                R.string.board_type_button,
-                                (dialog, which) -> showBoardTypeDialog())
                         .setOnDismissListener(dialog -> board.stopScan())
                         .show();
 
@@ -595,19 +598,22 @@ public class MainActivity extends AppCompatActivity
                             return;
                         }
                         // The Chessnut Air advertises its name with a trailing newline.
-                        String label =
-                                device.getName().trim()
-                                        + " ["
-                                        + device.getAddress()
-                                        + "] "
-                                        + device.getRssi()
-                                        + " dBm";
+                        // Just the advertised name: address and signal strength are developer
+                        // detail. Recognised boards (by name or advertised service) go to the top
+                        // of the list.
+                        String label = device.getName().trim();
+                        boolean isBoard =
+                                BoardType.guessFromAdvertisement(
+                                                label, device.getAdvertisedServiceUuids())
+                                        != null;
                         runOnUiThread(
                                 () -> {
-                                    if (!found.contains(device)) {
-                                        found.add(device);
-                                        adapter.add(label);
+                                    if (found.contains(device)) {
+                                        return;
                                     }
+                                    int index = isBoard ? boardCount[0]++ : found.size();
+                                    found.add(index, device);
+                                    adapter.insert(label, index);
                                 });
                     }
 
@@ -663,11 +669,9 @@ public class MainActivity extends AppCompatActivity
                 connected ? green : boardButtonDefaultBackgroundTint);
         binding.pegasusButton.setIconTint(connected ? white : boardButtonDefaultIconTint);
         binding.pegasusButton.setContentDescription(
-                getString(
-                        connected
-                                ? R.string.menu_board_disconnect_format
-                                : R.string.menu_board_connect_format,
-                        boardType.displayName()));
+                connected
+                        ? getString(R.string.menu_board_disconnect_format, boardLabel())
+                        : getString(R.string.menu_board_connect));
         TooltipCompat.setTooltipText(
                 binding.pegasusButton, binding.pegasusButton.getContentDescription());
     }
@@ -726,37 +730,6 @@ public class MainActivity extends AppCompatActivity
                 new PegasusGameBridge(new AndroidPegasusBleTransport(app), this));
     }
 
-    /** Lets the player pick the board type, then reopens the scan dialog for it. */
-    private void showBoardTypeDialog() {
-        BoardType[] types = BoardType.values();
-        String[] labels = new String[types.length];
-        int checked = 0;
-        for (int i = 0; i < types.length; i++) {
-            labels[i] = types[i].chooserLabel();
-            if (types[i] == boardType) {
-                checked = i;
-            }
-        }
-        currentDialog =
-                new MaterialAlertDialogBuilder(this)
-                        .setTitle(R.string.dialog_board_type_title)
-                        .setSingleChoiceItems(
-                                labels,
-                                checked,
-                                (dialog, which) -> {
-                                    dialog.dismiss();
-                                    switchBoardType(types[which]);
-                                })
-                        .setNegativeButton(R.string.action_cancel, null)
-                        .show();
-    }
-
-    /** {@link #applyBoardType} for a choice made in the board-type dialog; reopens the scan. */
-    private void switchBoardType(BoardType type) {
-        applyBoardType(type);
-        showPegasusScanDialog();
-    }
-
     /**
      * Replaces the current bridge with one for {@code type}: the old one is disconnected and shut
      * down (recording included) and the choice is persisted. No-op if {@code type} is current.
@@ -782,10 +755,17 @@ public class MainActivity extends AppCompatActivity
      * of the most likely type (advertised name, else the configured type) connects first; if its
      * transport then reports the type's GATT service missing, {@link #onTransportError} switches to
      * the next type and connects again. The type that succeeds is persisted by {@link
-     * #applyBoardType}, so the board-type dialog only matters for devices with unknown names.
+     * #applyBoardType}; the stored type only decides which candidate is tried first for a device
+     * with an unknown name.
      */
     private void connectWithDetection(DiscoveredDevice device) {
-        detection = BoardTypeDetection.start(device.getAddress(), device.getName(), boardType);
+        boardDeviceName = device.getName();
+        detection =
+                BoardTypeDetection.start(
+                        device.getAddress(),
+                        device.getName(),
+                        device.getAdvertisedServiceUuids(),
+                        boardType);
         Log.i(
                 TAG,
                 "Board type detection for '"
@@ -797,6 +777,11 @@ public class MainActivity extends AppCompatActivity
                         + ")");
         applyBoardType(detection.current());
         board.connect(device.getAddress());
+    }
+
+    /** The board's name for messages: "Chessnut Air", "DGT Pegasus", ... */
+    private String boardLabel() {
+        return boardType.displayNameFor(boardDeviceName);
     }
 
     /** True for the errors a transport raises when the connected device lacks the profile. */
@@ -893,13 +878,13 @@ public class MainActivity extends AppCompatActivity
             }
             Toast.makeText(
                             this,
-                            getString(R.string.board_connected_format, boardType.displayName()),
+                            getString(R.string.board_connected_format, boardLabel()),
                             Toast.LENGTH_SHORT)
                     .show();
         } else if (state == ConnectionState.DISCONNECTED) {
             Toast.makeText(
                             this,
-                            getString(R.string.board_disconnected_format, boardType.displayName()),
+                            getString(R.string.board_disconnected_format, boardLabel()),
                             Toast.LENGTH_SHORT)
                     .show();
         }
@@ -1150,7 +1135,7 @@ public class MainActivity extends AppCompatActivity
         }
         Toast.makeText(
                         this,
-                        getString(R.string.board_error_format, boardType.displayName(), error),
+                        getString(R.string.board_error_format, boardLabel(), error),
                         Toast.LENGTH_SHORT)
                 .show();
     }
@@ -1165,10 +1150,9 @@ public class MainActivity extends AppCompatActivity
         if (low && boardType == BoardType.PEGASUS) {
             message = getString(R.string.pegasus_battery_critical_format, percent);
         } else if (low) {
-            message =
-                    getString(R.string.board_battery_low_format, boardType.displayName(), percent);
+            message = getString(R.string.board_battery_low_format, boardLabel(), percent);
         } else {
-            message = getString(R.string.board_battery_format, boardType.displayName(), percent);
+            message = getString(R.string.board_battery_format, boardLabel(), percent);
         }
         Toast.makeText(this, message, Toast.LENGTH_LONG).show();
     }

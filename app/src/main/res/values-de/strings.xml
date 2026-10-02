@@ -9,7 +9,6 @@
     <string name="menu_more">Mehr</string>
     <string name="menu_opponent">Gegner</string>
     <string name="menu_board_connect">Brett verbinden…</string>
-    <string name="menu_board_connect_format">%1$s verbinden…</string>
     <string name="menu_board_disconnect_format">%1$s trennen</string>
 
     <string name="dialog_new_game_title">Neues Spiel</string>
@@ -85,7 +84,7 @@
     <string name="action_ok">OK</string>
     <string name="action_cancel">Abbrechen</string>
 
-    <string name="dialog_board_connect_format">%1$s verbinden</string>
+    <string name="dialog_board_connect">Brett verbinden</string>
     <string name="pegasus_scan_empty">Suche nach Geräten …</string>
     <string name="pegasus_scan_failed">Bluetooth-Suche fehlgeschlagen</string>
     <string name="board_connected_format">%1$s verbunden</string>
@@ -96,8 +95,6 @@
     <string name="board_battery_format">Akku %1$s: %2$d %%</string>
     <string name="pegasus_battery_critical_format">Pegasus-Brett Akku kritisch niedrig (%1$d %%) – schaltet sich bald ab</string>
     <string name="board_battery_low_format">Akku %1$s niedrig (%2$d %%)</string>
-    <string name="board_type_button">Bretttyp</string>
-    <string name="dialog_board_type_title">Welches Brett?</string>
     <string name="pegasus_board_mismatch">Brett stimmt nicht mit der Stellung überein – Figuren gemäß LEDs korrigieren</string>
     <string name="pegasus_auto_move_held">Der Zug der App wartet, bis das Brett stimmt</string>
     <string name="pegasus_mismatch_squares_format">Felder: %1$s</string>

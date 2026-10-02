@@ -10,6 +10,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+import java.util.List;
 import org.junit.Test;
 
 public class BoardTypeDetectionTest {
@@ -30,6 +31,44 @@ public class BoardTypeDetectionTest {
         assertNull(BoardType.guessFromDeviceName(""));
         assertNull(BoardType.guessFromDeviceName("d4"));
         assertNull(BoardType.guessFromDeviceName("Christian's board"));
+    }
+
+    @Test
+    public void displayNameFor_namesTheChessnutModelButNotARenamedPegasus() {
+        assertEquals("Chessnut Air", BoardType.CHESSNUT.displayNameFor("Chessnut Air\n"));
+        assertEquals("Chessnut Pro", BoardType.CHESSNUT.displayNameFor("Chessnut Pro"));
+        assertEquals("Chessnut", BoardType.CHESSNUT.displayNameFor("Smart Chess"));
+        assertEquals("Chessnut", BoardType.CHESSNUT.displayNameFor(null));
+        assertEquals("DGT Pegasus", BoardType.PEGASUS.displayNameFor("DGT_PEGASUS_12345"));
+        assertEquals("DGT Pegasus", BoardType.PEGASUS.displayNameFor("Testbrett"));
+    }
+
+    @Test
+    public void guessFromAdvertisement_recognisesRenamedPegasusByUartService() {
+        List<String> uart = List.of("6E400001-B5A3-F393-E0A9-E50E24DCCA9E");
+        assertEquals(
+                BoardType.PEGASUS, BoardType.guessFromAdvertisement("Christian's board", uart));
+        assertEquals(BoardType.PEGASUS, BoardType.guessFromAdvertisement(null, uart));
+        // The name wins when it says something; the service only breaks ties.
+        assertEquals(BoardType.CHESSNUT, BoardType.guessFromAdvertisement("Chessnut Air", uart));
+        assertNull(BoardType.guessFromAdvertisement("Christian's board", List.of()));
+        assertNull(BoardType.guessFromAdvertisement("Christian's board", null));
+        assertNull(
+                BoardType.guessFromAdvertisement(
+                        "BF700", List.of("0000ffe0-0000-1000-8000-00805f9b34fb")));
+    }
+
+    @Test
+    public void start_triesRenamedPegasusFirstByUartService() {
+        BoardTypeDetection d =
+                BoardTypeDetection.start(
+                        "AA:BB",
+                        "Christian's board",
+                        List.of("6e400001-b5a3-f393-e0a9-e50e24dcca9e"),
+                        BoardType.CHESSNUT);
+        assertEquals(BoardType.PEGASUS, d.current());
+        assertEquals(BoardType.CHESSNUT, d.next());
+        assertNull(d.next());
     }
 
     @Test

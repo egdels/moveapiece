@@ -11,7 +11,6 @@ import de.schliweb.pegasus.core.transport.DiscoveredDevice;
 import de.schliweb.pegasus.core.transport.ScanListener;
 import de.schliweb.pegasus.core.transport.TransportError;
 import java.util.Optional;
-import java.util.function.Function;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -20,12 +19,10 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
-import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
-import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
@@ -35,9 +32,10 @@ import javafx.stage.Stage;
  * once closed either way - mirrors the Android app's {@code MainActivity.showPegasusScanDialog},
  * minus the runtime-permission step (macOS has no Android-style BLE permission prompt).
  *
- * <p>A choice box switches the board type (DGT Pegasus / Chessnut); {@code switcher} is asked for
- * the bridge of the chosen type, which the dialog then scans with. The address returned belongs to
- * whichever bridge the switcher last returned.
+ * <p>There is nothing to configure: the dialog scans with the bridge it is given, lists every named
+ * device in range (recognised boards first) and returns the one picked. Working out whether that
+ * device is a DGT Pegasus or a Chessnut is the caller's job ({@code
+ * GameController.connectWithDetection}).
  */
 final class BoardConnectDialog {
 
@@ -45,9 +43,10 @@ final class BoardConnectDialog {
 
     private BoardConnectDialog() {}
 
-    static Optional<DiscoveredDevice> show(
-            Stage owner, BoardType current, Function<BoardType, PhysicalBoardBridge> switcher) {
+    static Optional<DiscoveredDevice> show(Stage owner, PhysicalBoardBridge bridge) {
         ObservableList<DiscoveredDevice> items = FXCollections.observableArrayList();
+        // How many entries at the top of the list are recognised boards (by name).
+        int[] boardCount = {0};
         ListView<DiscoveredDevice> listView = new ListView<>(items);
         listView.setPlaceholder(new Label(Messages.get("pegasus_scan_empty")));
         listView.setCellFactory(
@@ -56,44 +55,23 @@ final class BoardConnectDialog {
                             @Override
                             protected void updateItem(DiscoveredDevice item, boolean empty) {
                                 super.updateItem(item, empty);
-                                // The Chessnut Air advertises its name with a trailing newline.
+                                // Just the advertised name (the Chessnut Air sends it with a
+                                // trailing newline): address and signal strength are developer
+                                // detail.
                                 setText(
-                                        empty || item == null
+                                        empty || item == null || item.getName() == null
                                                 ? null
-                                                : (item.getName() == null
-                                                                ? ""
-                                                                : item.getName().trim())
-                                                        + " ["
-                                                        + item.getAddress()
-                                                        + "] "
-                                                        + item.getRssi()
-                                                        + " dBm");
+                                                : item.getName().trim());
                             }
                         });
         listView.setPrefSize(360, 240);
 
-        ChoiceBox<BoardType> typeBox = new ChoiceBox<>();
-        typeBox.getItems().addAll(BoardType.values());
-        typeBox.setValue(current);
-        typeBox.setConverter(
-                new javafx.util.StringConverter<>() {
-                    @Override
-                    public String toString(BoardType type) {
-                        return type == null ? "" : type.chooserLabel();
-                    }
-
-                    @Override
-                    public BoardType fromString(String s) {
-                        return BoardType.fromKey(s);
-                    }
-                });
-        HBox typeRow = new HBox(8, new Label(Messages.get("board_type_label")), typeBox);
-        typeRow.setStyle("-fx-alignment: center-left;");
-        VBox content = new VBox(8, typeRow, listView);
+        // No board type to choose: the caller works it out from the device picked.
+        VBox content = new VBox(8, listView);
 
         Dialog<DiscoveredDevice> dialog = new Dialog<>();
         dialog.initOwner(owner);
-        dialog.setTitle(Messages.get("dialog_board_connect_format", current.displayName()));
+        dialog.setTitle(Messages.get("dialog_board_connect"));
         dialog.getDialogPane().setContent(content);
         Styles.apply(dialog.getDialogPane());
         ButtonType connectType =
@@ -122,11 +100,20 @@ final class BoardConnectDialog {
                             // supported board; both always advertise a name.
                             return;
                         }
+                        // Recognised boards (by name or advertised service) go to the top of the
+                        // list. The desktop transports report no advertised services yet, so
+                        // here it is the name alone; Android already passes them.
+                        boolean isBoard =
+                                BoardType.guessFromAdvertisement(
+                                                device.getName(),
+                                                device.getAdvertisedServiceUuids())
+                                        != null;
                         Platform.runLater(
                                 () -> {
-                                    if (!items.contains(device)) {
-                                        items.add(device);
+                                    if (items.contains(device)) {
+                                        return;
                                     }
+                                    items.add(isBoard ? boardCount[0]++ : items.size(), device);
                                 });
                     }
 
@@ -145,28 +132,9 @@ final class BoardConnectDialog {
                                 });
                     }
                 };
-        PhysicalBoardBridge[] bridge = {switcher.apply(current)};
-        if (bridge[0] != null) {
-            bridge[0].startScan(scanListener, SCAN_TIMEOUT_MS);
+        if (bridge != null) {
+            bridge.startScan(scanListener, SCAN_TIMEOUT_MS);
         }
-        typeBox.valueProperty()
-                .addListener(
-                        (obs, old, type) -> {
-                            if (type == null || type == old) {
-                                return;
-                            }
-                            if (bridge[0] != null) {
-                                bridge[0].stopScan();
-                            }
-                            items.clear();
-                            dialog.setTitle(
-                                    Messages.get(
-                                            "dialog_board_connect_format", type.displayName()));
-                            bridge[0] = switcher.apply(type);
-                            if (bridge[0] != null) {
-                                bridge[0].startScan(scanListener, SCAN_TIMEOUT_MS);
-                            }
-                        });
 
         dialog.setResultConverter(
                 buttonType -> {
@@ -177,8 +145,8 @@ final class BoardConnectDialog {
                 });
 
         Optional<DiscoveredDevice> result = dialog.showAndWait();
-        if (bridge[0] != null) {
-            bridge[0].stopScan();
+        if (bridge != null) {
+            bridge.stopScan();
         }
         return result;
     }
