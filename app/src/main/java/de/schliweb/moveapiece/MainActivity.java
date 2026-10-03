@@ -2965,9 +2965,9 @@ public class MainActivity extends AppCompatActivity
     // ---- MaiaEngineListener --------------------------------------------------------
 
     /**
-     * (Re)loads {@link #maiaEngine} from the bundled {@code assets/maia/} model for {@code rating}
-     * - called both when a Maia game starts fresh ({@link #startNewGame}) and when "Continue free
-     * play" switches into Maia mode without resetting {@link #game} ({@link
+     * (Re)loads {@link #maiaEngine} from the bundled {@code assets/maia/} model and sets it to
+     * {@code rating} - called both when a Maia game starts fresh ({@link #startNewGame}) and when
+     * "Continue free play" switches into Maia mode without resetting {@link #game} ({@link
      * #showContinueFreePlayDialog}).
      *
      * <p>Captures the freshly created engine in {@code loadedEngine} and has its listener check
@@ -3027,7 +3027,8 @@ public class MainActivity extends AppCompatActivity
                                         error.getMessage()));
                     }
                 });
-        try (InputStream model = getAssets().open(MaiaRatings.resourcePath(rating))) {
+        loadedEngine.setElo(rating);
+        try (InputStream model = getAssets().open(MaiaRatings.MODEL_RESOURCE)) {
             loadedEngine.start(model);
         } catch (IOException e) {
             binding.statusText.setText(

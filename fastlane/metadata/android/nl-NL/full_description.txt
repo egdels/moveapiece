@@ -22,7 +22,7 @@ Heb je een DGT Pegasus of een Chessnut Air, Air+, Pro of Go? Verbind het via Blu
 OFFLINE EN PRIVÉ
 • Werkt volledig offline, niets verlaat je toestel
 • Geen account, geen advertenties, geen tracking, geen in-app-aankopen
-• De negen neurale netwerken van Maia zijn meegeleverd en draaien op het toestel
+• Het neurale netwerk van Maia is meegeleverd en draait op het toestel
 • Vrij en open source (GPLv3)
 
 Verder: zet-, slag- en schaakgeluiden; staand en liggend; lay-outs voor telefoon en tablet; Nederlands, Engels, Duits, Frans, Spaans en Italiaans.

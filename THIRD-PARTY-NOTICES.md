@@ -88,35 +88,30 @@ Gradle task) and are extracted to app-private storage at first launch by
 
 ## Maia neural network (human-like opponent, desktop and Android)
 
-Nine files each (ratings 1100–1900 in steps of 100, byte-identical between the
-two copies), run via ONNX Runtime (see above) as an alternative, human-like
-opponent to Stockfish - see `GameController#startMaiaGame` (desktop) and
-`MainActivity#loadMaiaEngine` (Android):
+One file, byte-identical in both places, run via ONNX Runtime (see above) as
+an alternative, human-like opponent to Stockfish - see
+`GameController#startMaiaGame` (desktop) and `MainActivity#loadMaiaEngine`
+(Android). The rating to play at is an input of the model:
 
-- `desktop/src/main/resources/de/schliweb/moveapiece/desktop/maia/maia-<rating>.onnx`
-- `app/src/main/assets/maia/maia-<rating>.onnx`
+- `desktop/src/main/resources/de/schliweb/moveapiece/desktop/maia/maia3-5m.onnx`
+- `app/src/main/assets/maia/maia3-5m.onnx`
 
-- Source: original Maia weights from
-  https://github.com/CSSLab/maia-chess (**not** the newer, AGPL-3.0-licensed
-  Maia-3), converted to ONNX with lc0's own official `leela2onnx` converter
-  (https://github.com/LeelaChessZero/lc0), no third-party conversion tool
-  involved
-- License: GPLv3 (same as MoveAPiece itself, no additional obligations)
-- Full provenance (exact upstream commit, per-file SHA-256 of both the
-  original `.pb.gz` weights and the converted `.onnx` files, declared
-  network-format fields, and how the conversion was verified against lc0's
-  own native output): see `MAIA_PROVENANCE.md`
+- Source: the Maia-3 5M weights published by the University of Toronto
+  CSSLab (https://github.com/CSSLab/maia3,
+  https://huggingface.co/UofTCSSLab/Maia3-5M), converted to ONNX with
+  `tools/maia3/export_onnx.py`
+- License: AGPL-3.0 (the license of the `maia3` repository, which its model
+  card names for code and weights). GPLv3 section 13 and AGPLv3 section 13
+  allow combining the two; the model file stays under AGPL-3.0, and whoever
+  runs a modified MoveAPiece for others over a network has to offer them the
+  source.
+- Full provenance (upstream revisions, SHA-256 of the original checkpoint and
+  of the converted file, the model's interface, and how the conversion was
+  verified against the PyTorch original): see `MAIA_PROVENANCE.md`
 
-`core/src/main/resources/de/schliweb/moveapiece/engine/maia/policy_index_1858.txt`
-is a separate, small artifact: the fixed lookup table mapping the network's
-1858-slot policy output to actual chess moves, used unmodified.
-
-- Source: `policy_index.py` from
-  https://github.com/Rocketknight1/minimal_lczero, commit
-  `dfccc33d4968d15922437a64608bcc7584a5ead6`
-- License: GPLv3
-- Independently cross-checked against lc0's own live `VerboseMoveStats`
-  debug output (see `MAIA_PROVENANCE.md`) rather than trusted as-is
+`desktop/src/test/resources/de/schliweb/moveapiece/desktop/maia3_golden.txt`
+(test data only, not shipped) lists moves the PyTorch original picks; it is
+written by the same script.
 
 ## Chess piece artwork (and app icon)
 

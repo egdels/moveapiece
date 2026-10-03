@@ -22,7 +22,7 @@ Own a DGT Pegasus or a Chessnut Air, Air+, Pro or Go? Connect it over Bluetooth 
 OFFLINE AND PRIVATE
 • Works completely offline, nothing leaves your device
 • No account, no ads, no tracking, no in-app purchases
-• Maia's nine neural networks are bundled and run on the device
+• Maia's neural network is bundled and runs on the device
 • Free and open source (GPLv3)
 
 Also there: move, capture and check sounds; portrait and landscape; phone and tablet layouts; English, German, French, Spanish, Italian and Dutch.

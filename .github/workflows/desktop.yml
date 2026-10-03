@@ -130,7 +130,7 @@ jobs:
 
       # :desktop:test includes the Maia golden tests (MaiaEngineGoldenTest,
       # MaiaEngineSmokeTest): a real ONNX Runtime forward pass over the
-      # bundled networks, checked against lc0's own output. Running it on
+      # bundled network, checked against the reference output. Running it on
       # every leg is what verifies the per-OS/arch onnxruntime natives
       # (including the 1.16.3 fallback on Intel macOS, see the matrix
       # comment above) actually load and agree - not just that they package.

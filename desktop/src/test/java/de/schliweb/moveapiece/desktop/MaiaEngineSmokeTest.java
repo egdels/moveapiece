@@ -10,6 +10,7 @@ import static org.junit.Assert.fail;
 
 import de.schliweb.moveapiece.engine.MaiaEngine;
 import de.schliweb.moveapiece.engine.MaiaEngineListener;
+import de.schliweb.moveapiece.engine.MaiaRatings;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.concurrent.CountDownLatch;
@@ -18,26 +19,17 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.Test;
 
 /**
- * First real, end-to-end correctness check of {@link MaiaEngine} against the bundled {@code
- * maia-1500.onnx} (see MAIA_PROVENANCE.md for its provenance) - runs the actual ONNX Runtime
- * inference, not a mock.
+ * End-to-end check of {@link MaiaEngine} against the bundled Maia-3 model (see MAIA_PROVENANCE.md
+ * for its provenance) - runs the actual ONNX Runtime inference, not a mock.
  *
- * <p>Only covers the starting position, which is the <b>simplest</b> case for {@code
- * MaiaPositionEncoder} (White to move, no mirroring, full castling rights on both sides, no real
- * history yet, no en passant) - it does not exercise the reasoned-but-not-yet-cross-checked
- * multi-ply/Black-to-move history mirroring flagged in that class's Javadoc. A pass here is a
- * meaningful first signal (bitboard-to-plane bit order, tensor shape, castling/aux planes, the
- * policy index round-trip all have to be right for this to work at all) but is not the full
- * golden-test battery in {@code MaiaEngineGoldenTest}.
- *
- * <p>The expected move comes from running lc0 itself natively (not this code) on the same network
- * and position during the provenance investigation: {@code bestmove e2e4} with 50.22% policy mass,
- * far ahead of the second choice (d2d4, 23.34%) - see MAIA_PROVENANCE.md.
+ * <p>Only covers the starting position at the engine's default rating; {@code MaiaEngineGoldenTest}
+ * is the wider battery. The expected move comes from the reference PyTorch implementation: e2e4
+ * with 64 % of the policy mass at 1500.
  */
 public class MaiaEngineSmokeTest {
 
     @Test
-    public void startingPosition_topMoveMatchesNativeLc0Output() throws Exception {
+    public void startingPosition_topMoveMatchesReference() throws Exception {
         MaiaEngine engine = new MaiaEngine(Runnable::run); // no UI thread in this test - run inline
         CountDownLatch ready = new CountDownLatch(1);
         CountDownLatch moved = new CountDownLatch(1);
@@ -88,9 +80,9 @@ public class MaiaEngineSmokeTest {
     }
 
     private static InputStream openModel() throws IOException {
-        InputStream in = MaiaEngineSmokeTest.class.getResourceAsStream("maia/maia-1500.onnx");
+        InputStream in = MaiaEngineSmokeTest.class.getResourceAsStream(MaiaRatings.MODEL_RESOURCE);
         if (in == null) {
-            throw new IOException("Missing test resource: maia/maia-1500.onnx");
+            throw new IOException("Missing test resource: " + MaiaRatings.MODEL_RESOURCE);
         }
         return in;
     }

@@ -8,6 +8,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versions follow [Semantic Versioning](https://semver.org/). Release
 candidates (`-rc`) and test tags are not listed.
 
+## [Unreleased]
+
+### Changed
+
+- Maia: the opponent now runs on Maia-3, the current generation of the
+  model, which predicts human moves more accurately. One network covers
+  every rating instead of one network per rating; the ratings on offer stay
+  1100 to 1900. The Maia-3 network is licensed under AGPL-3.0, see
+  `THIRD-PARTY-NOTICES.md`.
+
 ## [1.5.2] - 2026-10-02
 
 ### Changed

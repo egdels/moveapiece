@@ -8,14 +8,12 @@ package de.schliweb.moveapiece.engine;
 import java.util.List;
 
 /**
- * The 9 bundled Maia rating levels and where to find each one's ONNX model - see MAIA_PROVENANCE.md
- * for their provenance/conversion. Lives in {@code core} (not the desktop module, despite the
- * original integration being desktop-only) since both desktop and Android need the same rating
- * list, resource-path convention, and snapping logic - each platform just opens {@link
- * #resourcePath} differently (desktop: {@code Class#getResourceAsStream} against a classpath
- * resource under {@code desktop/src/main/resources/.../maia/}; Android: {@code AssetManager#open}
- * against {@code app/src/main/assets/maia/}), both bundling the identical set of 9 {@code .onnx}
- * files at that same relative path.
+ * The rating levels Maia can be set to and where to find its ONNX model - see MAIA_PROVENANCE.md
+ * for the model's provenance/conversion. One model serves every level; the rating is passed to it
+ * with {@link MaiaEngine#setElo}. Each platform opens {@link #MODEL_RESOURCE} in its own way
+ * (desktop: {@code Class#getResourceAsStream} against a classpath resource under {@code
+ * desktop/src/main/resources/.../maia/}; Android: {@code AssetManager#open} against {@code
+ * app/src/main/assets/maia/}), both bundling the identical file at that same relative path.
  */
 public final class MaiaRatings {
 
@@ -28,9 +26,7 @@ public final class MaiaRatings {
      * Path relative to each platform's own model resource root - see the class Javadoc for how
      * desktop and Android each resolve it to an actual {@code InputStream}.
      */
-    public static String resourcePath(int rating) {
-        return "maia/maia-" + rating + ".onnx";
-    }
+    public static final String MODEL_RESOURCE = "maia/maia3-5m.onnx";
 
     /**
      * Snaps {@code raw} to the closest value in {@link #ALL} (clamped to its range first) - assumes

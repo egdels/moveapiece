@@ -21,8 +21,7 @@ public interface MaiaEngineListener {
     void onReady();
 
     /**
-     * @param bestMoveUci the chosen move in real board UCI notation (e.g. "e2e4", "e1g1" for
-     *     castling - already translated back from Maia's internal "king captures rook" convention),
+     * @param bestMoveUci the chosen move in board UCI notation (e.g. "e2e4", "e1g1" for castling),
      *     or {@code null} if the position had no legal moves
      * @param winProbability Maia's own win/draw/loss estimate for the position it was asked about,
      *     from the side-to-move's perspective - informational only, not used to choose the move

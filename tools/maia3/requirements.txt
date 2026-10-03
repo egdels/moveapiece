@@ -1,0 +1,7 @@
+# Versions the bundled maia3-5m.onnx was exported with (Python 3.11).
+torch==2.14.1
+onnx==1.23.1
+onnxruntime==1.30.0
+numpy==2.4.6
+chess==1.11.2
+huggingface_hub==2.1.1

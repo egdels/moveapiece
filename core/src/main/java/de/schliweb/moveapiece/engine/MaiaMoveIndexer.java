@@ -5,96 +5,64 @@
 
 package de.schliweb.moveapiece.engine;
 
-import com.github.bhlangonijr.chesslib.Board;
 import com.github.bhlangonijr.chesslib.Piece;
 import com.github.bhlangonijr.chesslib.PieceType;
-import com.github.bhlangonijr.chesslib.Side;
 import com.github.bhlangonijr.chesslib.Square;
 import com.github.bhlangonijr.chesslib.move.Move;
 
 /**
- * Translates between a real chesslib {@link Move} (real board coordinates, normal UCI castling
- * notation like "e1g1") and the "network space" move string a Maia/lc0 policy output is addressed
- * by via {@link MaiaPolicyIndex} (always as if White is to move, castling written as "king captures
- * own rook") - see MAIA_PROVENANCE.md for why both quirks exist.
+ * Maps a move to its slot in Maia-3's policy output. Mirrors {@code get_all_possible_moves} of the
+ * reference implementation (see MAIA_PROVENANCE.md): 64 x 64 from/to pairs, then the 256 promotions
+ * from the seventh to the eighth rank with one slot each for queen, rook, bishop and knight.
  *
- * <p>Translation only ever runs forward, from a real legal {@link Move} to its network string,
- * never the other way around: {@link MaiaEngine} keeps the original {@link Move} object alongside
- * its network string while scoring candidates, so the winning move is reported in real board
- * coordinates directly, with no need to invert this transform.
+ * <p>Like the input (see {@link MaiaPositionEncoder}) the output is from the side to move's point
+ * of view, so a move of Black is flipped top to bottom first. Castling is the plain king move
+ * ({@code e1g1}), a promotion always uses its promotion slot.
  */
 final class MaiaMoveIndexer {
 
+    private static final int SQUARES = 64;
+
+    static final int POLICY_SIZE = SQUARES * SQUARES + 8 * 8 * 4;
+
     private MaiaMoveIndexer() {}
 
-    /**
-     * @param board the position {@code move} is legal in - only used to tell a castling king move
-     *     apart from an ordinary two-square move, and to resolve the promotion piece letter
-     */
-    static String toNetworkMove(Board board, Move move) {
-        Square from = move.getFrom();
-        Square to = move.getTo();
-        int fromFile = from.getFile().ordinal();
-        int fromRank = from.getRank().ordinal();
-        int toFile = to.getFile().ordinal();
-        int toRank = to.getRank().ordinal();
-
-        if (isCastling(board, move, fromFile, fromRank, toFile, toRank)) {
-            // "King captures own rook": in normal (non-Chess960) chess the rook is always on the
-            // a-file (queenside) or h-file (kingside) of the same rank as the king.
-            toFile = toFile > fromFile ? 7 : 0;
+    static int indexOf(Move move, boolean blackToMove) {
+        int fromFile = file(move.getFrom());
+        int toFile = file(move.getTo());
+        int fromRank = rank(move.getFrom(), blackToMove);
+        int toRank = rank(move.getTo(), blackToMove);
+        Piece promotion = move.getPromotion();
+        if (promotion != null && promotion != Piece.NONE) {
+            return SQUARES * SQUARES
+                    + fromFile * 32
+                    + toFile * 4
+                    + promotionIndex(promotion.getPieceType());
         }
-
-        boolean blackToMove = board.getSideToMove() == Side.BLACK;
-        if (blackToMove) {
-            fromRank = 7 - fromRank;
-            toRank = 7 - toRank;
-        }
-
-        StringBuilder sb = new StringBuilder(5);
-        appendSquare(sb, fromFile, fromRank);
-        appendSquare(sb, toFile, toRank);
-        char promo = promotionLetter(move.getPromotion());
-        if (promo != 0) {
-            sb.append(promo);
-        }
-        return sb.toString();
+        return (fromRank * 8 + fromFile) * SQUARES + toRank * 8 + toFile;
     }
 
-    /**
-     * A king move is castling iff the moving piece is a king and it travels two files - no other
-     * king move (or any other piece's move) can do that in standard chess, so this needs no
-     * explicit castling-rights lookup.
-     */
-    private static boolean isCastling(
-            Board board, Move move, int fromFile, int fromRank, int toFile, int toRank) {
-        if (fromRank != toRank) {
-            return false;
-        }
-        Piece moving = board.getPiece(move.getFrom());
-        return moving.getPieceType() == PieceType.KING && Math.abs(toFile - fromFile) == 2;
+    private static int file(Square square) {
+        return square.getFile().ordinal();
     }
 
-    private static void appendSquare(StringBuilder sb, int file, int rank) {
-        sb.append((char) ('a' + file));
-        sb.append((char) ('1' + rank));
+    private static int rank(Square square, boolean blackToMove) {
+        int rank = square.getRank().ordinal();
+        return blackToMove ? 7 - rank : rank;
     }
 
-    private static char promotionLetter(Piece promotion) {
-        if (promotion == null || promotion == Piece.NONE) {
-            return 0;
-        }
-        switch (promotion.getPieceType()) {
-            case KNIGHT:
-                return 'n';
-            case BISHOP:
-                return 'b';
-            case ROOK:
-                return 'r';
+    private static int promotionIndex(PieceType type) {
+        switch (type) {
             case QUEEN:
-                return 'q';
-            default:
                 return 0;
+            case ROOK:
+                return 1;
+            case BISHOP:
+                return 2;
+            case KNIGHT:
+                return 3;
+            default:
+                throw new IllegalArgumentException("Not a promotion piece: " + type);
         }
     }
 }
