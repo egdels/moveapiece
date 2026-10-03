@@ -11,8 +11,6 @@ import ai.onnxruntime.OrtEnvironment;
 import ai.onnxruntime.OrtException;
 import ai.onnxruntime.OrtSession;
 import com.github.bhlangonijr.chesslib.Board;
-import com.github.bhlangonijr.chesslib.CastleRight;
-import com.github.bhlangonijr.chesslib.Piece;
 import com.github.bhlangonijr.chesslib.Side;
 import com.github.bhlangonijr.chesslib.move.Move;
 import java.io.ByteArrayOutputStream;
@@ -33,45 +31,32 @@ import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 
 /**
- * Runs a Maia network (original CSSLab/maia-chess weights, converted to ONNX - see
- * MAIA_PROVENANCE.md) via ONNX Runtime for a single "what would a human of this network's rating
- * play here" forward pass, no search involved.
+ * Runs the Maia-3 network (CSSLab/maia3 weights, converted to ONNX - see MAIA_PROVENANCE.md) via
+ * ONNX Runtime for a single "what would a human of this rating play here" forward pass, no search
+ * involved. One model covers every rating: the rating is an input, see {@link #setElo}.
  *
  * <p>Unlike {@link StockfishEngine}, there is no subprocess and no UCI protocol: inference runs
- * in-process on a dedicated background executor (a forward pass is cheap for this network's size -
- * see the provenance doc - but must still not block the caller's thread), and callbacks go through
- * {@link MaiaEngineListener} via the supplied {@code mainThreadDispatcher}, same convention as
- * {@link StockfishEngine}.
+ * in-process on a dedicated background executor (a forward pass takes a few milliseconds, but must
+ * still not block the caller's thread), and callbacks go through {@link MaiaEngineListener} via the
+ * supplied {@code mainThreadDispatcher}, same convention as {@link StockfishEngine}.
  *
- * <p><b>Verified</b> (see {@code MaiaEngineSmokeTest} and {@code MaiaEngineGoldenTest}): the
- * starting position, three-ply history with Black to move, castling rights that have actually
- * changed through play, and a position reached the second time (repetition plane) all round-trip
- * end to end via ONNX Runtime and match lc0's own native output exactly - not just the winning
- * move, but (for the starting position) closely the logit gap to the runner-up too. See
- * MAIA_PROVENANCE.md for the exact reference numbers each test asserts against.
- *
- * <p>Two real bugs were caught by these tests during development, both fixed before the tests were
- * considered passing: this class's history padding originally repeated the current position for
- * missing history steps, which disagreed with lc0's own {@code encoder.cc} (it leaves missing
- * pre-game history as all-zero instead, once the available history bottoms out at the standard
- * starting position - see {@link MaiaPositionEncoder}'s Javadoc); and the initial per-history-step
- * alternating-mirror design question (also documented there) turned out to already be handled
- * correctly by this class's simpler constant-mirror approach once actually tested against a real
- * multi-ply, Black-to-move position rather than left as a reasoned guess.
- *
- * <p>All 9 rating levels (1100-1900) are downloaded, converted and covered by {@code
- * MaiaEngineGoldenTest}; the queen-promotion case is in the golden test too. <b>Deliberately not
- * covered</b> by a live ONNX comparison (see MAIA_PROVENANCE.md): en passant, which has no input
- * plane of its own in the classical 112-plane format, so a golden test would exercise no additional
- * code path; and underpromotion, which is only unit-tested at the move-string level.
+ * <p>{@code MaiaEngineGoldenTest} runs this class end to end through ONNX Runtime against moves the
+ * reference PyTorch implementation picks for the same games and ratings.
  */
 public class MaiaEngine {
 
     private static final String START_FEN =
             "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-    private static final String POLICY_OUTPUT_NAME = "/output/policy";
-    private static final String WDL_OUTPUT_NAME = "/output/wdl";
-    private static final String PLANES_INPUT_NAME = "/input/planes";
+    private static final String POLICY_OUTPUT_NAME = "policy";
+    private static final String WDL_OUTPUT_NAME = "wdl";
+    private static final String TOKENS_INPUT_NAME = "tokens";
+    private static final String SELF_ELO_INPUT_NAME = "self_elo";
+    private static final String OPPONENT_ELO_INPUT_NAME = "oppo_elo";
+
+    /** The range the reference implementation accepts for a rating. */
+    private static final int MIN_ELO = 0;
+
+    private static final int MAX_ELO = 5000;
 
     private final Consumer<Runnable> mainThreadDispatcher;
     private final ExecutorService ioExecutor = Executors.newSingleThreadExecutor();
@@ -81,12 +66,13 @@ public class MaiaEngine {
     private OrtSession session;
     private volatile MaiaEngineListener listener;
     private volatile boolean shuttingDown;
+    private volatile int elo = 1500;
 
     // Replay state, touched only on ioExecutor - same single-thread-confinement discipline as
     // StockfishEngine's process I/O.
     private final Board board = new Board();
-    private final Deque<MaiaPositionEncoder.Snapshot> history = new ArrayDeque<>();
-    private final Map<String, Integer> repetitionCounts = new HashMap<>();
+    // Oldest first, at most MaiaPositionEncoder.HISTORY_STEPS entries.
+    private final Deque<int[]> history = new ArrayDeque<>();
 
     public MaiaEngine(Consumer<Runnable> mainThreadDispatcher) {
         this(mainThreadDispatcher, new Random());
@@ -155,6 +141,14 @@ public class MaiaEngine {
     }
 
     /**
+     * The rating Maia plays at from the next {@link #go()} on; it is used for both sides, like the
+     * reference implementation's {@code Elo} option. Takes effect without reloading the model.
+     */
+    public void setElo(int elo) {
+        this.elo = Math.max(MIN_ELO, Math.min(MAX_ELO, elo));
+    }
+
+    /**
      * @param movesUci space-separated UCI moves from the start position, may be empty or null
      */
     public void setPosition(String movesUci) {
@@ -163,8 +157,7 @@ public class MaiaEngine {
 
     /**
      * @param startFen position the moves start from, {@code null} for the standard start. The
-     *     network's history planes then begin at that position, exactly as lc0 handles a game set
-     *     up from a FEN (earlier history steps stay zero, see {@link MaiaPositionEncoder}).
+     *     network's history then begins at that position (see {@link MaiaPositionEncoder}).
      * @param movesUci space-separated UCI moves from {@code startFen}, may be empty or null
      */
     public void setPosition(String startFen, String movesUci) {
@@ -194,10 +187,8 @@ public class MaiaEngine {
     /**
      * Runs one forward pass and reports a move sampled from the legal-move policy distribution.
      *
-     * @param temperature 0.0 picks the single highest-scoring legal move (deterministic); 1.0 uses
-     *     the network's own logits unscaled. lc0 reports {@code PolicyTemperature: 1.359} as this
-     *     network's own default (see MAIA_PROVENANCE.md) if a more human-like spread of choices is
-     *     wanted instead of the strongest-by-policy move every time.
+     * @param temperature 0.0 picks the single highest-scoring legal move (deterministic, what the
+     *     reference implementation's presets do); 1.0 samples from the network's own distribution.
      */
     public void go(double temperature) {
         ioExecutor.execute(() -> runInference(temperature));
@@ -228,64 +219,44 @@ public class MaiaEngine {
     private void resetReplayState(String fen) {
         board.loadFromFen(fen);
         history.clear();
-        repetitionCounts.clear();
         recordSnapshot();
     }
 
     private void recordSnapshot() {
-        long[] bitboards = new long[Piece.values().length];
-        for (Piece p : Piece.values()) {
-            if (p == Piece.NONE) {
-                continue;
-            }
-            bitboards[p.ordinal()] = board.getBitboard(p);
+        if (history.size() == MaiaPositionEncoder.HISTORY_STEPS) {
+            history.removeFirst();
         }
-        int repetitions = repetitionCounts.merge(repetitionKey(), 1, Integer::sum) - 1;
-        history.push(new MaiaPositionEncoder.Snapshot(bitboards, repetitions));
-    }
-
-    /**
-     * Piece placement + side to move + castling + en-passant only (chesslib's FEN also has the
-     * half-move/full-move counters, which must not participate in repetition comparison).
-     */
-    private String repetitionKey() {
-        String[] fields = board.getFen().split(" ");
-        return fields[0] + ' ' + fields[1] + ' ' + fields[2] + ' ' + fields[3];
+        history.addLast(MaiaPositionEncoder.placement(board));
     }
 
     private void runInference(double temperature) {
         try {
-            boolean blackToMove = board.getSideToMove() == Side.BLACK;
-            CastleRight ourRights = board.getCastleRight(board.getSideToMove());
-            CastleRight theirRights = board.getCastleRight(board.getSideToMove().flip());
-
-            float[] tensor =
-                    MaiaPositionEncoder.encode(
-                            new ArrayList<>(history),
-                            blackToMove,
-                            board.getHalfMoveCounter(),
-                            canCastleQueenside(ourRights),
-                            canCastleKingside(ourRights),
-                            canCastleQueenside(theirRights),
-                            canCastleKingside(theirRights));
-
             List<Move> legalMoves = board.legalMoves();
             if (legalMoves.isEmpty()) {
                 post(l -> l.onBestMove(null, 0f, 0f, 0f));
                 return;
             }
 
+            float[] tokens = MaiaPositionEncoder.encode(new ArrayList<>(history));
+            float[] rating = {elo};
+            long[] tokenShape = {1, MaiaPositionEncoder.SQUARES, MaiaPositionEncoder.TOKEN_SIZE};
             try (OnnxTensor input =
-                    OnnxTensor.createTensor(
-                            environment, FloatBuffer.wrap(tensor), new long[] {1, 112, 8, 8})) {
-                Map<String, OnnxTensor> inputs = Collections.singletonMap(PLANES_INPUT_NAME, input);
+                            OnnxTensor.createTensor(
+                                    environment, FloatBuffer.wrap(tokens), tokenShape);
+                    OnnxTensor selfElo = OnnxTensor.createTensor(environment, rating);
+                    OnnxTensor opponentElo = OnnxTensor.createTensor(environment, rating)) {
+                Map<String, OnnxTensor> inputs = new HashMap<>();
+                inputs.put(TOKENS_INPUT_NAME, input);
+                inputs.put(SELF_ELO_INPUT_NAME, selfElo);
+                inputs.put(OPPONENT_ELO_INPUT_NAME, opponentElo);
                 try (OrtSession.Result result = session.run(inputs)) {
                     float[] policy = extractRow(result, POLICY_OUTPUT_NAME);
-                    float[] wdl = extractRow(result, WDL_OUTPUT_NAME);
+                    // Logits in the reference implementation's order: loss, draw, win.
+                    float[] wdl = softmax(extractRow(result, WDL_OUTPUT_NAME));
 
                     Move chosen = chooseMove(legalMoves, policy, temperature);
-                    String bestMoveUci = chosen == null ? null : chosen.toString();
-                    post(l -> l.onBestMove(bestMoveUci, wdl[0], wdl[1], wdl[2]));
+                    String bestMoveUci = chosen.toString();
+                    post(l -> l.onBestMove(bestMoveUci, wdl[2], wdl[1], wdl[0]));
                 }
             }
         } catch (Exception e) {
@@ -298,22 +269,11 @@ public class MaiaEngine {
     }
 
     private Move chooseMove(List<Move> legalMoves, float[] policy, double temperature) {
-        List<Move> candidates = new ArrayList<>(legalMoves.size());
+        boolean blackToMove = board.getSideToMove() == Side.BLACK;
+        List<Move> candidates = legalMoves;
         List<Float> logits = new ArrayList<>(legalMoves.size());
         for (Move move : legalMoves) {
-            String networkMove = MaiaMoveIndexer.toNetworkMove(board, move);
-            int idx = MaiaPolicyIndex.indexOf(networkMove);
-            if (idx < 0) {
-                // Should not happen for a genuinely legal move once this encoder/indexer pair is
-                // fully verified - see the class-level "Not yet done" note. Skipping rather than
-                // failing the whole move keeps one indexing bug from making the engine unplayable.
-                continue;
-            }
-            candidates.add(move);
-            logits.add(policy[idx]);
-        }
-        if (candidates.isEmpty()) {
-            return legalMoves.get(0);
+            logits.add(policy[MaiaMoveIndexer.indexOf(move, blackToMove)]);
         }
         if (temperature <= 0.0) {
             int bestAt = 0;
@@ -356,12 +316,21 @@ public class MaiaEngine {
         return batch[0];
     }
 
-    private static boolean canCastleQueenside(CastleRight right) {
-        return right == CastleRight.QUEEN_SIDE || right == CastleRight.KING_AND_QUEEN_SIDE;
-    }
-
-    private static boolean canCastleKingside(CastleRight right) {
-        return right == CastleRight.KING_SIDE || right == CastleRight.KING_AND_QUEEN_SIDE;
+    private static float[] softmax(float[] logits) {
+        float max = Float.NEGATIVE_INFINITY;
+        for (float logit : logits) {
+            max = Math.max(max, logit);
+        }
+        float[] out = new float[logits.length];
+        float sum = 0f;
+        for (int i = 0; i < logits.length; i++) {
+            out[i] = (float) Math.exp(logits[i] - max);
+            sum += out[i];
+        }
+        for (int i = 0; i < out.length; i++) {
+            out[i] /= sum;
+        }
+        return out;
     }
 
     private static byte[] readAll(InputStream in) throws IOException {

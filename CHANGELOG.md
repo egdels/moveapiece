@@ -15,6 +15,11 @@ candidates (`-rc`) and test tags are not listed.
 - Engine: Stockfish 19 instead of 18. It plays stronger and needs one
   evaluation network instead of two; the networks of the previous version
   are removed from the device on first start.
+- Maia: the opponent now runs on Maia-3, the current generation of the
+  model, which predicts human moves more accurately. One network covers
+  every rating instead of one network per rating, and the ratings on offer
+  now run from 800 to 2400 instead of 1100 to 1900. The Maia-3 network is
+  licensed under AGPL-3.0, see `THIRD-PARTY-NOTICES.md`.
 
 ### Fixed
 

@@ -12,10 +12,17 @@ import org.junit.Test;
 /**
  * Locks in {@link MaiaRatings#nearest} against the exact bug it was written to fix: a JavaFX {@code
  * Slider} (or a value persisted by an earlier build's buggier rounding) reporting something a hair
- * off an exact multiple of 100, or clearly outside {@link MaiaRatings#ALL}'s 1100-1900 range, must
- * still resolve to a rating a bundled model actually exists for.
+ * off an exact multiple of 100, or clearly outside {@link MaiaRatings#ALL}'s 800-2400 range, must
+ * still resolve to a rating the app offers.
  */
 public class MaiaRatingsTest {
+
+    @Test
+    public void range_is800To2400InHundreds() {
+        assertEquals(17, MaiaRatings.ALL.size());
+        assertEquals(800, (int) MaiaRatings.ALL.get(0));
+        assertEquals(2400, (int) MaiaRatings.ALL.get(MaiaRatings.ALL.size() - 1));
+    }
 
     @Test
     public void exactTickValues_mapToThemselves() {
@@ -38,7 +45,7 @@ public class MaiaRatingsTest {
 
     @Test
     public void outOfRangeValue_clampsToTheNearestBound() {
-        assertEquals(1100, MaiaRatings.nearest(800));
-        assertEquals(1900, MaiaRatings.nearest(5000));
+        assertEquals(800, MaiaRatings.nearest(300));
+        assertEquals(2400, MaiaRatings.nearest(5000));
     }
 }

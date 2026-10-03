@@ -2,7 +2,7 @@ Openen en spelen. MoveAPiece is een offline schaakapp die meteen start met een p
 
 SCHAKEN TEGEN DE COMPUTER
 • Stockfish, de bekende opensource-schaakengine, met instelbare speelsterkte van 1320 tot 3190 Elo, van beginner tot meesterniveau
-• Maia, een menselijk spelende schaak-AI: ze speelt de zetten die een speler met de gekozen rating (1100 tot 1900) doorgaans zou spelen, met natuurlijke bedenktijd. Een tegenstander die aanvoelt als een clubspeler, niet als een rekenmachine
+• Maia, een menselijk spelende schaak-AI: ze speelt de zetten die een speler met de gekozen rating (800 tot 2400) doorgaans zou spelen, met natuurlijke bedenktijd. Een tegenstander die aanvoelt als een clubspeler, niet als een rekenmachine
 • Twee spelers op één telefoon of tablet
 
 SCHAAKOPENINGEN LEREN
@@ -22,7 +22,7 @@ Heb je een DGT Pegasus of een Chessnut Air, Air+, Pro of Go? Verbind het via Blu
 OFFLINE EN PRIVÉ
 • Werkt volledig offline, niets verlaat je toestel
 • Geen account, geen advertenties, geen tracking, geen in-app-aankopen
-• De negen neurale netwerken van Maia zijn meegeleverd en draaien op het toestel
+• Het neurale netwerk van Maia is meegeleverd en draait op het toestel
 • Vrij en open source (GPLv3)
 
 Verder: zet-, slag- en schaakgeluiden; staand en liggend; lay-outs voor telefoon en tablet; Nederlands, Engels, Duits, Frans, Spaans en Italiaans.

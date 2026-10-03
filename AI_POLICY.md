@@ -32,7 +32,7 @@ git log --format="%b" | grep -c "Co-Authored-By: Claude"    # AI-assisted commit
   C++/WinRT on Windows) and the `jpackage` packaging
 - Writes and runs automated tests (JVM unit tests in every module, Android
   instrumented tests, and the desktop golden tests that check the Maia
-  integration against lc0's own native output)
+  integration against the reference implementation's output)
 - Sets up and maintains build/CI tooling (Gradle, the three GitHub Actions
   workflows in `.github/workflows/`, formatting and lint checks)
 - Drafts documentation, release notes, and store metadata
@@ -64,9 +64,9 @@ This document is about how the software was **built**, not what it
 service, not to anything else (see the [README](README.md)).
 
 The app does bundle two kinds of chess neural networks, both run entirely
-on-device: the optional [Maia](https://github.com/CSSLab/maia-chess)
-opponent, nine pre-trained networks (GPLv3, shipped as `.onnx` files) that
-predict human-like moves via a single ONNX Runtime forward pass per move,
+on-device: the optional [Maia](https://github.com/CSSLab/maia3)
+opponent, one pre-trained network (AGPL-3.0, shipped as an `.onnx` file) that
+predicts human-like moves via a single ONNX Runtime forward pass per move,
 with ONNX Runtime's built-in telemetry disabled on both Android and desktop
 (see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)); and Stockfish's own
 NNUE evaluation networks, which are part of any modern Stockfish build.
@@ -82,7 +82,7 @@ automated tests, [Spotless](https://github.com/diffplug/spotless) formatting
 checks, and Android Lint, all enforced in CI. `.github/workflows/build.yml`
 runs the Android unit and instrumented tests plus a two-runner
 reproducible-build comparison; `desktop.yml` runs the shared `core` tests
-and the desktop tests (including the Maia golden tests against lc0's
+and the desktop tests (including the Maia golden tests against the reference
 output) on every supported OS/architecture before packaging. The physical
 board integrations (DGT Pegasus, Chessnut Air) are additionally verified in
 real hardware sessions with the developer.

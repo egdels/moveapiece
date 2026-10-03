@@ -160,16 +160,17 @@ final class GameController
     private final ScrollPane moveListScroll = new ScrollPane(moveListFlow);
     private final Slider strengthSlider = new Slider(1320, 3190, Settings.getEngineElo());
     private final Label strengthLabel = new Label();
-    // Live-adjustable counterpart to strengthSlider/strengthLabel for HUMAN_VS_MAIA: unlike
-    // Stockfish's Elo, Maia's rating isn't a UCI option on a running engine, it's a choice of which
-    // bundled model to load, so picking a new value here swaps in a whole new MaiaEngine mid-game
-    // (see #switchMaiaRating) instead of tweaking a parameter - the two pairs are shown one at a
-    // time, never together (see #updateStrengthControlsVisibility). Bounds match MaiaRatings.ALL
-    // (1100-1900 in steps of 100); snapToTicks/majorTickUnit/blockIncrement below keep the slider
-    // on
-    // those 9 values, since there's no bundled model for anything in between.
+    // Live-adjustable counterpart to strengthSlider/strengthLabel for HUMAN_VS_MAIA: picking a new
+    // value here swaps in a fresh MaiaEngine set to that rating mid-game (see #switchMaiaRating) -
+    // the two pairs are shown one at a time, never together (see
+    // #updateStrengthControlsVisibility). Bounds match MaiaRatings.ALL (800-2400 in steps of
+    // 100); snapToTicks/majorTickUnit/blockIncrement below keep the slider on those values.
     private final Label maiaRatingLabel = new Label();
-    private final Slider maiaRatingSlider = new Slider(1100, 1900, Settings.getMaiaRating());
+    private final Slider maiaRatingSlider =
+            new Slider(
+                    MaiaRatings.ALL.get(0),
+                    MaiaRatings.ALL.get(MaiaRatings.ALL.size() - 1),
+                    Settings.getMaiaRating());
     // Same Material icon glyphs as the Android app's ic_undo.xml/ic_flip_board.xml
     // (SVG path data reused verbatim - both use the same path-string syntax).
     private static final String NEW_GAME_ICON_PATH = "M19,13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z";
@@ -1998,10 +1999,11 @@ final class GameController
                                 Messages.get("error_engine_generic") + ": " + error.getMessage());
                     }
                 });
+        loadedEngine.setElo(rating);
         try (java.io.InputStream model =
-                GameController.class.getResourceAsStream(MaiaRatings.resourcePath(rating))) {
+                GameController.class.getResourceAsStream(MaiaRatings.MODEL_RESOURCE)) {
             if (model == null) {
-                throw new FileNotFoundException(MaiaRatings.resourcePath(rating));
+                throw new FileNotFoundException(MaiaRatings.MODEL_RESOURCE);
             }
             loadedEngine.start(model);
         } catch (IOException e) {

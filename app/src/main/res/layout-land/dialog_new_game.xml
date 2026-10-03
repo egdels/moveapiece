@@ -162,14 +162,14 @@
         app:layout_constraintTop_toBottomOf="@id/colorGroup"
         app:layout_constraintStart_toEndOf="@id/columnGuideline" />
 
-    <!-- 9 discrete steps, index into MaiaRatings.ALL - see the portrait
+    <!-- 17 discrete steps, index into MaiaRatings.ALL - see the portrait
          layout's note. -->
     <SeekBar
         android:id="@+id/maiaRatingSeekBar"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginStart="16dp"
-        android:max="8"
+        android:max="16"
         android:visibility="gone"
         app:layout_constraintTop_toBottomOf="@id/maiaRatingLabel"
         app:layout_constraintStart_toEndOf="@id/columnGuideline"

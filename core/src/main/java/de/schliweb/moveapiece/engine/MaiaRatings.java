@@ -8,19 +8,19 @@ package de.schliweb.moveapiece.engine;
 import java.util.List;
 
 /**
- * The 9 bundled Maia rating levels and where to find each one's ONNX model - see MAIA_PROVENANCE.md
- * for their provenance/conversion. Lives in {@code core} (not the desktop module, despite the
- * original integration being desktop-only) since both desktop and Android need the same rating
- * list, resource-path convention, and snapping logic - each platform just opens {@link
- * #resourcePath} differently (desktop: {@code Class#getResourceAsStream} against a classpath
- * resource under {@code desktop/src/main/resources/.../maia/}; Android: {@code AssetManager#open}
- * against {@code app/src/main/assets/maia/}), both bundling the identical set of 9 {@code .onnx}
- * files at that same relative path.
+ * The rating levels Maia can be set to and where to find its ONNX model - see MAIA_PROVENANCE.md
+ * for the model's provenance/conversion. One model serves every level; the rating is passed to it
+ * with {@link MaiaEngine#setElo}. Each platform opens {@link #MODEL_RESOURCE} in its own way
+ * (desktop: {@code Class#getResourceAsStream} against a classpath resource under {@code
+ * desktop/src/main/resources/.../maia/}; Android: {@code AssetManager#open} against {@code
+ * app/src/main/assets/maia/}), both bundling the identical file at that same relative path.
  */
 public final class MaiaRatings {
 
     public static final List<Integer> ALL =
-            List.of(1100, 1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900);
+            List.of(
+                    800, 900, 1000, 1100, 1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900, 2000,
+                    2100, 2200, 2300, 2400);
 
     private MaiaRatings() {}
 
@@ -28,9 +28,7 @@ public final class MaiaRatings {
      * Path relative to each platform's own model resource root - see the class Javadoc for how
      * desktop and Android each resolve it to an actual {@code InputStream}.
      */
-    public static String resourcePath(int rating) {
-        return "maia/maia-" + rating + ".onnx";
-    }
+    public static final String MODEL_RESOURCE = "maia/maia3-5m.onnx";
 
     /**
      * Snaps {@code raw} to the closest value in {@link #ALL} (clamped to its range first) - assumes
@@ -43,8 +41,8 @@ public final class MaiaRatings {
      * flipped back to {@code false}, so code reacting to that flip can still observe the pre-snap
      * value. Also used to sanitize a persisted rating setting so a value written by an earlier,
      * buggier build of that snapping logic self-heals instead of failing to load forever. Android's
-     * own rating picker is a plain {@code Spinner} over the 9 exact values (no free-form slider, so
-     * no snapping to get wrong) but reuses this for the same persisted-settings self-healing.
+     * own rating picker indexes into {@link #ALL} directly (no free-form value, so no snapping to
+     * get wrong) but reuses this for the same persisted-settings self-healing.
      */
     public static int nearest(double raw) {
         int min = ALL.get(0);

@@ -2,7 +2,7 @@ Apri e gioca. MoveAPiece è un'app di scacchi offline che parte direttamente con
 
 GIOCARE A SCACCHI CONTRO IL COMPUTER
 • Stockfish, il noto motore scacchistico open source, con forza di gioco regolabile da 1320 a 3190 Elo, dal principiante al livello di maestro
-• Maia, un'IA scacchistica dallo stile umano: gioca le mosse che un giocatore del punteggio scelto (da 1100 a 1900) giocherebbe di solito, con pause di riflessione naturali. Un avversario che sembra un giocatore di circolo, non una calcolatrice
+• Maia, un'IA scacchistica dallo stile umano: gioca le mosse che un giocatore del punteggio scelto (da 800 a 2400) giocherebbe di solito, con pause di riflessione naturali. Un avversario che sembra un giocatore di circolo, non una calcolatrice
 • Due giocatori sullo stesso telefono o tablet
 
 IMPARARE LE APERTURE DI SCACCHI
@@ -22,7 +22,7 @@ Hai una DGT Pegasus o una Chessnut Air, Air+, Pro o Go? Collegala via Bluetooth 
 OFFLINE E PRIVATA
 • Funziona completamente offline, nulla lascia il tuo dispositivo
 • Nessun account, nessuna pubblicità, nessun tracciamento, nessun acquisto in-app
-• Le nove reti neurali di Maia sono incluse e girano sul dispositivo
+• La rete neurale di Maia è inclusa e gira sul dispositivo
 • Libera e open source (GPLv3)
 
 Inoltre: suoni di mossa, cattura e scacco; verticale e orizzontale; layout per telefono e tablet; italiano, inglese, tedesco, francese, spagnolo e olandese.
