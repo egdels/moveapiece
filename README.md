@@ -20,7 +20,7 @@ JDK's own `jpackage`.
 
 - Play against Stockfish (adjustable Elo 1320–3190), against Maia (a
   human-like opponent that plays like a player of a chosen rating,
-  1100–1900, see the Tech stack table), or against another person
+  800–2400, see the Tech stack table), or against another person
 - Drill an opening: pick one of 20 well-known lines, the app plays the
   book side and accepts only the correct reply
 - Look an opening up in a step-through library
@@ -69,7 +69,7 @@ choose.
 | Desktop UI | JavaFX, styled with a custom stylesheet using the Android app's own Material 3 colors (`desktop/.../app.css`) |
 | Chess rules | [chesslib](https://github.com/bhlangonijr/chesslib) (MIT) |
 | Engine | [Stockfish](https://github.com/official-stockfish/Stockfish) (GPLv3), built from source, driven over UCI through `ProcessBuilder` — via the NDK on Android, via the host's native toolchain (Makefile `COMP=gcc`/`clang`/`mingw`) on desktop |
-| Human-like opponent | [Maia-3](https://github.com/CSSLab/maia3) (AGPL-3.0, the 5M model converted to ONNX, see [MAIA_PROVENANCE.md](MAIA_PROVENANCE.md)), one bundled network that takes the rating as an input (offered: 1100–1900), run in-process via [ONNX Runtime](https://github.com/microsoft/onnxruntime) (MIT) — a single forward pass per move, no subprocess/UCI involved unlike Stockfish |
+| Human-like opponent | [Maia-3](https://github.com/CSSLab/maia3) (AGPL-3.0, the 5M model converted to ONNX, see [MAIA_PROVENANCE.md](MAIA_PROVENANCE.md)), one bundled network that takes the rating as an input (offered: 800–2400), run in-process via [ONNX Runtime](https://github.com/microsoft/onnxruntime) (MIT) — a single forward pass per move, no subprocess/UCI involved unlike Stockfish |
 | Physical boards | DGT Pegasus: vendored from a companion project's `core`/BLE-transport modules (GPLv3, own code — see [Third-Party Notices](THIRD-PARTY-NOTICES.md)). Chessnut (Air family): `chessnut-core`, own implementation of the board's BLE protocol, verified byte by byte against a real Chessnut Air with the capture tool in `tools/chessnut-sniffer/` (protocol notes there), plus piece-identity-based move detection on top of `pegasus-core`'s chess model. Transport implementations (shared by both boards through a per-board GATT profile): Android (`android.bluetooth.*`), desktop/macOS (CoreBluetooth via a small in-house Objective-C/JNI bridge, `desktop/src/main/native/macos/`), desktop/Windows (Windows Runtime `Windows.Devices.Bluetooth` via a small in-house C++/WinRT/JNI bridge, `desktop/src/main/native/windows/`, MSVC-built), desktop/Linux ([bluez-dbus](https://github.com/hypfvieh/bluez-dbus)/[dbus-java](https://github.com/hypfvieh/dbus-java), both MIT — pure Java, no native code, since BlueZ's GATT client API is fully reachable over D-Bus). No third-party dependency for macOS/Windows: the one mature cross-platform BLE library (SimpleBLE) is BUSL-1.1-licensed, not GPL/FOSS |
 | License | GPLv3 (required by the Stockfish dependency); the bundled Maia-3 network and the sound effects are AGPLv3, see [Third-Party Notices](THIRD-PARTY-NOTICES.md) |
 
@@ -294,8 +294,8 @@ but not yet hardware-verified - see the Physical boards section above. All five 
 legs (Linux x86-64/arm64, macOS Apple Silicon/Intel, Windows) build and
 package in CI and ship installers with every GitHub Release.
 
-Maia (human-like opponent) is feature-complete on both platforms, all 9
-rating levels (desktop: `:desktop:test`'s golden tests against the reference
+Maia (human-like opponent) is feature-complete on both platforms, ratings
+800–2400 (desktop: `:desktop:test`'s golden tests against the reference
 implementation's output).
 
 What changed in each release is recorded in [CHANGELOG.md](CHANGELOG.md).

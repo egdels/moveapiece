@@ -18,7 +18,9 @@ import java.util.List;
 public final class MaiaRatings {
 
     public static final List<Integer> ALL =
-            List.of(1100, 1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900);
+            List.of(
+                    800, 900, 1000, 1100, 1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900, 2000,
+                    2100, 2200, 2300, 2400);
 
     private MaiaRatings() {}
 
@@ -39,8 +41,8 @@ public final class MaiaRatings {
      * flipped back to {@code false}, so code reacting to that flip can still observe the pre-snap
      * value. Also used to sanitize a persisted rating setting so a value written by an earlier,
      * buggier build of that snapping logic self-heals instead of failing to load forever. Android's
-     * own rating picker is a plain {@code Spinner} over the 9 exact values (no free-form slider, so
-     * no snapping to get wrong) but reuses this for the same persisted-settings self-healing.
+     * own rating picker indexes into {@link #ALL} directly (no free-form value, so no snapping to
+     * get wrong) but reuses this for the same persisted-settings self-healing.
      */
     public static int nearest(double raw) {
         int min = ALL.get(0);

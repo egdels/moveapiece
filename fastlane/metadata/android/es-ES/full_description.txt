@@ -2,7 +2,7 @@ Abre y juega. MoveAPiece es una app de ajedrez sin conexión que arranca directa
 
 JUGAR AL AJEDREZ CONTRA EL ORDENADOR
 • Stockfish, el conocido motor de ajedrez de código abierto, con fuerza de juego ajustable de 1320 a 3190 Elo, desde principiante hasta nivel de maestro
-• Maia, una IA de ajedrez de estilo humano: juega las jugadas que un jugador del rating elegido (1100 a 1900) haría normalmente, con pausas de reflexión naturales. Un rival que se siente como un jugador de club, no como una calculadora
+• Maia, una IA de ajedrez de estilo humano: juega las jugadas que un jugador del rating elegido (800 a 2400) haría normalmente, con pausas de reflexión naturales. Un rival que se siente como un jugador de club, no como una calculadora
 • Dos jugadores en el mismo teléfono o tableta
 
 APRENDER APERTURAS DE AJEDREZ

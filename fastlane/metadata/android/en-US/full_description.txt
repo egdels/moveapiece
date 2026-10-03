@@ -2,7 +2,7 @@ Open it and play. MoveAPiece is an offline chess app that starts straight into a
 
 PLAY CHESS AGAINST THE COMPUTER
 • Stockfish, the well-known open-source chess engine, at an adjustable playing strength from Elo 1320 to 3190, from beginner to master level
-• Maia, a human-like chess AI: it plays the moves a player of a chosen rating (1100 to 1900) would typically play, with natural thinking pauses. An opponent that feels like a club player, not a calculator
+• Maia, a human-like chess AI: it plays the moves a player of a chosen rating (800 to 2400) would typically play, with natural thinking pauses. An opponent that feels like a club player, not a calculator
 • Two players on one phone or tablet
 
 LEARN CHESS OPENINGS

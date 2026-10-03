@@ -137,7 +137,7 @@
         app:layout_constraintTop_toBottomOf="@id/colorGroup"
         app:layout_constraintStart_toStartOf="parent" />
 
-    <!-- 9 discrete steps (1100-1900 in 100s, see MaiaRatings.ALL) - max is a count-1 index into
+    <!-- 17 discrete steps (800-2400 in 100s, see MaiaRatings.ALL) - max is a count-1 index into
          that list, not a rating value itself, so onProgressChanged must map it back via
          MaiaRatings.ALL.get(progress) rather than doing arithmetic on it directly like
          strengthSeekBar's Elo does. -->
@@ -145,7 +145,7 @@
         android:id="@+id/maiaRatingSeekBar"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:max="8"
+        android:max="16"
         android:visibility="gone"
         app:layout_constraintTop_toBottomOf="@id/maiaRatingLabel"
         app:layout_constraintStart_toStartOf="parent"

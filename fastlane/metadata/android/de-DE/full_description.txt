@@ -2,7 +2,7 @@
 
 SCHACH GEGEN DEN COMPUTER
 • Stockfish, die bekannte Open-Source-Schachengine, mit einstellbarer Spielstärke von Elo 1320 bis 3190, vom Anfänger bis zum Meisterniveau
-• Maia, eine menschenähnliche Schach-KI: Sie spielt die Züge, die ein Spieler der gewählten Wertung (1100 bis 1900) typischerweise spielen würde, mit natürlichen Bedenkpausen. Ein Gegner, der sich wie ein Vereinsspieler anfühlt, nicht wie ein Rechner
+• Maia, eine menschenähnliche Schach-KI: Sie spielt die Züge, die ein Spieler der gewählten Wertung (800 bis 2400) typischerweise spielen würde, mit natürlichen Bedenkpausen. Ein Gegner, der sich wie ein Vereinsspieler anfühlt, nicht wie ein Rechner
 • Zwei Spieler an einem Handy oder Tablet
 
 SCHACHERÖFFNUNGEN LERNEN

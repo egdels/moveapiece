@@ -2,7 +2,7 @@ Ouvrez et jouez. MoveAPiece est une application d'échecs hors ligne qui démarr
 
 JOUER AUX ÉCHECS CONTRE L'ORDINATEUR
 • Stockfish, le célèbre moteur d'échecs open source, avec une force de jeu réglable de 1320 à 3190 Elo, du débutant au niveau maître
-• Maia, une IA d'échecs au jeu humain : elle joue les coups qu'un joueur du classement choisi (1100 à 1900) jouerait typiquement, avec des temps de réflexion naturels. Un adversaire qui ressemble à un joueur de club, pas à une calculatrice
+• Maia, une IA d'échecs au jeu humain : elle joue les coups qu'un joueur du classement choisi (800 à 2400) jouerait typiquement, avec des temps de réflexion naturels. Un adversaire qui ressemble à un joueur de club, pas à une calculatrice
 • Deux joueurs sur un même téléphone ou une même tablette
 
 APPRENDRE LES OUVERTURES D'ÉCHECS

@@ -1401,13 +1401,13 @@ public class MainActivity extends AppCompatActivity
     /**
      * Shared by {@link #showNewGameDialog} and {@link #showContinueFreePlayDialog}. Mirrors
      * strengthSeekBar's own live-label-while-dragging pattern, except the SeekBar's progress is an
-     * index into {@link MaiaRatings#ALL} (0-8), not the rating itself - {@code max="8"} in both
-     * layouts - since a plain Elo-style linear range would let it land on values with no bundled
-     * model.
+     * index into {@link MaiaRatings#ALL}, not the rating itself, so it can only land on the ratings
+     * the app offers.
      */
     private void setUpMaiaRatingSeekBar(TextView label, SeekBar seekBar) {
         int initialRating = settings.getMaiaRating();
         label.setText(getString(R.string.dialog_maia_rating_format, initialRating));
+        seekBar.setMax(MaiaRatings.ALL.size() - 1);
         seekBar.setProgress(MaiaRatings.ALL.indexOf(initialRating));
         seekBar.setOnSeekBarChangeListener(
                 new SeekBar.OnSeekBarChangeListener() {
