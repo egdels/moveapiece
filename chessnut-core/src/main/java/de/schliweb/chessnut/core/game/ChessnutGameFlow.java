@@ -47,6 +47,14 @@ public final class ChessnutGameFlow {
          * guided move's own. Fired on every evaluation while deviating and once when it clears.
          */
         default void onGuideDeviation(boolean deviating) {}
+
+        /**
+         * The player just put the board into a state no legal move explains: a piece on a square it
+         * cannot go to, or a piece moved that is not part of the guided move. Fired once when that
+         * happens, not while it lasts, and not when the position changes under a board that was
+         * left as it stood (new game, undo).
+         */
+        default void onIllegalPlacement() {}
     }
 
     private final IdentityMoveDetector detector =
@@ -97,7 +105,14 @@ public final class ChessnutGameFlow {
             evaluateGuide();
             return;
         }
-        dispatch(detector.onPhysicalBoard(board));
+        MoveDetectionState before = detector.state();
+        IdentityDetectionResult result = detector.onPhysicalBoard(board);
+        dispatch(result);
+        if (result.kind() == IdentityDetectionResult.Kind.BOARD_MISMATCH
+                && (before == MoveDetectionState.SYNCHRONIZED
+                        || before == MoveDetectionState.MOVE_IN_PROGRESS)) {
+            listener.onIllegalPlacement();
+        }
     }
 
     private void dispatch(IdentityDetectionResult result) {
@@ -205,6 +220,9 @@ public final class ChessnutGameFlow {
         guideDeviating = deviating;
         if (deviating || changed) {
             listener.onGuideDeviation(deviating);
+        }
+        if (deviating && changed) {
+            listener.onIllegalPlacement();
         }
     }
 

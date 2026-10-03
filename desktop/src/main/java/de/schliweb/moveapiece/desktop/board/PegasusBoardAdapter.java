@@ -145,7 +145,7 @@ public final class PegasusBoardAdapter implements PhysicalBoardBridge {
     }
 
     @Override
-    public boolean playMoveSound(boolean capture, boolean check) {
+    public boolean playMoveSound(boolean capture, boolean check, boolean checkmate) {
         return false; // no speaker
     }
 

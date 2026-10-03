@@ -85,11 +85,17 @@ public interface PhysicalBoardBridge {
     void syncBoardToPosition(String fen);
 
     /**
-     * Plays the move sound on the board instead of the phone, if the board has a speaker and is
-     * connected. Returns {@code true} when the board took care of it, {@code false} when the caller
-     * should play the phone sound.
+     * Lets a connected board with a speaker answer for the move instead of the host's own sound.
+     * Returns {@code true} when the board took care of it (which may mean staying silent, see the
+     * Chessnut adapter), {@code false} when the caller should play its own sound.
      */
-    boolean playMoveSound(boolean capture, boolean check);
+    boolean playMoveSound(boolean capture, boolean check, boolean checkmate);
+
+    /**
+     * Signals on the board that its NEW GAME button was pressed once during a game and a second
+     * press is needed. Boards without a speaker or such a button do nothing.
+     */
+    default void playNewGameArmedSound() {}
 
     /** Whether {@link #physicalPositionFen} can work at all: only boards that identify pieces. */
     boolean canLoadPhysicalPosition();

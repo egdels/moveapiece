@@ -139,6 +139,37 @@ public class ChessnutDeviceTest {
         assertEquals(Arrays.asList("newgame", "newgame"), listener.events);
     }
 
+    /** Two presses in quick succession both reach the host, which may ask for exactly that. */
+    @Test
+    public void doublePressYieldsTwoNewGameEvents() {
+        device.onDataReceived(CMD, Fixtures.NEW_GAME);
+        nowMs += 600;
+        device.onDataReceived(CMD, Fixtures.NEW_GAME);
+
+        assertEquals(Arrays.asList("newgame", "newgame"), listener.events);
+    }
+
+    @Test
+    public void contactBounceIsOnePress() {
+        device.onDataReceived(CMD, Fixtures.NEW_GAME);
+        nowMs += ChessnutDevice.BUTTON_BOUNCE_MS - 1;
+        device.onDataReceived(CMD, Fixtures.NEW_GAME);
+
+        assertEquals(Arrays.asList("newgame"), listener.events);
+    }
+
+    /** The release of a long press must not pass for the second press of a double press. */
+    @Test
+    public void longPressReleaseIsDroppedAtBothEndsOfItsWindow() {
+        device.onDataReceived(CMD, Fixtures.NEW_GAME);
+        nowMs += ChessnutDevice.BUTTON_DOUBLE_PRESS_MS;
+        device.onDataReceived(CMD, Fixtures.NEW_GAME);
+        nowMs += ChessnutDevice.BUTTON_DEBOUNCE_MS - ChessnutDevice.BUTTON_DOUBLE_PRESS_MS - 1;
+        device.onDataReceived(CMD, Fixtures.NEW_GAME);
+
+        assertEquals(Arrays.asList("newgame"), listener.events);
+    }
+
     @Test
     public void unknownMessagesAreReportedRaw() {
         device.onDataReceived(CMD, Fixtures.hex("0f 01 07"));

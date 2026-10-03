@@ -12,6 +12,7 @@ import de.schliweb.chessnut.core.protocol.ChessnutDevice;
 import de.schliweb.chessnut.core.protocol.ChessnutDeviceListener;
 import de.schliweb.chessnut.core.protocol.ChessnutFrame;
 import de.schliweb.chessnut.core.protocol.ChessnutLedController;
+import de.schliweb.chessnut.core.protocol.ChessnutTones;
 import de.schliweb.pegasus.core.chess.PieceColor;
 import de.schliweb.pegasus.core.protocol.BoardState;
 import de.schliweb.pegasus.core.record.SessionRecorder;
@@ -124,6 +125,11 @@ public class DesktopChessnutGameBridge {
                                 if (l != null) {
                                     l.onGuideDeviation(deviating);
                                 }
+                            }
+
+                            @Override
+                            public void onIllegalPlacement() {
+                                playTones(ChessnutTones.ILLEGAL_PLACEMENT);
                             }
                         });
         this.device =
@@ -287,9 +293,22 @@ public class DesktopChessnutGameBridge {
         return transport.getConnectionState();
     }
 
-    /** Plays a tone on the board's speaker; ignored while not connected. */
-    public void beep(int frequencyHz, int durationMs) {
-        device.beep(frequencyHz, durationMs);
+    /** Plays the tones one after the other on the board's speaker; ignored while not connected. */
+    public void playTones(List<ChessnutTones.Tone> tones) {
+        long delayMs = 0;
+        for (ChessnutTones.Tone tone : tones) {
+            if (delayMs == 0) {
+                device.beep(tone.frequencyHz, tone.durationMs);
+            } else {
+                scheduler.schedule(
+                        () ->
+                                Platform.runLater(
+                                        () -> device.beep(tone.frequencyHz, tone.durationMs)),
+                        delayMs,
+                        TimeUnit.MILLISECONDS);
+            }
+            delayMs += tone.durationMs + ChessnutTones.GAP_MS;
+        }
     }
 
     // ------------------------------------------------------------ recording

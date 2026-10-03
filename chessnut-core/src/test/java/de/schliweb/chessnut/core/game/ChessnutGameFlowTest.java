@@ -31,6 +31,8 @@ public class ChessnutGameFlowTest {
 
     private final List<String> events = new ArrayList<>();
 
+    private int illegalPlacements;
+
     private final ChessnutGameFlow flow =
             new ChessnutGameFlow(
                     new ChessnutLedController(this::recordLed),
@@ -54,7 +56,53 @@ public class ChessnutGameFlowTest {
                         public void onGuideDeviation(boolean deviating) {
                             events.add("deviation:" + deviating);
                         }
+
+                        @Override
+                        public void onIllegalPlacement() {
+                            illegalPlacements++;
+                        }
                     });
+
+    @Test
+    public void illegalPlacementIsReportedOnceWhenItHappens() {
+        flow.onPhysicalBoard(Boards.start());
+        flow.onPhysicalBoard(lift(Boards.start(), "e2"));
+        assertEquals("a lifted piece is a move in progress", 0, illegalPlacements);
+
+        flow.onPhysicalBoard(move(Boards.start(), "e2", "e5"));
+        assertEquals(1, illegalPlacements);
+
+        // Still wrong, just differently: no second report while it lasts.
+        flow.onPhysicalBoard(move(Boards.start(), "e2", "e6"));
+        assertEquals(1, illegalPlacements);
+
+        flow.onPhysicalBoard(Boards.start());
+        flow.onPhysicalBoard(move(Boards.start(), "e2", "e4"));
+        assertEquals("a legal move is not an illegal placement", 1, illegalPlacements);
+    }
+
+    /** A new game under a board that still shows the old one is a mismatch, not a wrong move. */
+    @Test
+    public void positionChangedByTheAppIsNotAnIllegalPlacement() {
+        flow.onPhysicalBoard(Boards.start());
+        flow.onPhysicalBoard(move(Boards.start(), "e2", "e4"));
+        flow.resetForNewGame();
+        flow.onPhysicalBoard(move(Boards.start(), "e2", "e4"));
+
+        assertTrue(flow.isBoardMismatched());
+        assertEquals(0, illegalPlacements);
+    }
+
+    @Test
+    public void wrongPieceMovedDuringAGuideIsAnIllegalPlacement() {
+        flow.onPhysicalBoard(Boards.start());
+        flow.onPhysicalBoard(move(Boards.start(), "e2", "e4"));
+        flow.guideEngineMove("e7e5");
+        assertEquals(0, illegalPlacements);
+
+        flow.onPhysicalBoard(move(move(Boards.start(), "e2", "e4"), "d7", "d5"));
+        assertEquals(1, illegalPlacements);
+    }
 
     private void recordLed(byte[] command) {
         List<String> names = new ArrayList<>();

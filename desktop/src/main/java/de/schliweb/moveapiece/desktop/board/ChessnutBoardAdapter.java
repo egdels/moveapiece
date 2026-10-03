@@ -6,6 +6,7 @@
 package de.schliweb.moveapiece.desktop.board;
 
 import de.schliweb.chessnut.core.game.InvalidPositionException;
+import de.schliweb.chessnut.core.protocol.ChessnutTones;
 import de.schliweb.moveapiece.desktop.chessnut.DesktopChessnutGameBridge;
 import de.schliweb.moveapiece.logic.BoardType;
 import de.schliweb.pegasus.core.chess.PieceColor;
@@ -149,22 +150,23 @@ public final class ChessnutBoardAdapter implements PhysicalBoardBridge {
     }
 
     /**
-     * Tones on the board's piezo standing in for move.mp3, capture.mp3 and check.mp3: a short click
-     * for a move, a lower and longer one for a capture, a high and long one for check.
+     * A connected board speaks for itself, see {@link ChessnutTones}: a tone for check, two for
+     * checkmate, nothing for an ordinary move or capture - the LEDs show those.
      */
     @Override
-    public boolean playMoveSound(boolean capture, boolean check) {
+    public boolean playMoveSound(boolean capture, boolean check, boolean checkmate) {
         if (bridge.getConnectionState() != ConnectionState.CONNECTED) {
             return false;
         }
-        if (check) {
-            bridge.beep(1800, 250);
-        } else if (capture) {
-            bridge.beep(800, 140);
-        } else {
-            bridge.beep(1200, 70);
-        }
+        bridge.playTones(ChessnutTones.forMove(check, checkmate));
         return true;
+    }
+
+    @Override
+    public void playNewGameArmedSound() {
+        if (bridge.getConnectionState() == ConnectionState.CONNECTED) {
+            bridge.playTones(ChessnutTones.NEW_GAME_ARMED);
+        }
     }
 
     @Override

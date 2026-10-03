@@ -49,8 +49,9 @@ choose.
   hardware-verified.
 - **Chessnut Air, Air+, Pro, Go** identify every piece, so captures and
   promotions are recognised directly, a position set up on the board can be
-  taken over into the game, move sounds play on the board's speaker, and the
-  NEW GAME button restarts what was last played. Hardware-verified with a
+  taken over into the game, the board's speaker signals check, checkmate and
+  a piece put where it cannot go, and the NEW GAME button restarts what was
+  last played (two presses while a game is under way). Hardware-verified with a
   Chessnut Air on Android and macOS; Windows and Linux share the same
   transports and are expected to work but are not yet verified. The Air+,
   Pro and Go speak the same BLE protocol according to the vendor's EasyLink

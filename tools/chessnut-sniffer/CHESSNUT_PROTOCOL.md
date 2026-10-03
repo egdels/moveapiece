@@ -54,6 +54,12 @@ the board report stream continues with the same position, no LEDs light
 up and the board stays on, so "new game" is purely an event for the app
 to act on. Debounce repeated events within a few seconds.
 
+MoveAPiece (`ChessnutDevice`) passes on a second event that follows within
+2.5 s as a second press, so a running game can ask for a double press, and
+drops one that follows after 2.5 to 4 s as the release of a long press.
+Not measured: whether a press held for one or two seconds also sends a
+release event. If it does, such a press would pass for a double press.
+
 The board switched itself off once after roughly ten minutes without a
 connection or piece movement, so expect an idle auto power-off.
 
@@ -134,6 +140,10 @@ Not verified on our hardware; collected from public sources on 2026-09-30.
     restart the game; a NEW GAME button sending another code would do
     nothing. Third parties report unspecified "Air/Go differences" without
     documenting them.
+  - User report for a Chessnut Go, 2026-10-03 (issue #1, MoveAPiece 1.5.2
+    on Android, no capture): advertised as `Chessnut GO`; battery level,
+    LEDs, move detection including castling and promotions, reconnect after
+    power-off and the NEW GAME button all worked.
 - **Move** uses the same services, `21 01 00` and the same board report,
   but different LED (`43 20` + 32 colour nibble bytes) and battery
   (`41 01 0c`, reply `41 03 0c <charging> <level>`) commands plus motorised

@@ -9,6 +9,7 @@ import com.github.bhlangonijr.chesslib.Piece;
 import com.github.bhlangonijr.chesslib.Side;
 import com.github.bhlangonijr.chesslib.Square;
 import de.schliweb.chessnut.core.game.InvalidPositionException;
+import de.schliweb.chessnut.core.game.NewGamePressGate;
 import de.schliweb.chessnut.core.protocol.ChessnutUuids;
 import de.schliweb.moveapiece.desktop.board.ChessnutBoardAdapter;
 import de.schliweb.moveapiece.desktop.board.PegasusBoardAdapter;
@@ -256,6 +257,7 @@ final class GameController
     // constructor and live for the app's whole lifetime - a different rating is a different
     // bundled model file, not a UCI option to change on a running instance.
     private MaiaEngine maiaEngine;
+    private final NewGamePressGate newGameGate = new NewGamePressGate();
     private boolean maiaReady = false;
     private int currentMaiaRating;
     // Bridges a #maybeStartEngineMove call's searchGeneration snapshot and go()-start time across
@@ -727,8 +729,10 @@ final class GameController
 
     /** Check sound takes priority over move/capture, matching common chess-app UX. */
     private void playMoveSound(boolean wasCapture) {
-        // A connected board with a speaker (Chessnut Air) plays the sound itself.
-        if (pegasusBridge != null && pegasusBridge.playMoveSound(wasCapture, game.isCheck())) {
+        // A connected board with a speaker (Chessnut) answers for the move itself - and stays
+        // silent for an ordinary move.
+        if (pegasusBridge != null
+                && pegasusBridge.playMoveSound(wasCapture, game.isCheck(), game.isCheckmate())) {
             return;
         }
         if (game.isCheck()) {
@@ -1297,10 +1301,31 @@ final class GameController
      */
     @Override
     public void onNewGameButton() {
+        // A game still being played takes two presses in quick succession (see
+        // NewGamePressGate), so a bumped button does not throw it away.
+        if (newGameGate.onPress(isGameInProgress()) == NewGamePressGate.Decision.ARMED) {
+            if (pegasusBridge != null) {
+                pegasusBridge.playNewGameArmedSound();
+            }
+            showToast(Messages.get("board_new_game_confirm"));
+            return;
+        }
         if (closeCurrentModal != null) {
             closeCurrentModal.run();
         }
         restartLastActivity();
+    }
+
+    /** Moves were played and nothing has ended yet: neither the game nor a training line. */
+    private boolean isGameInProgress() {
+        if (game.moveCount() == 0 || game.isGameOver()) {
+            return false;
+        }
+        if (mode == Mode.TRAINING) {
+            TrainingSession session = trainingFlow.session();
+            return session != null && !session.isComplete();
+        }
+        return true;
     }
 
     /**

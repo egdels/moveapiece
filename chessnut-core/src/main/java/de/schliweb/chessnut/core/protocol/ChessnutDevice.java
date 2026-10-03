@@ -23,8 +23,10 @@ import java.util.function.LongSupplier;
  *   <li>The board repeats the full state about ten times per second. Only reports whose 64 squares
  *       differ from the previous one are dispatched.
  *   <li>A long press of NEW GAME sends the button event twice, on press and on release (3.2 s apart
- *       on hardware). Events within {@link #BUTTON_DEBOUNCE_MS} of the last dispatched one are
- *       dropped.
+ *       on hardware). An event that follows the last dispatched one after {@link
+ *       #BUTTON_DOUBLE_PRESS_MS} but before {@link #BUTTON_DEBOUNCE_MS} is taken for that release
+ *       and dropped; a sooner one is a second press and is dispatched, so a host can ask for a
+ *       double press.
  * </ul>
  *
  * <p>Not thread-safe; drive from one thread (e.g. the transport callback thread).
@@ -36,7 +38,16 @@ public final class ChessnutDevice {
         void write(byte[] data);
     }
 
-    /** Button events closer together than this are one press (long press = 2 events, 3.2 s). */
+    /** Events this close together are one contact, not two presses. */
+    public static final long BUTTON_BOUNCE_MS = 150;
+
+    /** A second press has to come within this time to count as a double press. */
+    public static final long BUTTON_DOUBLE_PRESS_MS = 2500;
+
+    /**
+     * End of the window in which a later event is the release of a long press (2 events, 3.2 s
+     * apart) rather than a new press.
+     */
     public static final long BUTTON_DEBOUNCE_MS = 4000;
 
     private final CommandSink sink;
@@ -135,7 +146,10 @@ public final class ChessnutDevice {
                 if (frame.payloadLength() == 1
                         && (frame.payload()[0] & 0xFF) == ChessnutMessageType.BUTTON_NEW_GAME) {
                     long now = clockMs.getAsLong();
-                    if (now - lastButtonMs < BUTTON_DEBOUNCE_MS) {
+                    long sinceLast = now - lastButtonMs;
+                    if (sinceLast < BUTTON_BOUNCE_MS
+                            || (sinceLast >= BUTTON_DOUBLE_PRESS_MS
+                                    && sinceLast < BUTTON_DEBOUNCE_MS)) {
                         return;
                     }
                     lastButtonMs = now;

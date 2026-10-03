@@ -40,6 +40,7 @@ import com.github.bhlangonijr.chesslib.Side;
 import com.github.bhlangonijr.chesslib.Square;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import de.schliweb.chessnut.core.game.NewGamePressGate;
 import de.schliweb.chessnut.core.protocol.ChessnutUuids;
 import de.schliweb.moveapiece.board.ChessnutBoardAdapter;
 import de.schliweb.moveapiece.board.PegasusBoardAdapter;
@@ -149,6 +150,7 @@ public class MainActivity extends AppCompatActivity
     // here (this app has no persistent sidebar to put one in) - matches how Stockfish's own Elo is
     // also a one-time dialog choice on this platform, not a live slider.
     private MaiaEngine maiaEngine;
+    private final NewGamePressGate newGameGate = new NewGamePressGate();
     private boolean maiaReady = false;
     private int currentMaiaRating;
     // Bridges a #maybeTriggerEngineMove call's searchGeneration snapshot and go()-start time across
@@ -1186,13 +1188,34 @@ public class MainActivity extends AppCompatActivity
      * the same colours - so a rematch never needs the phone in hand. Changing the setup stays with
      * the on-screen New Game button. Any open dialog (training complete, new game, ...) is
      * dismissed first so it cannot act on the game it was shown for.
+     *
+     * <p>A game still being played takes two presses in quick succession (see {@link
+     * NewGamePressGate}), so a bumped button does not throw it away; the first press only says so,
+     * on the board and on the screen.
      */
     @Override
     public void onNewGameButton() {
+        if (newGameGate.onPress(isGameInProgress()) == NewGamePressGate.Decision.ARMED) {
+            board.playNewGameArmedSound();
+            Toast.makeText(this, R.string.board_new_game_confirm, Toast.LENGTH_SHORT).show();
+            return;
+        }
         if (currentDialog != null && currentDialog.isShowing()) {
             currentDialog.dismiss();
         }
         restartLastActivity();
+    }
+
+    /** Moves were played and nothing has ended yet: neither the game nor a training line. */
+    private boolean isGameInProgress() {
+        if (game.moveCount() == 0 || game.isGameOver()) {
+            return false;
+        }
+        if (mode == GameMode.TRAINING) {
+            TrainingSession session = trainingFlow.session();
+            return session != null && !session.isComplete();
+        }
+        return true;
     }
 
     /**
@@ -2825,9 +2848,9 @@ public class MainActivity extends AppCompatActivity
 
     /** Check sound takes priority over move/capture, matching common chess-app UX. */
     private void playMoveSound(boolean wasCapture) {
-        // A connected board with a speaker (Chessnut Air) plays the sound itself, so the
-        // player hears it where the pieces are rather than from the phone.
-        if (board.playMoveSound(wasCapture, game.isCheck())) {
+        // A connected board with a speaker (Chessnut) answers for the move itself, where the
+        // pieces are rather than from the phone - and stays silent for an ordinary move.
+        if (board.playMoveSound(wasCapture, game.isCheck(), game.isCheckmate())) {
             return;
         }
         if (game.isCheck()) {

@@ -106,6 +106,7 @@
     <string name="board_position_invalid_pawns">Les pions ne peuvent pas être sur la première ou la dernière rangée</string>
     <string name="board_position_invalid_check">Le camp qui n\'a pas le trait est en échec</string>
     <string name="board_position_invalid">L\'échiquier ne montre pas une position jouable</string>
+    <string name="board_new_game_confirm">Appuyez de nouveau sur NEW GAME pour commencer une nouvelle partie</string>
     <string name="board_pending_capture_hint_format">Prise en %1$s ? Soulevez brièvement la pièce sur cette case pour que l\'échiquier la détecte</string>
     <string name="board_lifted_piece_no_moves_format">La pièce en %1$s n\'a aucun coup légal (clouée, ou le roi est en échec)</string>
     <string name="board_lifted_piece_moves_format">Pièce en %1$s soulevée : coups possibles : %2$s</string>

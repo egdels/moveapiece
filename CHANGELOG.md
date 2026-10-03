@@ -12,6 +12,13 @@ candidates (`-rc`) and test tags are not listed.
 
 ### Changed
 
+- Chessnut: the board is quieter. Ordinary moves and captures no longer
+  beep, the LEDs show them. A tone remains for check, two for checkmate,
+  and a low one when a piece is put where it cannot go.
+- Chessnut: while a game is under way, the NEW GAME button has to be
+  pressed twice in quick succession to start over, so a bumped button no
+  longer throws the game away. Before the first move and after the game
+  has ended, one press is enough as before.
 - Engine: Stockfish 19 instead of 18. It plays stronger and needs one
   evaluation network instead of two; the networks of the previous version
   are removed from the device on first start.
