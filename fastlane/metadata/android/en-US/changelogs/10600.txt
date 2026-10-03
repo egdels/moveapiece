@@ -1,0 +1,8 @@
+New engines, quieter Chessnut boards.
+
+* Stockfish 19 replaces 18.
+* Maia runs on Maia-3: ratings from 800 to 2400, more human-like moves.
+* Chessnut: no beep on ordinary moves; one for check, two for mate, a low
+  one for a misplaced piece.
+* Chessnut: NEW GAME needs two presses during a game.
+* Impossible board positions are turned down.
