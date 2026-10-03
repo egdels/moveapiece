@@ -200,7 +200,7 @@ public class MainActivity extends AppCompatActivity
     private boolean engineReady = false;
     private boolean waitingForEngineMove = false;
     private boolean waitingForHint = false;
-    private volatile NnueAssets.Paths nnuePaths;
+    private volatile String nnuePath;
 
     // ---- Evaluation display state --------------------------------------------
     /**
@@ -523,23 +523,23 @@ public class MainActivity extends AppCompatActivity
         engine = new StockfishEngine(enginePath, new Handler(Looper.getMainLooper())::post);
         engine.setListener(this);
 
-        // The NNUE nets (~112 MB) are shipped as APK assets instead of being
+        // The NNUE net (~99 MB) is shipped as an APK asset instead of being
         // embedded in the engine binary (see app/stockfish.gradle); extract
-        // them to app-private storage off the main thread before starting
+        // it to app-private storage off the main thread before starting
         // the engine process.
         new Thread(
                         () -> {
                             try {
-                                NnueAssets.Paths paths =
+                                String path =
                                         NnueAssets.extractIfNeeded(
-                                                path ->
+                                                asset ->
                                                         getApplicationContext()
                                                                 .getAssets()
-                                                                .open(path),
+                                                                .open(asset),
                                                 getApplicationContext().getFilesDir());
                                 runOnUiThread(
                                         () -> {
-                                            nnuePaths = paths;
+                                            nnuePath = path;
                                             engine.start();
                                         });
                             } catch (IOException e) {
@@ -2843,8 +2843,8 @@ public class MainActivity extends AppCompatActivity
 
     @Override
     public void onUciOk() {
-        if (nnuePaths != null) {
-            engine.setEvalFiles(nnuePaths.bigNetPath, nnuePaths.smallNetPath);
+        if (nnuePath != null) {
+            engine.setEvalFile(nnuePath);
         }
         engine.newGame();
     }

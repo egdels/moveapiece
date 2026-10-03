@@ -1,16 +1,16 @@
 /*
  * Builds the Stockfish UCI engine binary for the machine running the build,
  * from the same pinned git submodule the Android app uses
- * (app/src/main/cpp/stockfish, fixed at tag sf_18), by driving Stockfish's
+ * (app/src/main/cpp/stockfish, fixed at tag sf_19), by driving Stockfish's
  * own Makefile directly with the host's native toolchain (no NDK/cross
  * compilation involved - see app/stockfish.gradle for that variant).
  *
- * NNUE networks: reuses the same committed, SHA-256-verified copies from
+ * NNUE network: reuses the same committed, SHA-256-verified copy from
  * app/nnue-nets/ that the Android build uses (built with NNUE_EMBEDDING_OFF,
  * see the header comment in app/stockfish.gradle for the full rationale) so
- * the files are not duplicated in the repo. They are copied next to the
- * built binary; DesktopApp points Stockfish at them via
- * "setoption name EvalFile/EvalFileSmall value <path>", same as Android.
+ * the file is not duplicated in the repo. It is copied next to the
+ * built binary; DesktopApp points Stockfish at it via
+ * "setoption name EvalFile value <path>", same as Android.
  *
  * Host coverage: macOS, Linux and Windows are all built in CI
  * (.github/workflows/desktop.yml). macOS/Linux expect make, the system
@@ -35,10 +35,8 @@ def committedNnueDir = file("$rootDir/app/nnue-nets")
 def nnueCacheDir = layout.buildDirectory.dir('nnue-cache').get().asFile
 
 def nnueNets = [
-    [name: 'nn-c288c895ea92.nnue',
-     sha256: 'c288c895ea924429ea9092e3f36b2b3c1f00f2a3a4c759ff7e57e79e3b43e4a7'],
-    [name: 'nn-37f18f62d772.nnue',
-     sha256: '37f18f62d772f3107e1d6aaca3898c130c3c86f2ab63e6555fbbca20635a899d'],
+    [name: 'nn-1a298aa575a0.nnue',
+     sha256: '1a298aa575a085434d29027978dc36867fe9c5bcea9376654b7a8eba1e52dfc2'],
 ]
 
 def sha256Of = { File f ->
@@ -204,7 +202,7 @@ def exeName = os.isWindows() ? 'stockfish.exe' : 'stockfish'
 def outFile = new File(outDir, exeName)
 
 // Consumed by packaging.gradle, which bundles outDir's contents (the exe
-// plus the two NNUE nets buildStockfishHost drops next to it) into the
+// plus the NNUE net buildStockfishHost drops next to it) into the
 // jpackage image - see StockfishLocator's Javadoc for why that's needed.
 project.ext.stockfishOutDir = outDir
 project.ext.stockfishExeName = exeName
@@ -252,6 +250,13 @@ tasks.register('buildStockfishHost') {
             throw new GradleException("Stockfish host build did not produce an executable")
         }
         outDir.mkdirs()
+        // packaging.gradle bundles this whole directory, so a net left over
+        // from an earlier Stockfish version must not stay in it.
+        outDir.listFiles().each { f ->
+            if (f.name.endsWith('.nnue') && !nnueNets.any { it.name == f.name }) {
+                f.delete()
+            }
+        }
         outFile.bytes = builtExe.bytes
         outFile.setExecutable(true, false)
 

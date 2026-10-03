@@ -2780,7 +2780,7 @@ final class GameController
     @Override
     public void onUciOk() {
         try {
-            NnueAssets.Paths paths =
+            String netPath =
                     NnueAssets.extractIfNeeded(
                             path -> {
                                 throw new FileNotFoundException(
@@ -2791,7 +2791,7 @@ final class GameController
                                                 + " - run :desktop:buildStockfishHost");
                             },
                             engineLocation.homeDir());
-            engine.setEvalFiles(paths.bigNetPath, paths.smallNetPath);
+            engine.setEvalFile(netPath);
         } catch (IOException e) {
             statusLabel.setText(Messages.get("error_nnue_load_failed") + ": " + e.getMessage());
             return;

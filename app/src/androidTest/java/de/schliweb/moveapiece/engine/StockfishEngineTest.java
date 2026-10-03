@@ -96,9 +96,9 @@ public class StockfishEngineTest {
     }
 
     /**
-     * Starts the engine and waits for uciok. Does NOT load NNUE nets, so it must not be followed by
-     * {@code go()}: the binary is built with NNUE_EMBEDDING_OFF (see app/stockfish.gradle) and has
-     * no network to evaluate with until {@link StockfishEngine#setEvalFiles} is called, exactly
+     * Starts the engine and waits for uciok. Does NOT load the NNUE net, so it must not be followed
+     * by {@code go()}: the binary is built with NNUE_EMBEDDING_OFF (see app/stockfish.gradle) and
+     * has no network to evaluate with until {@link StockfishEngine#setEvalFile} is called, exactly
      * like {@code MainActivity.onUciOk()} always does before any search in the real app.
      */
     private Recorder startEngine() throws InterruptedException {
@@ -113,16 +113,16 @@ public class StockfishEngineTest {
     }
 
     /**
-     * Starts the engine, loads the real NNUE nets, and starts a new game - ready to {@code go()}.
+     * Starts the engine, loads the real NNUE net, and starts a new game - ready to {@code go()}.
      */
     private Recorder startReadyToPlayEngine() throws Exception {
         Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
-        NnueAssets.Paths paths =
+        String netPath =
                 NnueAssets.extractIfNeeded(
                         path -> context.getAssets().open(path), context.getFilesDir());
 
         Recorder recorder = startEngine();
-        engine.setEvalFiles(paths.bigNetPath, paths.smallNetPath);
+        engine.setEvalFile(netPath);
         engine.newGame();
         assertTrue(
                 "expected readyok within " + TIMEOUT_SECONDS + "s",

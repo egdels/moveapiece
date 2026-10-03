@@ -12,10 +12,10 @@ import java.io.InputStream;
 import java.io.OutputStream;
 
 /**
- * Installs the two NNUE evaluation networks into a plain install directory, where Stockfish can
- * open them as plain files via "setoption name EvalFile/EvalFileSmall value &lt;path&gt;". See
- * app/stockfish.gradle (NNUE_EMBEDDING_OFF) for why the networks are shipped this way instead of
- * embedded in the engine binary.
+ * Installs the NNUE evaluation network into a plain install directory, where Stockfish can open it
+ * as a plain file via "setoption name EvalFile value &lt;path&gt;". See app/stockfish.gradle
+ * (NNUE_EMBEDDING_OFF) for why the network is shipped this way instead of embedded in the engine
+ * binary.
  *
  * <p>Where the raw bytes come from is platform-specific (an Android APK asset, a file sitting next
  * to a desktop-built Stockfish binary, ...), so that part is abstracted behind {@link NetSource}.
@@ -23,8 +23,7 @@ import java.io.OutputStream;
 public final class NnueAssets {
 
     private static final String ASSET_DIR = "nnue";
-    public static final String BIG_NET = "nn-c288c895ea92.nnue";
-    public static final String SMALL_NET = "nn-37f18f62d772.nnue";
+    public static final String NET = "nn-1a298aa575a0.nnue";
 
     private NnueAssets() {}
 
@@ -33,24 +32,36 @@ public final class NnueAssets {
         InputStream open(String relativePath) throws IOException;
     }
 
-    public static final class Paths {
-        public final String bigNetPath;
-        public final String smallNetPath;
-
-        Paths(String bigNetPath, String smallNetPath) {
-            this.bigNetPath = bigNetPath;
-            this.smallNetPath = smallNetPath;
-        }
+    /**
+     * Blocking (copies ~99 MB on first run, or a no-op if the file is already present in {@code
+     * installDir}); call off the main thread.
+     *
+     * @return absolute path of the installed net
+     */
+    public static String extractIfNeeded(NetSource source, File installDir) throws IOException {
+        File net = extractOne(source, installDir, NET);
+        deleteStaleNets(installDir);
+        return net.getAbsolutePath();
     }
 
     /**
-     * Blocking (copies ~112 MB on first run, or a no-op if the files are already present in {@code
-     * installDir}); call off the main thread.
+     * Removes nets an earlier app version installed (other Stockfish releases need other nets), so
+     * an update does not leave them behind in {@code installDir} for good.
      */
-    public static Paths extractIfNeeded(NetSource source, File installDir) throws IOException {
-        File bigNet = extractOne(source, installDir, BIG_NET);
-        File smallNet = extractOne(source, installDir, SMALL_NET);
-        return new Paths(bigNet.getAbsolutePath(), smallNet.getAbsolutePath());
+    private static void deleteStaleNets(File installDir) {
+        File[] stale =
+                installDir.listFiles(
+                        (dir, name) ->
+                                name.startsWith("nn-")
+                                        && (name.endsWith(".nnue") || name.endsWith(".nnue.tmp"))
+                                        && !name.equals(NET));
+        if (stale == null) {
+            return;
+        }
+        for (File file : stale) {
+            // Best effort: a read-only install dir just keeps the old file.
+            file.delete();
+        }
     }
 
     private static File extractOne(NetSource source, File installDir, String name)

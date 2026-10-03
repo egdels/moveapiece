@@ -7,7 +7,7 @@ This project (MoveAPiece) is licensed under the GNU General Public License v3.0
 
 | Component | License | Source |
 |---|---|---|
-| Stockfish (`app/src/main/cpp/stockfish`, git submodule, pinned to tag `sf_18`, commit `cb3d4ee9b47d0c5aae855b12379378ea1439675c`) | GPLv3 | https://github.com/official-stockfish/Stockfish |
+| Stockfish (`app/src/main/cpp/stockfish`, git submodule, pinned to tag `sf_19`, commit `edb0d9db6731067ec50ce619ff372b463bc4dd5d`) | GPLv3 | https://github.com/official-stockfish/Stockfish |
 | chesslib 1.3.7 | Apache 2.0 | https://github.com/bhlangonijr/chesslib |
 | Apache Commons Lang3 3.18.0 (transitive dependency of chesslib above, both `app` and `desktop`) | Apache 2.0 | https://github.com/apache/commons-lang |
 | AndroidX (appcompat, constraintlayout) | Apache 2.0 | https://developer.android.com/jetpack/androidx |
@@ -64,27 +64,25 @@ Two changes address this:
   relaunch is invisible - it only affects the packaged app, not
   `:desktop:run` dev mode, which goes through `DesktopApp` directly.
 
-## NNUE evaluation networks
+## NNUE evaluation network
 
 Originally obtained from the Stockfish project's own network distribution
 (`tests.stockfishchess.org` / `data.stockfishchess.org`), pinned by filename
 (which itself encodes the SHA-256 prefix) and verified against a full SHA-256
 checksum recorded in `app/stockfish.gradle`. Committed in this repo under
-`app/nnue-nets/` (the big net xz-compressed) so the build needs no network
-access — `app/stockfish.gradle` decompresses/verifies them from there,
+`app/nnue-nets/` (xz-compressed) so the build needs no network
+access — `app/stockfish.gradle` decompresses/verifies it from there,
 falling back to the original download only if that copy is missing or fails
 verification:
 
-- `nn-c288c895ea92.nnue` (big net)
-- `nn-37f18f62d772.nnue` (small net)
+- `nn-1a298aa575a0.nnue`
 
-These are Stockfish project artifacts and fall under the same GPLv3 terms.
-The engine binary is built with `NNUE_EMBEDDING_OFF` so the networks are not
-duplicated into each of the three ABI binaries; instead they ship once as APK
-assets (`app/build/generated/nnueAssets`, populated by the `installNnueAssets`
-Gradle task) and are extracted to app-private storage at first launch by
-`NnueAssets.java`, then pointed to via the standard UCI `EvalFile` /
-`EvalFileSmall` options.
+This is a Stockfish project artifact and falls under the same GPLv3 terms.
+The engine binary is built with `NNUE_EMBEDDING_OFF` so the network is not
+duplicated into each of the three ABI binaries; instead it ships once as an APK
+asset (`app/build/generated/nnueAssets`, populated by the `installNnueAssets`
+Gradle task) and is extracted to app-private storage at first launch by
+`NnueAssets.java`, then pointed to via the standard UCI `EvalFile` option.
 
 ## Maia neural network (human-like opponent, desktop and Android)
 

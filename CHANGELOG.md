@@ -8,6 +8,23 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versions follow [Semantic Versioning](https://semver.org/). Release
 candidates (`-rc`) and test tags are not listed.
 
+## [Unreleased]
+
+### Changed
+
+- Engine: Stockfish 19 instead of 18. It plays stronger and needs one
+  evaluation network instead of two; the networks of the previous version
+  are removed from the device on first start.
+
+### Fixed
+
+- Chessnut, "load position from board": a board with more pieces of a kind
+  than promotions could have produced (for example a second queen next to
+  all eight pawns) is turned down as an invalid position instead of being
+  handed to the engine.
+- If the engine process ends unexpectedly, the app now says so instead of
+  waiting for a move that never comes.
+
 ## [1.5.2] - 2026-10-02
 
 ### Changed

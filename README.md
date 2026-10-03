@@ -90,8 +90,8 @@ git submodule update --init
 ./gradlew :app:assembleDebug
 ```
 
-NNUE evaluation networks (~112 MB) are downloaded automatically at build
-time and shipped as APK assets rather than embedded per-ABI in the native
+The NNUE evaluation network (~99 MB) is unpacked automatically at build
+time and shipped as an APK asset rather than embedded per-ABI in the native
 binary, to keep the APK size down — see `app/stockfish.gradle`.
 
 #### Reproducible builds
@@ -157,7 +157,7 @@ the bundle cannot be built with them on (see the `splits` block in
 ```
 
 Stockfish is built from the same pinned submodule and the same committed
-NNUE networks as Android, but for the host OS/architecture directly (no
+NNUE network as Android, but for the host OS/architecture directly (no
 NDK) — see `desktop/stockfish.gradle`. `jpackageAppImage` bundles that
 binary plus a full JRE into a double-clickable `.app`/`.exe`/Linux binary
 via the JDK's `jpackage` tool (`desktop/packaging.gradle`), using the same

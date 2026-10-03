@@ -76,6 +76,22 @@ public class PhysicalPositionTest {
         assertEquals("4k3/8/8/8/8/8/4Q3/4K3 b - - 0 1", safeFen(queenOnE2, PieceColor.BLACK));
     }
 
+    @Test
+    public void rejectsMaterialNoPromotionCouldProduce() throws InvalidPositionException {
+        // A spare queen next to all eight pawns; fine once a pawn is gone.
+        BoardState secondQueen = put(lift(Boards.start(), "d8"), "d3", PieceCodes.WQUEEN);
+        assertEquals(Reason.UNPLAYABLE, reasonOf(secondQueen, PieceColor.WHITE));
+        assertEquals(
+                "rnb1kbnr/pppppppp/8/8/8/3Q4/1PPPPPPP/RNBQKBNR w KQkq - 0 1",
+                PhysicalPosition.fenOf(lift(secondQueen, "a2"), PieceColor.WHITE));
+
+        BoardState thirdKnight = put(Boards.start(), "d6", PieceCodes.BKNIGHT);
+        assertEquals(Reason.UNPLAYABLE, reasonOf(thirdKnight, PieceColor.BLACK));
+
+        BoardState ninthPawn = put(Boards.start(), "e4", PieceCodes.WPAWN);
+        assertEquals(Reason.UNPLAYABLE, reasonOf(ninthPawn, PieceColor.WHITE));
+    }
+
     private static String safeFen(BoardState board, PieceColor side) {
         try {
             return PhysicalPosition.fenOf(board, side);

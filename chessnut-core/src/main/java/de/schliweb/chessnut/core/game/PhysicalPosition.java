@@ -23,7 +23,8 @@ public final class PhysicalPosition {
 
     /**
      * @throws InvalidPositionException if the board is not a playable position: not exactly one
-     *     king each, a pawn on a back rank, or the side not to move standing in check.
+     *     king each, a pawn on a back rank, more pieces of a kind than promotions could have
+     *     produced, or the side not to move standing in check.
      */
     public static String fenOf(BoardState board, PieceColor sideToMove)
             throws InvalidPositionException {
@@ -32,6 +33,7 @@ public final class PhysicalPosition {
         }
         int whiteKings = 0;
         int blackKings = 0;
+        int[] counts = new int[PieceCodes.BQUEEN + 1];
         StringBuilder placement = new StringBuilder();
         for (int rank = 0; rank < 8; rank++) {
             int empty = 0;
@@ -46,6 +48,9 @@ public final class PhysicalPosition {
                     empty = 0;
                 }
                 placement.append(PieceCodes.toChar(code));
+                if (code > 0 && code < counts.length) {
+                    counts[code]++;
+                }
                 if (code == PieceCodes.WKING) {
                     whiteKings++;
                 } else if (code == PieceCodes.BKING) {
@@ -64,6 +69,20 @@ public final class PhysicalPosition {
         }
         if (whiteKings != 1 || blackKings != 1) {
             throw new InvalidPositionException(Reason.KINGS);
+        }
+        if (!reachableByPromotion(
+                        counts[PieceCodes.WPAWN],
+                        counts[PieceCodes.WKNIGHT],
+                        counts[PieceCodes.WBISHOP],
+                        counts[PieceCodes.WROOK],
+                        counts[PieceCodes.WQUEEN])
+                || !reachableByPromotion(
+                        counts[PieceCodes.BPAWN],
+                        counts[PieceCodes.BKNIGHT],
+                        counts[PieceCodes.BBISHOP],
+                        counts[PieceCodes.BROOK],
+                        counts[PieceCodes.BQUEEN])) {
+            throw new InvalidPositionException(Reason.UNPLAYABLE);
         }
         String castling = castlingRights(board);
         String fen =
@@ -89,6 +108,21 @@ public final class PhysicalPosition {
             throw new InvalidPositionException(Reason.UNPLAYABLE);
         }
         return fen;
+    }
+
+    /**
+     * Whether one side's material can come from a real game: at most eight pawns, and every piece
+     * beyond the starting set (a spare queen, a third knight, ...) paid for by a missing pawn.
+     * Stockfish refuses anything else and terminates, so such a board must not reach it.
+     */
+    private static boolean reachableByPromotion(
+            int pawns, int knights, int bishops, int rooks, int queens) {
+        int promoted =
+                Math.max(knights - 2, 0)
+                        + Math.max(bishops - 2, 0)
+                        + Math.max(rooks - 2, 0)
+                        + Math.max(queens - 1, 0);
+        return pawns <= 8 && promoted <= 8 - pawns;
     }
 
     private static String castlingRights(BoardState board) {

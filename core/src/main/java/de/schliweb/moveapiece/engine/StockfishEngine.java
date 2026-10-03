@@ -23,6 +23,7 @@ import java.util.function.Consumer;
 public class StockfishEngine {
 
     private static final long SHUTDOWN_TIMEOUT_MS = 2000;
+    private static final String CRITICAL_ERROR_PREFIX = "info string CRITICAL ERROR:";
 
     private final String enginePath;
     private final Consumer<Runnable> mainThreadDispatcher;
@@ -32,6 +33,7 @@ public class StockfishEngine {
     private BufferedWriter stdin;
     private volatile EngineListener listener;
     private volatile boolean shuttingDown;
+    private volatile String criticalError;
 
     public StockfishEngine(String enginePath, Consumer<Runnable> mainThreadDispatcher) {
         this.enginePath = enginePath;
@@ -66,7 +68,7 @@ public class StockfishEngine {
 
                                             @Override
                                             public void onStreamClosed() {
-                                                // Engine process ended; nothing further to read.
+                                                handleProcessEnded();
                                             }
                                         });
                         new Thread(reader, "stockfish-stdout").start();
@@ -83,13 +85,12 @@ public class StockfishEngine {
     }
 
     /**
-     * Points the engine at the NNUE network files extracted from APK assets by {@link NnueAssets}
-     * (the binary is built with NNUE_EMBEDDING_OFF, so it has no networks of its own). Call once,
-     * right after {@code uciok} and before the first {@link #newGame()}.
+     * Points the engine at the NNUE network file installed by {@link NnueAssets} (the binary is
+     * built with NNUE_EMBEDDING_OFF, so it has no network of its own). Call once, right after
+     * {@code uciok} and before the first {@link #newGame()}.
      */
-    public void setEvalFiles(String bigNetPath, String smallNetPath) {
-        writeLineAsync("setoption name EvalFile value " + bigNetPath);
-        writeLineAsync("setoption name EvalFileSmall value " + smallNetPath);
+    public void setEvalFile(String netPath) {
+        writeLineAsync("setoption name EvalFile value " + netPath);
     }
 
     /** Limits engine strength to the given Elo (range enforced by Stockfish: ~1320-3190). */
@@ -225,9 +226,24 @@ public class StockfishEngine {
             String best = parts.length > 1 ? parts[1] : null;
             String ponder = parts.length > 3 ? parts[3] : null;
             post(l -> l.onBestMove(best, ponder));
+        } else if (line.startsWith(CRITICAL_ERROR_PREFIX)) {
+            criticalError = line.substring(CRITICAL_ERROR_PREFIX.length()).trim();
         } else if (line.startsWith("info")) {
             post(l -> l.onInfo(line));
         }
+    }
+
+    /**
+     * Stockfish terminates itself on a command it rejects (invalid position, illegal move, ...)
+     * after printing why; without reporting that, the host would wait for a bestmove that never
+     * comes.
+     */
+    private void handleProcessEnded() {
+        if (shuttingDown) {
+            return;
+        }
+        String reason = criticalError;
+        notifyError(new IOException(reason != null ? reason : "Engine process ended unexpectedly"));
     }
 
     private void notifyError(Exception e) {
