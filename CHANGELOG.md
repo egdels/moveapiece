@@ -30,6 +30,13 @@ candidates (`-rc`) and test tags are not listed.
 - If the engine process ends unexpectedly, the app now says so instead of
   waiting for a move that never comes.
 
+### Build
+
+- The Foojay toolchain resolver is gone from `settings.gradle`; F-Droid's
+  source scanner rejects it, which stopped the 1.5.2 build there. Running the
+  desktop app from Gradle with a JDK older than 22 needs an installed JDK 23
+  again.
+
 ## [1.5.2] - 2026-10-02
 
 ### Changed
