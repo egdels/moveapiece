@@ -16,6 +16,7 @@ import de.schliweb.chessnut.core.protocol.ChessnutDeviceListener;
 import de.schliweb.chessnut.core.protocol.ChessnutFrame;
 import de.schliweb.chessnut.core.protocol.ChessnutLedController;
 import de.schliweb.chessnut.core.protocol.ChessnutTones;
+import de.schliweb.moveapiece.board.ChessnutBridge;
 import de.schliweb.pegasus.core.chess.PieceColor;
 import de.schliweb.pegasus.core.protocol.BoardState;
 import de.schliweb.pegasus.core.record.SessionRecorder;
@@ -41,7 +42,7 @@ import java.util.List;
  *
  * <p>Runs entirely on the main thread; all transport callbacks are posted onto it.
  */
-public class ChessnutGameBridge {
+public class ChessnutGameBridge implements ChessnutBridge {
 
     private static final String TAG = "ChessnutGameBridge";
 
@@ -234,6 +235,11 @@ public class ChessnutGameBridge {
 
     public void setListener(Listener listener) {
         this.listener = listener;
+    }
+
+    @Override
+    public void detachListener() {
+        setListener(null);
     }
 
     private Listener listener() {

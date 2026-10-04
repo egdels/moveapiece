@@ -5,6 +5,7 @@
 
 package de.schliweb.moveapiece.desktop.pegasus;
 
+import de.schliweb.moveapiece.board.PegasusBridge;
 import de.schliweb.pegasus.core.chess.ChessPosition;
 import de.schliweb.pegasus.core.chess.Move;
 import de.schliweb.pegasus.core.chess.OccupancyProjection;
@@ -62,7 +63,7 @@ import javafx.application.Platform;
  * via {@link Platform#runLater}, matching {@code GameController}'s own threading model (see its
  * {@code StockfishEngine} construction, which uses {@code Platform::runLater} the same way).
  */
-public class DesktopPegasusGameBridge {
+public class DesktopPegasusGameBridge implements PegasusBridge {
 
     private static final Logger LOG = Logger.getLogger(DesktopPegasusGameBridge.class.getName());
 
@@ -307,6 +308,11 @@ public class DesktopPegasusGameBridge {
 
     public void setListener(Listener listener) {
         this.listener = listener;
+    }
+
+    @Override
+    public void detachListener() {
+        setListener(null);
     }
 
     private Listener listener() {

@@ -218,12 +218,12 @@ core/                    Platform-agnostic chess logic, shared by :app and
 │   │                     Maia (human-like opponent): ONNX position encoding/
 │   │                     policy decoding/engine + its bundled rating list
 │   ├── logic/             chesslib integration (ChessGame), PGN helpers
+│   ├── board/             PhysicalBoardBridge: one interface over both boards, adapters
 │   └── training/          Opening trainer: curated line library + session progress
 
 app/                    Android application module
 ├── src/main/java/de/schliweb/moveapiece/
 │   ├── ui/               Board view, sound effects, opening library/preview screens
-│   ├── board/            PhysicalBoardBridge: one interface over both boards, adapters
 │   ├── pegasus/          Bridge between the DGT Pegasus and ChessGame
 │   ├── chessnut/         Bridge between a Chessnut board and ChessGame (thin, logic in chessnut-core)
 │   └── MainActivity.java
@@ -237,7 +237,6 @@ desktop/                JavaFX desktop application module
 │   ├── BoardCanvas.java       Board rendering + click-to-move (Canvas/GraphicsContext)
 │   ├── GameSetupDialog.java, BoardConnectDialog.java, OpeningLibraryWindow.java,
 │   │   OpeningPreviewWindow.java
-│   ├── board/            PhysicalBoardBridge: one interface over both boards, adapters
 │   ├── pegasus/          Bridge between the DGT Pegasus and ChessGame, plus the
 │   │                     per-OS BLE transports (macOS/Windows/Linux, profile-aware)
 │   ├── chessnut/         Bridge between a Chessnut board and ChessGame
@@ -259,7 +258,7 @@ pegasus-core/            DGT Pegasus protocol + chess-rules/move-detection
                          vendored — see Third-Party Notices); used by
                          :app and :desktop (Pegasus support), by
                          :chessnut-core (chess model, BoardState, BLE
-                         profile) and by :core's own tests
+                         profile) and by :core (board interface)
 
 chessnut-core/           Chessnut protocol, Air family (frames, board reports with
                          piece identity, LEDs, beep, battery, button) and

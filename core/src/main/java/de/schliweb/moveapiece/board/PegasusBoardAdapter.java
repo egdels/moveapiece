@@ -3,13 +3,10 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-package de.schliweb.moveapiece.desktop.board;
+package de.schliweb.moveapiece.board;
 
 import de.schliweb.chessnut.core.game.InvalidPositionException;
-import de.schliweb.chessnut.core.protocol.ChessnutTones;
-import de.schliweb.moveapiece.desktop.chessnut.DesktopChessnutGameBridge;
 import de.schliweb.moveapiece.logic.BoardType;
-import de.schliweb.pegasus.core.chess.PieceColor;
 import de.schliweb.pegasus.core.chess.PieceType;
 import de.schliweb.pegasus.core.transport.ConnectionState;
 import de.schliweb.pegasus.core.transport.ScanListener;
@@ -17,21 +14,18 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 
-/**
- * {@link PhysicalBoardBridge} over {@link DesktopChessnutGameBridge}; promotion and ambiguity never
- * arise there, so those two resolvers are no-ops.
- */
-public final class ChessnutBoardAdapter implements PhysicalBoardBridge {
+/** {@link PhysicalBoardBridge} over a {@link PegasusBridge}. */
+public final class PegasusBoardAdapter implements PhysicalBoardBridge {
 
-    private final DesktopChessnutGameBridge bridge;
+    private final PegasusBridge bridge;
 
-    public ChessnutBoardAdapter(DesktopChessnutGameBridge bridge) {
+    public PegasusBoardAdapter(PegasusBridge bridge) {
         this.bridge = bridge;
     }
 
     @Override
     public BoardType type() {
-        return BoardType.CHESSNUT;
+        return BoardType.PEGASUS;
     }
 
     @Override
@@ -56,7 +50,7 @@ public final class ChessnutBoardAdapter implements PhysicalBoardBridge {
 
     @Override
     public void detachListener() {
-        bridge.setListener(null);
+        bridge.detachListener();
     }
 
     @Override
@@ -116,27 +110,27 @@ public final class ChessnutBoardAdapter implements PhysicalBoardBridge {
 
     @Override
     public int liftedPieceSquare() {
-        return -1; // an illegal placement shows up as a mismatch right away
+        return bridge.liftedPieceSquare();
     }
 
     @Override
     public List<Integer> liftedPieceDestinations() {
-        return List.of();
+        return bridge.liftedPieceDestinations();
     }
 
     @Override
     public boolean liftedPieceBelongsToOpponent() {
-        return false;
+        return bridge.liftedPieceBelongsToOpponent();
     }
 
     @Override
     public int pendingCaptureSquare() {
-        return -1; // piece identity proves every capture
+        return bridge.pendingCaptureSquare();
     }
 
     @Override
     public int promotionSquareAwaitingPiece() {
-        return bridge.promotionSquareAwaitingPiece();
+        return -1; // the Pegasus asks via a dialog instead
     }
 
     @Override
@@ -149,43 +143,28 @@ public final class ChessnutBoardAdapter implements PhysicalBoardBridge {
         bridge.syncBoardToPosition(fen);
     }
 
-    /**
-     * A connected board speaks for itself, see {@link ChessnutTones}: a tone for check, two for
-     * checkmate, nothing for an ordinary move or capture - the LEDs show those.
-     */
     @Override
     public boolean playMoveSound(boolean capture, boolean check, boolean checkmate) {
-        if (bridge.getConnectionState() != ConnectionState.CONNECTED) {
-            return false;
-        }
-        bridge.playTones(ChessnutTones.forMove(check, checkmate));
-        return true;
-    }
-
-    @Override
-    public void playNewGameArmedSound() {
-        if (bridge.getConnectionState() == ConnectionState.CONNECTED) {
-            bridge.playTones(ChessnutTones.NEW_GAME_ARMED);
-        }
+        return false; // no speaker
     }
 
     @Override
     public boolean canLoadPhysicalPosition() {
-        return true;
+        return false; // occupancy only, no piece identity
     }
 
     @Override
     public String physicalPositionFen(boolean whiteToMove) throws InvalidPositionException {
-        return bridge.physicalPositionFen(whiteToMove ? PieceColor.WHITE : PieceColor.BLACK);
+        throw new InvalidPositionException(InvalidPositionException.Reason.NO_BOARD);
     }
 
     @Override
     public void selectPromotion(PieceType promotion) {
-        // The Chessnut reads the promotion piece off the board; nothing is ever pending.
+        bridge.selectPromotion(promotion);
     }
 
     @Override
     public void selectCandidate(String uci) {
-        // Piece identity makes every completed move unique; nothing is ever pending.
+        bridge.selectCandidate(uci);
     }
 }

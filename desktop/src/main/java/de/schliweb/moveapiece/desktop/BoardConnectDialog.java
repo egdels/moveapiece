@@ -5,7 +5,7 @@
 
 package de.schliweb.moveapiece.desktop;
 
-import de.schliweb.moveapiece.desktop.board.PhysicalBoardBridge;
+import de.schliweb.moveapiece.board.PhysicalBoardBridge;
 import de.schliweb.moveapiece.logic.BoardType;
 import de.schliweb.pegasus.core.transport.DiscoveredDevice;
 import de.schliweb.pegasus.core.transport.ScanListener;

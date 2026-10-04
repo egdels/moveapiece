@@ -9,6 +9,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
 import android.util.Log;
+import de.schliweb.moveapiece.board.PegasusBridge;
 import de.schliweb.pegasus.core.chess.ChessPosition;
 import de.schliweb.pegasus.core.chess.Move;
 import de.schliweb.pegasus.core.chess.OccupancyProjection;
@@ -55,7 +56,7 @@ import java.util.List;
  * <p>Runs entirely on the main thread; all transport callbacks are marshalled onto it via {@link
  * #mainHandler}, matching the reference implementation.
  */
-public class PegasusGameBridge {
+public class PegasusGameBridge implements PegasusBridge {
 
     private static final String TAG = "PegasusGameBridge";
 
@@ -342,6 +343,11 @@ public class PegasusGameBridge {
 
     public void setListener(Listener listener) {
         this.listener = listener;
+    }
+
+    @Override
+    public void detachListener() {
+        setListener(null);
     }
 
     private Listener listener() {
