@@ -866,13 +866,6 @@ public class PegasusGameBridge {
     }
 
     /**
-     * True if every pending candidate targets the same square - covers a plain single-candidate
-     * capture as well as a capture-promotion's four promotion-piece candidates (same from/to,
-     * differing only in the promoted piece), which occupancy can never tell apart from each other
-     * either way - so "was the destination seen vacated" is exactly as valid a positive-proof
-     * signal for either shape.
-     */
-    /**
      * How long a single capture candidate may stay unproven before the host is told to show a hint.
      * A capture executed as a quick swap on the destination (captured piece off, attacker on,
      * within one sensor scan) never shows the square empty, and occupancy alone then cannot tell it
@@ -1049,17 +1042,6 @@ public class PegasusGameBridge {
     }
 
     /**
-     * Timer tick for {@link #updateCheckIndicator()}: unlike capture guidance, a check can leave
-     * the board fully idle for a while (the player is just thinking) with no physical event to hang
-     * a {@link PegasusLedController#resend()} off, so this keeps the pattern alive on a plain
-     * interval instead. Self-cancelling: only re-sends and reschedules itself while the indicator
-     * is still the right thing to show (still in check, no board mismatch, no active engine-move
-     * guidance) - any of those transitions already calls {@link #updateCheckIndicator()} (which
-     * cancels this) or {@link #guideEngineMove} from their own call sites, so this only ever needs
-     * to stand down, never to reassert priority over them.
-     */
-
-    /**
      * FEN of the bridge's own tracked position (see the class javadoc on why it keeps one). Lets a
      * host compare it with its authoritative game position, e.g. to tell whether a pending guided
      * move has already been executed on the board.
@@ -1166,6 +1148,16 @@ public class PegasusGameBridge {
         return syncGuide.isActive();
     }
 
+    /**
+     * Timer tick for {@link #updateCheckIndicator()}: unlike capture guidance, a check can leave
+     * the board fully idle for a while (the player is just thinking) with no physical event to hang
+     * a {@link PegasusLedController#resend()} off, so this keeps the pattern alive on a plain
+     * interval instead. Self-cancelling: only re-sends and reschedules itself while the indicator
+     * is still the right thing to show (still in check, no board mismatch, no active engine-move
+     * guidance) - any of those transitions already calls {@link #updateCheckIndicator()} (which
+     * cancels this) or {@link #guideEngineMove} from their own call sites, so this only ever needs
+     * to stand down, never to reassert priority over them.
+     */
     private void refreshCheckIndicator() {
         if (syncGuide.isActive()
                 || moveDetector.state() == MoveDetectionState.BOARD_MISMATCH
