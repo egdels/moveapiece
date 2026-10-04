@@ -21,6 +21,7 @@ import de.schliweb.pegasus.core.transport.TransportError;
 import de.schliweb.pegasus.core.transport.TransportListener;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
@@ -283,7 +284,7 @@ public class LinuxPegasusBleTransportTest {
 
         private FakeService serviceFor(String uuid) {
             return services.computeIfAbsent(
-                    uuid.toLowerCase(), u -> new FakeService(this, u, notifyStarted));
+                    uuid.toLowerCase(Locale.ROOT), u -> new FakeService(this, u, notifyStarted));
         }
 
         @Override
@@ -326,7 +327,7 @@ public class LinuxPegasusBleTransportTest {
             if (!connected.get()) {
                 return null;
             }
-            return services.get(uuid.toLowerCase());
+            return services.get(uuid.toLowerCase(Locale.ROOT));
         }
 
         /** The peripheral goes away: link down, and BlueZ tells the transport so. */
@@ -349,7 +350,7 @@ public class LinuxPegasusBleTransportTest {
         }
 
         void addCharacteristic(String charUuid) {
-            String key = charUuid.toLowerCase();
+            String key = charUuid.toLowerCase(Locale.ROOT);
             characteristics.put(key, new FakeCharacteristic(this, key, notifyStarted));
         }
 
@@ -360,7 +361,7 @@ public class LinuxPegasusBleTransportTest {
 
         @Override
         public BluetoothGattCharacteristic getGattCharacteristicByUuid(String charUuid) {
-            return characteristics.get(charUuid.toLowerCase());
+            return characteristics.get(charUuid.toLowerCase(Locale.ROOT));
         }
     }
 

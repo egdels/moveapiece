@@ -208,6 +208,11 @@ ratings from 800 to 2400; `:app:connectedDebugAndroidTest` covers the
 Android-only pieces (`StockfishEngine` against a real subprocess, `BoardView`
 real measure/layout/touch) that can't run on the plain JVM.
 
+The library modules compile with `-Xlint:all -Werror`. `-Perrorprone` adds
+[Error Prone](https://errorprone.info) to them and to `:desktop` (CI runs it;
+release builds do not), and every `test` run of a library module writes a
+JaCoCo coverage report to `build/reports/jacoco/test`.
+
 ## Project structure
 
 ```

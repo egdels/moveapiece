@@ -184,19 +184,11 @@ final class GameController
                     + "4.05,-5.5 7.6,-5.5 1.95,0 3.73,0.72 5.12,1.88L13,16h9v-9L18.4,10.6z";
     private static final String FLIP_BOARD_ICON_PATH =
             "M16,17.01V10h-2v7.01h-3L15,21l4,-3.99h-3zM9,3L5,6.99h3V14h2V6.99h3L9,3z";
-    // Same Material "bar chart" glyph as the Android app's ic_analyze.xml.
-    private static final String ANALYZE_ICON_PATH =
-            "M3,19H21V21H3Z M5,4H8V19H5Z M10,7H13V19H10Z M15,10H19V19H15Z";
     // Same Material "lightbulb" glyph as the Android app's ic_hint.xml.
     private static final String HINT_ICON_PATH =
             "M9,21c0,0.55 0.45,1 1,1h4c0.55,0 1,-0.45 1,-1v-1H9V21zM12,2C8.14,2 5,5.14 5,9c0,2.38 "
                     + "1.19,4.47 3,5.74V17c0,0.55 0.45,1 1,1h6c0.55,0 1,-0.45 1,-1v-2.26c1.81,-1.27 "
                     + "3,-3.36 3,-5.74C19,5.14 15.86,2 12,2z";
-    // Same Material "search" glyph as the Android app's ic_opening_library.xml.
-    private static final String OPENING_LIBRARY_ICON_PATH =
-            "M15.5,14h-0.79l-0.28,-0.27C15.41,12.59 16,11.11 16,9.5C16,5.91 13.09,3 9.5,3S3,5.91 "
-                    + "3,9.5S5.91,16 9.5,16c1.61,0 3.09,-0.59 4.23,-1.57l0.27,0.28v0.79l5,4.99L20.49,19"
-                    + "L15.5,14zM9.5,14C7.01,14 5,11.99 5,9.5S7.01,5 9.5,5S14,7.01 14,9.5S11.99,14 9.5,14z";
     // Same Material "more vert" glyph as the Android app's ic_more_vert.xml.
     private static final String MORE_ICON_PATH =
             "M12,8c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2zM12,10c-1.1,0 -2,0.9 -2,2"
@@ -2061,7 +2053,7 @@ final class GameController
             finishMaiaMove(bestMoveUci);
             return;
         }
-        PauseTransition pause = new PauseTransition(Duration.millis(remainingMs));
+        PauseTransition pause = new PauseTransition(Duration.millis((double) remainingMs));
         pause.setOnFinished(e -> finishMaiaMove(bestMoveUci));
         pendingMaiaMove = pause;
         pause.play();
@@ -3017,7 +3009,7 @@ final class GameController
         @Override
         public void scheduleBookMove(Runnable action, long delayMs) {
             cancelScheduledBookMove();
-            pendingBookMove = new PauseTransition(Duration.millis(delayMs));
+            pendingBookMove = new PauseTransition(Duration.millis((double) delayMs));
             pendingBookMove.setOnFinished(e -> action.run());
             pendingBookMove.play();
         }

@@ -50,6 +50,11 @@ jobs:
       - name: Check formatting (Spotless)
         run: ./gradlew --no-daemon spotlessCheck
 
+      # Opt-in (see the root build.gradle); its findings fail the build in the library modules
+      # through -Werror and are only reported for :desktop.
+      - name: Error Prone
+        run: ./gradlew --no-daemon -Perrorprone :pegasus-core:compileTestJava :chessnut-core:compileTestJava :core:compileTestJava :desktop:compileTestJava
+
       - name: Android Lint
         run: ./gradlew --no-daemon :app:lintDebug
 
@@ -97,6 +102,8 @@ jobs:
             app/build/test-results/testDebugUnitTest
             pegasus-core/build/test-results/test
             chessnut-core/build/test-results/test
+            pegasus-core/build/reports/jacoco/test
+            chessnut-core/build/reports/jacoco/test
 
   instrumented-tests:
     name: Instrumented tests (emulator)

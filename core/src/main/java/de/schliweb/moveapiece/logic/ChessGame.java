@@ -15,10 +15,11 @@ import com.github.bhlangonijr.chesslib.move.MoveConversionException;
 import com.github.bhlangonijr.chesslib.move.MoveList;
 import com.github.bhlangonijr.chesslib.pgn.PgnHolder;
 import com.github.bhlangonijr.chesslib.pgn.PgnIterator;
-import java.text.SimpleDateFormat;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
@@ -286,7 +287,9 @@ public class ChessGame {
      * game mode or opponent strength.
      */
     public String toPgn(String whiteName, String blackName) {
-        String date = new SimpleDateFormat("yyyy.MM.dd", Locale.ROOT).format(new Date());
+        String date =
+                LocalDate.now(ZoneId.systemDefault())
+                        .format(DateTimeFormatter.ofPattern("yyyy.MM.dd", Locale.ROOT));
         String result = pgnResult();
         StringBuilder sb = new StringBuilder();
         sb.append("[Event \"MoveAPiece-Partie\"]\n");

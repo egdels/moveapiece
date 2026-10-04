@@ -8,6 +8,8 @@ package de.schliweb.chessnut.core.game;
 /** Why a physical board cannot be taken over as a game position; see {@link PhysicalPosition}. */
 public final class InvalidPositionException extends Exception {
 
+    private static final long serialVersionUID = 1L;
+
     public enum Reason {
         /** No board report received yet. */
         NO_BOARD,
