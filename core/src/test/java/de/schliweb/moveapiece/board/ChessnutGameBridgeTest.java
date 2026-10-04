@@ -34,6 +34,32 @@ public class ChessnutGameBridgeTest {
     private static final byte[] BATTERY_95 = {0x2a, 0x02, 0x5f, 0x00};
     private static final byte[] BATTERY_10 = {0x2a, 0x02, 0x0a, 0x00};
     private static final byte[] NEW_GAME = {0x0f, 0x01, 0x02};
+    private static final String BOARD = "board-rx";
+
+    /** Board reports captured from a real Chessnut Air (see chessnut-core's own Fixtures). */
+    private static final byte[] START_POSITION =
+            hex(
+                    "01 24 58 23 31 85 44 44 44 44 00 00 00 00 00 00 00 00"
+                            + " 00 00 00 00 00 00 00 00 77 77 77 77 a6 c9 9b 6a cb 01 00 00");
+
+    private static final byte[] E2_LIFTED =
+            hex(
+                    "01 24 58 23 31 85 44 44 44 44 00 00 00 00 00 00 00 00"
+                            + " 00 00 00 00 00 00 00 00 77 07 77 77 a6 c9 9b 6a ec 01 00 00");
+
+    private static final byte[] AFTER_E4 =
+            hex(
+                    "01 24 58 23 31 85 44 44 44 44 00 00 00 00 00 00 00 00"
+                            + " 00 70 00 00 00 00 00 00 77 07 77 77 a6 c9 9b 6a ec 01 00 00");
+
+    private static byte[] hex(String s) {
+        String[] parts = s.trim().split(" +");
+        byte[] out = new byte[parts.length];
+        for (int i = 0; i < parts.length; i++) {
+            out[i] = (byte) Integer.parseInt(parts[i], 16);
+        }
+        return out;
+    }
 
     private final TestMainThread main = new TestMainThread();
     private final FakeTransport transport = new FakeTransport();
@@ -69,13 +95,19 @@ public class ChessnutGameBridgeTest {
         }
 
         @Override
-        public void onPhysicalMoveConfirmed(String uci) {}
+        public void onPhysicalMoveConfirmed(String uci) {
+            events.add("move:" + uci);
+        }
 
         @Override
-        public void onBoardMismatch(boolean mismatched) {}
+        public void onBoardMismatch(boolean mismatched) {
+            events.add("mismatch:" + mismatched);
+        }
 
         @Override
-        public void onEngineMoveGuidanceComplete() {}
+        public void onEngineMoveGuidanceComplete() {
+            events.add("guidanceComplete");
+        }
 
         @Override
         public void onGuideDeviation(boolean deviating) {}
@@ -121,6 +153,52 @@ public class ChessnutGameBridgeTest {
         assertEquals("battery:10:true", listener.events.poll(TIMEOUT_SECONDS, TimeUnit.SECONDS));
         // The button event after them shows that the second 95 % reading was not reported.
         assertEquals("newGame", listener.events.poll(TIMEOUT_SECONDS, TimeUnit.SECONDS));
+    }
+
+    private String nextEvent() throws InterruptedException {
+        return listener.events.poll(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+    }
+
+    @Test
+    public void aMovePlayedOnTheBoard_isConfirmedWithItsUci() throws InterruptedException {
+        ChessnutGameBridge bridge = connectedBridge();
+
+        transport.feed(BOARD, START_POSITION);
+        transport.feed(BOARD, E2_LIFTED);
+        transport.feed(BOARD, AFTER_E4);
+
+        String event = nextEvent();
+        while (event != null && !event.startsWith("move:")) {
+            event = nextEvent();
+        }
+        assertEquals("move:e2e4", event);
+        String[] fen = new String[1];
+        main.runSync(() -> fen[0] = bridge.trackedFen());
+        assertTrue(fen[0], fen[0].startsWith("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b"));
+    }
+
+    @Test
+    public void anEngineMove_isGuidedUntilItStandsOnTheBoard() throws InterruptedException {
+        ChessnutGameBridge bridge = connectedBridge();
+        transport.feed(BOARD, START_POSITION);
+        boolean[] active = new boolean[1];
+        main.runSync(
+                () -> {
+                    bridge.guideEngineMove("e2e4");
+                    active[0] = bridge.isGuideActive();
+                });
+        assertTrue(active[0]);
+
+        transport.feed(BOARD, E2_LIFTED);
+        transport.feed(BOARD, AFTER_E4);
+
+        String event = nextEvent();
+        while (event != null && !event.equals("guidanceComplete")) {
+            event = nextEvent();
+        }
+        assertEquals("guidanceComplete", event);
+        main.runSync(() -> active[0] = bridge.isGuideActive());
+        assertFalse(active[0]);
     }
 
     @Test

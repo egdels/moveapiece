@@ -49,9 +49,7 @@ public class StockfishEngine {
         ioExecutor.execute(
                 () -> {
                     try {
-                        ProcessBuilder builder = new ProcessBuilder(enginePath);
-                        builder.redirectErrorStream(true);
-                        process = builder.start();
+                        process = launchProcess();
                         stdin =
                                 new BufferedWriter(
                                         new OutputStreamWriter(
@@ -77,6 +75,13 @@ public class StockfishEngine {
                         notifyError(e);
                     }
                 });
+    }
+
+    /** Launches the engine binary; a seam for tests, which hand in a scripted process. */
+    Process launchProcess() throws IOException {
+        ProcessBuilder builder = new ProcessBuilder(enginePath);
+        builder.redirectErrorStream(true);
+        return builder.start();
     }
 
     public void newGame() {
