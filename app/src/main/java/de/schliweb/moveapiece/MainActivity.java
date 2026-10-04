@@ -42,6 +42,9 @@ import com.google.android.material.button.MaterialButton;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import de.schliweb.chessnut.core.game.NewGamePressGate;
 import de.schliweb.chessnut.core.protocol.ChessnutUuids;
+import de.schliweb.moveapiece.analysis.MoveQuality;
+import de.schliweb.moveapiece.analysis.MultiPvCandidates;
+import de.schliweb.moveapiece.analysis.PostGameReport;
 import de.schliweb.moveapiece.board.AndroidBoardScheduler;
 import de.schliweb.moveapiece.board.ChessnutBoardAdapter;
 import de.schliweb.moveapiece.board.ChessnutGameBridge;
@@ -89,7 +92,6 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -271,21 +273,16 @@ public class MainActivity extends AppCompatActivity
 
     private ColorStateList boardButtonDefaultBackgroundTint;
 
-    private static final int INACCURACY_CP_LOSS = 50;
-    private static final int MISTAKE_CP_LOSS = 150;
-    private static final int BLUNDER_CP_LOSS = 300;
-
     // ---- Multi-PV hint state ----------------------------------------------------
     /**
      * True only while a {@link #requestHint} search (run with MultiPV raised to {@link
      * #HINT_MULTI_PV_LINES}) is in flight - {@link #onInfo} routes every line to {@link
-     * #captureMultiPvCandidate} instead of the single-eval/move-quality/post-game-analysis paths
-     * while this is set, since none of those want a non-PV-1 line's score.
+     * #hintCandidates} instead of the single-eval/move-quality/post-game-analysis paths while this
+     * is set, since none of those want a non-PV-1 line's score.
      */
     private boolean multiPvSearchActive;
 
-    private final String[] multiPvMoveByRank = new String[HINT_MULTI_PV_LINES];
-    private final int[] multiPvCpByRank = new int[HINT_MULTI_PV_LINES];
+    private final MultiPvCandidates hintCandidates = new MultiPvCandidates(HINT_MULTI_PV_LINES);
 
     // ---- Post-game analysis state ------------------------------------------------
     /**
@@ -2139,7 +2136,7 @@ public class MainActivity extends AppCompatActivity
         engine.stop();
         pendingSearches.add(new PendingSearch(SearchPurpose.HINT, searchGeneration));
         multiPvSearchActive = true;
-        java.util.Arrays.fill(multiPvMoveByRank, null);
+        hintCandidates.clear();
         engine.setFullStrength();
         engine.setMultiPv(HINT_MULTI_PV_LINES);
         engine.setPosition(game.startFen(), game.toUciMoveList());
@@ -2153,27 +2150,21 @@ public class MainActivity extends AppCompatActivity
     }
 
     /**
-     * Shows the 2nd/3rd-best candidates collected by {@link #captureMultiPvCandidate} during the
-     * hint search that just finished, as plain from-to text next to the board-highlighted best move
-     * (rank 1) - hidden if the engine didn't report that many distinct lines (e.g. very few legal
-     * moves).
+     * Shows the 2nd/3rd-best candidates collected in {@link #hintCandidates} during the hint search
+     * that just finished, as plain from-to text next to the board-highlighted best move (rank 1) -
+     * hidden if the engine didn't report that many distinct lines (e.g. very few legal moves).
      */
     private void showHintAlternatives() {
         List<String> alternatives = new ArrayList<>();
         for (int rank = 1; rank < HINT_MULTI_PV_LINES; rank++) {
-            String uci = multiPvMoveByRank[rank];
-            if (uci == null) {
+            if (hintCandidates.move(rank) == null) {
                 continue;
             }
-            String squares =
-                    uci.substring(0, 2).toLowerCase(Locale.ROOT)
-                            + "-"
-                            + uci.substring(2, 4).toLowerCase(Locale.ROOT);
             alternatives.add(
                     getString(
                             R.string.hint_alternative_format,
-                            squares,
-                            multiPvCpByRank[rank] / 100.0));
+                            hintCandidates.squares(rank),
+                            hintCandidates.cp(rank) / 100.0));
         }
         hintAlternativesNote =
                 alternatives.isEmpty()
@@ -2181,34 +2172,6 @@ public class MainActivity extends AppCompatActivity
                         : getString(
                                 R.string.hint_alternatives_label, String.join(", ", alternatives));
         updateNoteText();
-    }
-
-    /**
-     * Records one MultiPV line's move+score, indexed by its 1-based {@code multipv} rank (see
-     * {@link UciInfoParser#parseMultiPv}) - only called while {@link #multiPvSearchActive}. Later
-     * lines for the same rank (deeper iterations) simply overwrite earlier ones, so what's left
-     * once the search ends is the converged answer.
-     */
-    private void captureMultiPvCandidate(String infoLine) {
-        OptionalInt multiPv = UciInfoParser.parseMultiPv(infoLine);
-        if (multiPv.isEmpty()
-                || multiPv.getAsInt() < 1
-                || multiPv.getAsInt() > HINT_MULTI_PV_LINES) {
-            return;
-        }
-        Optional<String> pvMove = UciInfoParser.parsePvFirstMove(infoLine);
-        if (pvMove.isEmpty()) {
-            return;
-        }
-        OptionalInt mate = UciInfoParser.parseScoreMate(infoLine);
-        OptionalInt cp =
-                mate.isPresent() ? OptionalInt.empty() : UciInfoParser.parseScoreCp(infoLine);
-        if (mate.isEmpty() && cp.isEmpty()) {
-            return;
-        }
-        int rank = multiPv.getAsInt() - 1;
-        multiPvMoveByRank[rank] = pvMove.get();
-        multiPvCpByRank[rank] = mate.isPresent() ? mateToCp(mate.getAsInt()) : cp.getAsInt();
     }
 
     private void updateHintButtonState() {
@@ -2220,14 +2183,6 @@ public class MainActivity extends AppCompatActivity
                         && !waitingForHint
                         && postGameUciMoves == null
                         && isBoardInteractiveNow());
-    }
-
-    /**
-     * Converts a "mate in N" score to a centipawn-scale value that still dominates normal evals.
-     */
-    private static int mateToCp(int mateIn) {
-        int magnitude = 100000 - Math.min(Math.abs(mateIn), 100) * 100;
-        return mateIn >= 0 ? magnitude : -magnitude;
     }
 
     private void recordPositionEval(int rawCp) {
@@ -2270,37 +2225,35 @@ public class MainActivity extends AppCompatActivity
         showMoveQualityIfNotable(cpLoss);
     }
 
-    /**
-     * Move-quality string resource for a given centipawn loss, or 0 if not notable enough to flag.
-     */
-    private static int moveQualityLabelRes(int cpLoss) {
-        if (cpLoss >= BLUNDER_CP_LOSS) {
-            return R.string.move_quality_blunder;
+    private static int moveQualityLabelRes(MoveQuality quality) {
+        switch (quality) {
+            case BLUNDER:
+                return R.string.move_quality_blunder;
+            case MISTAKE:
+                return R.string.move_quality_mistake;
+            default:
+                return R.string.move_quality_inaccuracy;
         }
-        if (cpLoss >= MISTAKE_CP_LOSS) {
-            return R.string.move_quality_mistake;
-        }
-        if (cpLoss >= INACCURACY_CP_LOSS) {
-            return R.string.move_quality_inaccuracy;
-        }
-        return 0;
     }
 
     private void showMoveQualityIfNotable(int cpLoss) {
-        int labelRes = moveQualityLabelRes(cpLoss);
-        if (labelRes == 0) {
+        MoveQuality quality = MoveQuality.of(cpLoss);
+        if (quality == null) {
             clearMoveQualityNote();
             return;
         }
         moveQualityNote =
-                getString(R.string.move_quality_format, getString(labelRes), -cpLoss / 100.0);
+                getString(
+                        R.string.move_quality_format,
+                        getString(moveQualityLabelRes(quality)),
+                        -cpLoss / 100.0);
         updateInfoText();
     }
 
     /**
      * Replays the game played so far from the start, one ply at a time, grading every move the same
-     * way live blunder-check does ({@link #moveQualityLabelRes}) and showing a summary dialog once
-     * done. Works whether the game has actually ended or is still in progress - only {@link
+     * way live blunder-check does ({@link MoveQuality#of}) and showing a summary dialog once done.
+     * Works whether the game has actually ended or is still in progress - only {@link
      * ChessGame#moveCount()} needs to be positive, there has to be something to replay. Always
      * searches at full strength, restored afterwards in {@link #advancePostGameAnalysis}.
      *
@@ -2340,7 +2293,7 @@ public class MainActivity extends AppCompatActivity
     private void requestPostGameEvalFor(int positionIndex) {
         if (positionIndex == postGameUciMoves.size()
                 && (game.isCheckmate() || game.isStalemate())) {
-            recordPostGameEval(game.isCheckmate() ? -mateToCp(0) : 0);
+            recordPostGameEval(game.isCheckmate() ? -MoveQuality.mateToCp(0) : 0);
             return;
         }
         pendingSearches.add(new PendingSearch(SearchPurpose.POST_GAME, searchGeneration));
@@ -2383,77 +2336,26 @@ public class MainActivity extends AppCompatActivity
         }
     }
 
-    /**
-     * Splits every SAN move out of {@link ChessGame#toSan()}'s numbered movetext (e.g. "1. e4 e5 2.
-     * Nf3" -&gt; ["e4", "e5", "Nf3"]) - ply-ordered, so it lines up 1:1 with {@link
-     * ChessGame#toUciMoveList()}'s split.
-     */
-    private static List<String> sanMoveList(String toSan) {
-        List<String> moves = new ArrayList<>();
-        for (String token : toSan.split("\\s+")) {
-            if (!token.isEmpty() && !token.matches("\\d+\\.")) {
-                moves.add(token);
-            }
-        }
-        return moves;
-    }
-
-    private static String plyLabel(int plyIndex) {
-        int moveNumber = plyIndex / 2 + 1;
-        return plyIndex % 2 == 0 ? moveNumber + "." : moveNumber + "...";
-    }
-
-    /** Index into every per-side array below: 0 = White, 1 = Black. */
     private void showPostGameReport(List<String> uciMoves, List<Integer> evals) {
-        List<String> sanMoves = sanMoveList(game.toSan());
-        double[] lossSum = new double[2];
-        int[] plies = new int[2];
-        int[] inaccuracies = new int[2];
-        int[] mistakes = new int[2];
-        int[] blunders = new int[2];
+        PostGameReport analysis =
+                PostGameReport.of(uciMoves, evals, PostGameReport.sanMoveList(game.toSan()));
         StringBuilder flaggedMoves = new StringBuilder();
-        for (int ply = 0; ply < uciMoves.size(); ply++) {
-            int side = ply % 2;
-            plies[side]++;
-            int cpLoss = Math.max(0, evals.get(ply) + evals.get(ply + 1));
-            lossSum[side] += cpLoss;
-            int labelRes = moveQualityLabelRes(cpLoss);
-            if (labelRes == R.string.move_quality_blunder) {
-                blunders[side]++;
-            } else if (labelRes == R.string.move_quality_mistake) {
-                mistakes[side]++;
-            } else if (labelRes == R.string.move_quality_inaccuracy) {
-                inaccuracies[side]++;
-            } else {
-                continue;
-            }
-            String san = ply < sanMoves.size() ? sanMoves.get(ply) : uciMoves.get(ply);
+        for (PostGameReport.FlaggedMove move : analysis.flaggedMoves()) {
             if (flaggedMoves.length() > 0) {
                 flaggedMoves.append('\n');
             }
             flaggedMoves.append(
                     getString(
                             R.string.analysis_flagged_move_format,
-                            plyLabel(ply),
-                            san,
-                            getString(labelRes),
-                            -cpLoss / 100.0));
+                            move.plyLabel(),
+                            move.san(),
+                            getString(moveQualityLabelRes(move.quality())),
+                            move.lossPawns()));
         }
         StringBuilder report = new StringBuilder();
-        int[] sideColorRes = {R.string.color_white, R.string.color_black};
-        for (int side = 0; side < 2; side++) {
-            if (side > 0) {
-                report.append('\n');
-            }
-            report.append(
-                    getString(
-                            R.string.analysis_side_summary_format,
-                            getString(sideColorRes[side]),
-                            plies[side] == 0 ? 0.0 : lossSum[side] / plies[side] / 100.0,
-                            inaccuracies[side],
-                            mistakes[side],
-                            blunders[side]));
-        }
+        report.append(postGameSideSummary(R.string.color_white, analysis.white()));
+        report.append('\n');
+        report.append(postGameSideSummary(R.string.color_black, analysis.black()));
         report.append("\n\n");
         report.append(
                 flaggedMoves.length() > 0
@@ -2465,6 +2367,16 @@ public class MainActivity extends AppCompatActivity
                         .setMessage(report.toString())
                         .setPositiveButton(R.string.action_ok, null)
                         .show();
+    }
+
+    private String postGameSideSummary(int colorRes, PostGameReport.SideSummary side) {
+        return getString(
+                R.string.analysis_side_summary_format,
+                getString(colorRes),
+                side.averageLossPawns(),
+                side.count(MoveQuality.INACCURACY),
+                side.count(MoveQuality.MISTAKE),
+                side.count(MoveQuality.BLUNDER));
     }
 
     /**
@@ -2483,7 +2395,7 @@ public class MainActivity extends AppCompatActivity
         if (multiPvSearchActive) {
             // A hint search was interrupted mid-flight (new game/undo/PGN import/post-game analysis
             // starting) - restore MultiPV so the next (unrelated) search's info lines aren't
-            // misrouted to captureMultiPvCandidate() forever.
+            // misrouted to hintCandidates forever.
             multiPvSearchActive = false;
             engine.setMultiPv(1);
         }
@@ -2931,7 +2843,7 @@ public class MainActivity extends AppCompatActivity
     @Override
     public void onInfo(String infoLine) {
         if (multiPvSearchActive) {
-            captureMultiPvCandidate(infoLine);
+            hintCandidates.capture(infoLine);
             return;
         }
         OptionalInt mate = UciInfoParser.parseScoreMate(infoLine);
@@ -2940,7 +2852,7 @@ public class MainActivity extends AppCompatActivity
         if (mate.isEmpty() && cp.isEmpty()) {
             return;
         }
-        int rawCp = mate.isPresent() ? mateToCp(mate.getAsInt()) : cp.getAsInt();
+        int rawCp = mate.isPresent() ? MoveQuality.mateToCp(mate.getAsInt()) : cp.getAsInt();
         if (postGameUciMoves != null) {
             // Post-game analysis replays past positions - never the live eval/move-quality state.
             postGameLiveScoreCp = rawCp;
