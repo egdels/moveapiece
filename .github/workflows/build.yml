@@ -86,7 +86,7 @@ jobs:
         run: sdkmanager --install "platforms;${PLATFORM_VERSION}" "build-tools;${BUILD_TOOLS_VERSION}" "ndk;${NDK_VERSION}"
 
       - name: Run JVM unit tests
-        run: ./gradlew --no-daemon :pegasus-core:test :app:testDebugUnitTest
+        run: ./gradlew --no-daemon :pegasus-core:test :chessnut-core:test :app:testDebugUnitTest
 
       - name: Upload test report
         if: always()
@@ -96,6 +96,7 @@ jobs:
           path: |
             app/build/test-results/testDebugUnitTest
             pegasus-core/build/test-results/test
+            chessnut-core/build/test-results/test
 
   instrumented-tests:
     name: Instrumented tests (emulator)
