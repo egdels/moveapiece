@@ -62,8 +62,9 @@ configure(subprojects.findAll { it.name in ['pegasus-core', 'chessnut-core', 'co
 
 // Error Prone is opt-in (-Perrorprone), so that release builds - F-Droid's in particular - compile
 // with plain javac and nothing else on the processor path. CI's code-quality job passes the flag.
-// Its warnings fail the build in the library modules through -Werror above; in :desktop they are
-// only reported.
+// Its warnings fail the build in the library modules through -Werror above, and in :desktop when
+// the build runs on JDK 22 or newer. On older JDKs javac warns about every JavaFX 24 class file
+// (version 66) it reads, which -Werror would turn into errors, so there they are only reported.
 if (project.hasProperty('errorprone')) {
     configure(subprojects.findAll { it.name in ['pegasus-core', 'chessnut-core', 'core', 'desktop'] }) {
         plugins.withId('java') {
@@ -78,6 +79,9 @@ if (project.hasProperty('errorprone')) {
                 options.fork = true
                 // :desktop's JavaFX class-file warnings alone would fill javac's default limit of 100.
                 options.compilerArgs += ['-Xmaxwarns', '1000']
+                if (project.name == 'desktop' && JavaVersion.current() >= JavaVersion.VERSION_22) {
+                    options.compilerArgs += ['-Werror']
+                }
                 options.errorprone {
                     // Pure style suggestions (newer syntax, Javadoc summaries) and two checks that do
                     // not fit here: StringSplitter recommends Guava, and EnumOrdinal objects to
