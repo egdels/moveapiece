@@ -171,7 +171,8 @@ public class EngineSearchFlowTest {
         flow.onBestMove("e7e5");
 
         assertEquals(Arrays.asList("stop", "position e2e4", "go 1200"), engine.commands);
-        assertEquals(Arrays.asList("engineMove:e7e5"), host.events);
+        // Its own move is the one search that runs at the opponent's strength.
+        assertEquals(Arrays.asList("restoreStrength", "engineMove:e7e5"), host.events);
     }
 
     @Test
@@ -179,7 +180,7 @@ public class EngineSearchFlowTest {
         flow.startEngineMoveSearch(1200);
         flow.onBestMove("(none)");
 
-        assertEquals(Arrays.asList("engineMove:null"), host.events);
+        assertEquals(Arrays.asList("restoreStrength", "engineMove:null"), host.events);
     }
 
     @Test
@@ -205,6 +206,27 @@ public class EngineSearchFlowTest {
     }
 
     @Test
+    public void evaluation_isSearchedAtFullStrengthWhateverTheOpponentsElo() {
+        flow.startEngineMoveSearch(1200);
+        flow.onBestMove("e2e4");
+        game.applyUciMove("e2e4");
+
+        flow.maybeStartAnalysis();
+
+        assertEquals(
+                Arrays.asList(
+                        "stop",
+                        "position ",
+                        "go 1200",
+                        "stop",
+                        "fullStrength",
+                        "position e2e4",
+                        "go 1500"),
+                engine.commands);
+        assertEquals(1, java.util.Collections.frequency(host.events, "restoreStrength"));
+    }
+
+    @Test
     public void evaluation_isReportedForWhiteWhicheverSideIsToMove() {
         flow.maybeStartAnalysis();
         flow.onInfo("info depth 10 score cp 30 pv e2e4");
@@ -224,7 +246,7 @@ public class EngineSearchFlowTest {
         flow.onInfo("info depth 10 score cp 30 pv e2e4");
         flow.onBestMove("e2e4");
 
-        assertEquals(Arrays.asList("abandoned"), host.events);
+        assertEquals(Arrays.asList("restoreStrength", "abandoned"), host.events);
     }
 
     @Test
@@ -235,10 +257,10 @@ public class EngineSearchFlowTest {
         flow.startEngineMoveSearch(1200);
 
         flow.onBestMove("g1f3");
-        assertTrue(host.events.isEmpty());
+        assertEquals(Arrays.asList("restoreStrength"), host.events);
         flow.onBestMove("e2e4");
 
-        assertEquals(Arrays.asList("engineMove:e2e4"), host.events);
+        assertEquals(Arrays.asList("restoreStrength", "engineMove:e2e4"), host.events);
     }
 
     @Test
@@ -285,7 +307,7 @@ public class EngineSearchFlowTest {
         flow.onBestMove("e2e4");
 
         assertFalse(flow.isWaitingForHint());
-        assertEquals(Arrays.asList("restoreStrength", "hint:e2e4"), host.events);
+        assertEquals(Arrays.asList("hint:e2e4"), host.events);
         assertEquals("d2d4", flow.hintCandidates().move(1));
         assertEquals("multipv 1", engine.commands.get(engine.commands.size() - 1));
     }
@@ -337,7 +359,7 @@ public class EngineSearchFlowTest {
         assertFalse(flow.isPostGameAnalysisRunning());
         assertEquals(Arrays.asList("e2e4", "e7e5"), host.reportMoves);
         assertEquals(Arrays.asList(20, -35, 30), host.reportEvals);
-        assertEquals(Arrays.asList("abandoned", "restoreStrength", "report"), host.events);
+        assertEquals(Arrays.asList("abandoned", "report"), host.events);
         assertTrue(
                 engine.commands.containsAll(
                         Arrays.asList("position ", "position e2e4", "position e2e4 e7e5")));

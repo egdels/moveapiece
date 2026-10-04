@@ -51,7 +51,10 @@ public final class EngineSearchFlow {
          */
         boolean isEngineAboutToMove();
 
-        /** Puts the engine back to the opponent's strength after a full-strength search. */
+        /**
+         * Sets the engine to the opponent's strength, right before it searches for its own move.
+         * Every other search (evaluation, hint, post-game analysis) runs at full strength.
+         */
         void restoreEngineStrength();
 
         /** The engine's reply from {@link #startEngineMoveSearch}; {@code null} if it has none. */
@@ -226,6 +229,19 @@ public final class EngineSearchFlow {
     }
 
     /**
+     * The strength a search runs at is set anew for every search: the opponent's for its own move,
+     * full strength for everything that judges a position. An evaluation computed at a limited Elo
+     * is the score of a deliberately weakened search and can be off by a piece or more.
+     */
+    private void setStrengthFor(SearchPurpose purpose) {
+        if (purpose == SearchPurpose.REAL_MOVE) {
+            host.restoreEngineStrength();
+        } else {
+            engine.setFullStrength();
+        }
+    }
+
+    /**
      * Starts a dedicated evaluation search when the evaluation is wanted and nothing else is
      * already searching the current position.
      */
@@ -248,14 +264,15 @@ public final class EngineSearchFlow {
         engine.stop();
         pendingSearches.add(new PendingSearch(purpose, generation));
         analysisSideToMove = game.sideToMove();
+        setStrengthFor(purpose);
         engine.setPosition(game.startFen(), game.toUciMoveList());
         engine.go(movetimeMs);
     }
 
     /**
      * Asks Stockfish for the best move in the current position without applying it - the player
-     * decides whether to play it. Always searches at full strength, then restores the opponent's
-     * strength for whatever search comes next, so a low-Elo opponent does not leak into the hint.
+     * decides whether to play it. Searches at full strength, so a low-Elo opponent does not leak
+     * into the hint.
      */
     public void requestHint() {
         if (!host.isEngineReady()
@@ -271,7 +288,7 @@ public final class EngineSearchFlow {
         pendingSearches.add(new PendingSearch(SearchPurpose.HINT, generation));
         multiPvSearchActive = true;
         hintCandidates.clear();
-        engine.setFullStrength();
+        setStrengthFor(SearchPurpose.HINT);
         engine.setMultiPv(HINT_MULTI_PV_LINES);
         engine.setPosition(game.startFen(), game.toUciMoveList());
         engine.go(HINT_MOVETIME_MS);
@@ -343,14 +360,14 @@ public final class EngineSearchFlow {
     /**
      * Replays the game played so far from the start, one ply at a time, and reports every
      * position's eval once done ({@link Host#onPostGameReport}). Works whether the game has ended
-     * or is still in progress - there only has to be something to replay. Always searches at full
-     * strength, restored afterwards.
+     * or is still in progress - there only has to be something to replay. Searches at full
+     * strength.
      *
      * <p>Unlike every other search, this does not send "ucinewgame" before replaying (its "readyok"
-     * would undo the full-strength setting and, in a still-live game, fire off an unwanted real
-     * move). The live searches cancelled here are therefore the host's to restart once the report
-     * is in. The host must also keep the board from being played on meanwhile: a move made
-     * mid-replay would go through the same engine without this flow noticing.
+     * would, in a still-live game, fire off an unwanted real move). The live searches cancelled
+     * here are therefore the host's to restart once the report is in. The host must also keep the
+     * board from being played on meanwhile: a move made mid-replay would go through the same engine
+     * without this flow noticing.
      */
     public void startPostGameAnalysis() {
         if (!host.isEngineReady()
@@ -364,7 +381,7 @@ public final class EngineSearchFlow {
         postGamePositionEvals = new ArrayList<>(postGameUciMoves.size() + 1);
         host.onHintAvailabilityChanged();
         host.onPostGameProgress();
-        engine.setFullStrength();
+        setStrengthFor(SearchPurpose.POST_GAME);
         requestPostGameEvalFor(0);
     }
 
@@ -399,7 +416,6 @@ public final class EngineSearchFlow {
         List<Integer> evals = postGamePositionEvals;
         postGameUciMoves = null;
         postGamePositionEvals = null;
-        host.restoreEngineStrength();
         host.onHintAvailabilityChanged();
         host.onPostGameProgress();
         host.onPostGameReport(uciMoves, evals);
@@ -425,7 +441,6 @@ public final class EngineSearchFlow {
                 waitingForHint = false;
                 multiPvSearchActive = false;
                 engine.setMultiPv(1);
-                host.restoreEngineStrength();
                 host.onHintAvailabilityChanged();
                 host.onHint(move);
                 return;
