@@ -199,8 +199,8 @@ toolchains in the same job, see `desktop.yml`'s comments on that step).
 ```
 
 `:core:test` covers the chess logic, Stockfish engine wrapper, opening
-trainer library, and Maia's ONNX position encoding/policy decoding shared by
-both apps; `:chessnut-core:test` covers the Chessnut protocol (against frames
+trainer library, Maia's ONNX position encoding/policy decoding and the two
+physical-board bridges (against a fake transport) shared by both apps; `:chessnut-core:test` covers the Chessnut protocol (against frames
 captured from the real board) and the identity-based move detection; `:desktop:test` additionally golden-tests `MaiaEngine`'s actual
 ONNX Runtime output against the reference PyTorch implementation for several
 hundred positions (multi-ply history, castling, repetition, promotion) at five
@@ -223,14 +223,15 @@ core/                    Platform-agnostic chess logic, shared by :app and
 │   │                     Maia (human-like opponent): ONNX position encoding/
 │   │                     policy decoding/engine + its bundled rating list
 │   ├── logic/             chesslib integration (ChessGame), PGN helpers
-│   ├── board/             PhysicalBoardBridge: one interface over both boards, adapters
+│   ├── board/             Physical boards: PegasusGameBridge and ChessnutGameBridge
+│   │                     (board <-> ChessGame, on the platform's BoardScheduler) and
+│   │                     PhysicalBoardBridge, one interface over both
 │   └── training/          Opening trainer: curated line library + session progress
 
 app/                    Android application module
 ├── src/main/java/de/schliweb/moveapiece/
 │   ├── ui/               Board view, sound effects, opening library/preview screens
-│   ├── pegasus/          Bridge between the DGT Pegasus and ChessGame
-│   ├── chessnut/         Bridge between a Chessnut board and ChessGame (thin, logic in chessnut-core)
+│   ├── board/            AndroidBoardScheduler: BoardScheduler on the main thread
 │   └── MainActivity.java
 ├── src/main/java/de/schliweb/pegasus/bluetooth/  BLE transport (vendored, profile-aware)
 ├── src/main/cpp/stockfish/                       Stockfish, pinned git submodule
@@ -242,9 +243,8 @@ desktop/                JavaFX desktop application module
 │   ├── BoardCanvas.java       Board rendering + click-to-move (Canvas/GraphicsContext)
 │   ├── GameSetupDialog.java, BoardConnectDialog.java, OpeningLibraryWindow.java,
 │   │   OpeningPreviewWindow.java
-│   ├── pegasus/          Bridge between the DGT Pegasus and ChessGame, plus the
-│   │                     per-OS BLE transports (macOS/Windows/Linux, profile-aware)
-│   ├── chessnut/         Bridge between a Chessnut board and ChessGame
+│   ├── pegasus/          Per-OS BLE transports (macOS/Windows/Linux, profile-aware)
+│   ├── FxBoardScheduler.java  BoardScheduler on the JavaFX Application Thread
 │   ├── Messages.java          Localized strings (i18n/Messages*.properties)
 │   └── DesktopApp.java, Launcher.java, Styles.java, MoveSoundPlayer.java, ...
 ├── src/main/native/macos/, src/main/native/windows/   Objective-C/JNI and C++/WinRT/JNI

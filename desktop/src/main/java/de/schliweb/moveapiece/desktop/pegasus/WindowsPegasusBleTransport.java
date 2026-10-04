@@ -48,7 +48,7 @@ import javafx.application.Platform;
  * a shared base class would risk that verified code for an untested one.
  *
  * <p>Every native callback wraps its body in {@link Platform#runLater} before touching any shared
- * state, matching {@code DesktopPegasusGameBridge}'s single-thread contract.
+ * state, matching {@code PegasusGameBridge}'s single-thread contract.
  */
 public final class WindowsPegasusBleTransport implements PegasusTransport {
 

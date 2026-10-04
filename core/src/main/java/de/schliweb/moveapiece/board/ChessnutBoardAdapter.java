@@ -17,14 +17,14 @@ import java.io.IOException;
 import java.util.List;
 
 /**
- * {@link PhysicalBoardBridge} over a {@link ChessnutBridge}; promotion and ambiguity never arise
- * there, so those two resolvers are no-ops.
+ * {@link PhysicalBoardBridge} over the {@link ChessnutGameBridge}; promotion and ambiguity never
+ * arise there, so those two resolvers are no-ops.
  */
 public final class ChessnutBoardAdapter implements PhysicalBoardBridge {
 
-    private final ChessnutBridge bridge;
+    private final ChessnutGameBridge bridge;
 
-    public ChessnutBoardAdapter(ChessnutBridge bridge) {
+    public ChessnutBoardAdapter(ChessnutGameBridge bridge) {
         this.bridge = bridge;
     }
 
@@ -55,7 +55,7 @@ public final class ChessnutBoardAdapter implements PhysicalBoardBridge {
 
     @Override
     public void detachListener() {
-        bridge.detachListener();
+        bridge.setListener(null);
     }
 
     @Override

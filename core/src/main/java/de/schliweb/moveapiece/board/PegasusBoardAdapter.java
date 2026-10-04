@@ -14,12 +14,12 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 
-/** {@link PhysicalBoardBridge} over a {@link PegasusBridge}. */
+/** {@link PhysicalBoardBridge} over the {@link PegasusGameBridge}. */
 public final class PegasusBoardAdapter implements PhysicalBoardBridge {
 
-    private final PegasusBridge bridge;
+    private final PegasusGameBridge bridge;
 
-    public PegasusBoardAdapter(PegasusBridge bridge) {
+    public PegasusBoardAdapter(PegasusGameBridge bridge) {
         this.bridge = bridge;
     }
 
@@ -50,7 +50,7 @@ public final class PegasusBoardAdapter implements PhysicalBoardBridge {
 
     @Override
     public void detachListener() {
-        bridge.detachListener();
+        bridge.setListener(null);
     }
 
     @Override

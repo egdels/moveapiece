@@ -42,10 +42,12 @@ import com.google.android.material.button.MaterialButton;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import de.schliweb.chessnut.core.game.NewGamePressGate;
 import de.schliweb.chessnut.core.protocol.ChessnutUuids;
+import de.schliweb.moveapiece.board.AndroidBoardScheduler;
 import de.schliweb.moveapiece.board.ChessnutBoardAdapter;
+import de.schliweb.moveapiece.board.ChessnutGameBridge;
 import de.schliweb.moveapiece.board.PegasusBoardAdapter;
+import de.schliweb.moveapiece.board.PegasusGameBridge;
 import de.schliweb.moveapiece.board.PhysicalBoardBridge;
-import de.schliweb.moveapiece.chessnut.ChessnutGameBridge;
 import de.schliweb.moveapiece.databinding.ActivityMainBinding;
 import de.schliweb.moveapiece.databinding.DialogContinueFreePlayBinding;
 import de.schliweb.moveapiece.databinding.DialogNewGameBinding;
@@ -63,7 +65,6 @@ import de.schliweb.moveapiece.logic.ChessGame;
 import de.schliweb.moveapiece.logic.GameSetup;
 import de.schliweb.moveapiece.logic.Opponent;
 import de.schliweb.moveapiece.logic.PgnGames;
-import de.schliweb.moveapiece.pegasus.PegasusGameBridge;
 import de.schliweb.moveapiece.training.OpeningLine;
 import de.schliweb.moveapiece.training.OpeningRepository;
 import de.schliweb.moveapiece.training.TrainingFlow;
@@ -726,10 +727,13 @@ public class MainActivity extends AppCompatActivity
         if (type == BoardType.CHESSNUT) {
             return new ChessnutBoardAdapter(
                     new ChessnutGameBridge(
-                            new AndroidPegasusBleTransport(app, ChessnutUuids.PROFILE), this));
+                            new AndroidPegasusBleTransport(app, ChessnutUuids.PROFILE),
+                            new AndroidBoardScheduler(),
+                            this));
         }
         return new PegasusBoardAdapter(
-                new PegasusGameBridge(new AndroidPegasusBleTransport(app), this));
+                new PegasusGameBridge(
+                        new AndroidPegasusBleTransport(app), new AndroidBoardScheduler(), this));
     }
 
     /**

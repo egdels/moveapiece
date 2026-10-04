@@ -3,15 +3,12 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-package de.schliweb.moveapiece.pegasus;
+package de.schliweb.moveapiece.board;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-import android.app.Instrumentation;
-import androidx.test.ext.junit.runners.AndroidJUnit4;
-import androidx.test.platform.app.InstrumentationRegistry;
 import de.schliweb.pegasus.core.chess.ChessPosition;
 import de.schliweb.pegasus.core.chess.OccupancyProjection;
 import de.schliweb.pegasus.core.chess.PieceType;
@@ -21,16 +18,13 @@ import de.schliweb.pegasus.core.protocol.PegasusLedController;
 import de.schliweb.pegasus.core.protocol.PegasusMessageType;
 import de.schliweb.pegasus.core.transport.ConnectionState;
 import de.schliweb.pegasus.core.transport.PegasusTransport;
-import de.schliweb.pegasus.core.transport.ScanListener;
 import de.schliweb.pegasus.core.transport.TransportError;
-import de.schliweb.pegasus.core.transport.TransportListener;
 import java.util.Arrays;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import org.junit.After;
 import org.junit.Test;
-import org.junit.runner.RunWith;
 
 /**
  * Drives {@link PegasusGameBridge} through a hand-written fake {@link PegasusTransport} (no real
@@ -38,13 +32,18 @@ import org.junit.runner.RunWith;
  * PegasusCommands}/frame encoding. Covers the connect/init sequence (incl. DevKey), a confirmed
  * physical move, and engine-move LED guidance to completion.
  *
- * <p>{@link PegasusGameBridge} documents itself as main-thread-confined (like the real BLE
- * transport's callback consumer would be in MainActivity), so every call to its public API here
- * goes through {@link Instrumentation#runOnMainSync}; only simulated incoming transport data is fed
- * from the test thread, mirroring a real BLE callback thread.
+ * <p>{@link PegasusGameBridge} documents itself as main-thread-confined, so every call to its
+ * public API here goes through {@link TestMainThread#runSync}; only simulated incoming transport
+ * data is fed from the test thread, mirroring a real BLE callback thread.
  */
-@RunWith(AndroidJUnit4.class)
 public class PegasusGameBridgeTest {
+
+    private final TestMainThread main = new TestMainThread();
+
+    @After
+    public void stopMainThread() {
+        main.close();
+    }
 
     private static final long TIMEOUT_SECONDS = 5;
     private static final String DEVICE_ADDRESS = "AA:BB:CC:DD:EE:FF";
@@ -73,58 +72,6 @@ public class PegasusGameBridgeTest {
         return frame(
                 PegasusMessageType.FIELD_UPDATE,
                 new byte[] {(byte) BoardState.squareIndex(square), (byte) code});
-    }
-
-    /** Fake BLE transport: records writes, lets the test inject "received" bytes. */
-    private static class FakeTransport implements PegasusTransport {
-        final LinkedBlockingQueue<byte[]> written = new LinkedBlockingQueue<>();
-        private volatile TransportListener listener;
-        private volatile ConnectionState state = ConnectionState.DISCONNECTED;
-
-        @Override
-        public void setListener(TransportListener listener) {
-            this.listener = listener;
-        }
-
-        @Override
-        public void startScan(ScanListener listener, long timeoutMs) {}
-
-        @Override
-        public void stopScan() {}
-
-        @Override
-        public void connect(String deviceAddress) {
-            state = ConnectionState.CONNECTED;
-            if (listener != null) {
-                listener.onConnectionStateChanged(ConnectionState.CONNECTED);
-            }
-        }
-
-        @Override
-        public void disconnect() {
-            state = ConnectionState.DISCONNECTED;
-            if (listener != null) {
-                listener.onConnectionStateChanged(ConnectionState.DISCONNECTED);
-            }
-        }
-
-        @Override
-        public void write(byte[] data) {
-            written.add(data.clone());
-        }
-
-        @Override
-        public ConnectionState getConnectionState() {
-            return state;
-        }
-
-        /** Simulates a BLE notification arriving (real hardware: a non-main thread). */
-        void feed(byte[] data) {
-            TransportListener l = listener;
-            if (l != null) {
-                l.onDataReceived("uart-rx", data);
-            }
-        }
     }
 
     private static class RecordingListener implements PegasusGameBridge.Listener {
@@ -196,9 +143,8 @@ public class PegasusGameBridgeTest {
 
     private PegasusGameBridge newBridgeOnMainThread(
             FakeTransport transport, RecordingListener listener) {
-        Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
         AtomicReference<PegasusGameBridge> ref = new AtomicReference<>();
-        instrumentation.runOnMainSync(() -> ref.set(new PegasusGameBridge(transport, listener)));
+        main.runSync(() -> ref.set(new PegasusGameBridge(transport, main, listener)));
         return ref.get();
     }
 
@@ -206,8 +152,7 @@ public class PegasusGameBridgeTest {
     private void connectAndSyncStartingPosition(
             PegasusGameBridge bridge, FakeTransport transport, RecordingListener listener)
             throws InterruptedException {
-        InstrumentationRegistry.getInstrumentation()
-                .runOnMainSync(() -> bridge.connect(DEVICE_ADDRESS));
+        main.runSync(() -> bridge.connect(DEVICE_ADDRESS));
         assertTrue(
                 "expected CONNECTED within " + TIMEOUT_SECONDS + "s",
                 listener.connected.await(TIMEOUT_SECONDS, TimeUnit.SECONDS));
@@ -224,8 +169,7 @@ public class PegasusGameBridgeTest {
         RecordingListener listener = new RecordingListener();
         PegasusGameBridge bridge = newBridgeOnMainThread(transport, listener);
 
-        InstrumentationRegistry.getInstrumentation()
-                .runOnMainSync(() -> bridge.connect(DEVICE_ADDRESS));
+        main.runSync(() -> bridge.connect(DEVICE_ADDRESS));
         assertTrue(listener.connected.await(TIMEOUT_SECONDS, TimeUnit.SECONDS));
 
         byte[] devKey = PegasusCommands.encodeDevKey();
@@ -271,8 +215,7 @@ public class PegasusGameBridgeTest {
         connectAndSyncStartingPosition(bridge, transport, listener);
         transport.written.clear();
 
-        InstrumentationRegistry.getInstrumentation()
-                .runOnMainSync(() -> bridge.guideEngineMove("e2e4"));
+        main.runSync(() -> bridge.guideEngineMove("e2e4"));
         byte[] ledCommand = transport.written.poll(TIMEOUT_SECONDS, TimeUnit.SECONDS);
         assertTrue("expected an LED command as soon as guidance starts", ledCommand != null);
 
@@ -300,8 +243,7 @@ public class PegasusGameBridgeTest {
         connectAndSyncStartingPosition(bridge, transport, listener);
 
         String fenAfterE4 = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1";
-        InstrumentationRegistry.getInstrumentation()
-                .runOnMainSync(() -> bridge.syncBoardToPosition(fenAfterE4));
+        main.runSync(() -> bridge.syncBoardToPosition(fenAfterE4));
 
         assertTrue(
                 "expected a mismatch as soon as the target diverges from the untouched board",
@@ -328,15 +270,13 @@ public class PegasusGameBridgeTest {
         RecordingListener listener = new RecordingListener();
         PegasusGameBridge bridge = newBridgeOnMainThread(transport, listener);
 
-        InstrumentationRegistry.getInstrumentation()
-                .runOnMainSync(() -> bridge.connect(DEVICE_ADDRESS));
+        main.runSync(() -> bridge.connect(DEVICE_ADDRESS));
         assertTrue(listener.connected.await(TIMEOUT_SECONDS, TimeUnit.SECONDS));
 
         // Minimal legal position with a white pawn one push away from
         // promoting: white king e1, white pawn e7, black king a8.
         String promotionFen = "k7/4P3/8/8/8/8/8/4K3 w - - 0 1";
-        InstrumentationRegistry.getInstrumentation()
-                .runOnMainSync(() -> bridge.syncBoardToPosition(promotionFen));
+        main.runSync(() -> bridge.syncBoardToPosition(promotionFen));
 
         byte[] payload = new byte[BoardState.SQUARE_COUNT];
         payload[BoardState.squareIndex("a8")] = 1;
@@ -356,8 +296,7 @@ public class PegasusGameBridgeTest {
                 "expected a promotion prompt instead of a silently stuck detector",
                 listener.promotionRequired.await(TIMEOUT_SECONDS, TimeUnit.SECONDS));
 
-        InstrumentationRegistry.getInstrumentation()
-                .runOnMainSync(() -> bridge.selectPromotion(PieceType.QUEEN));
+        main.runSync(() -> bridge.selectPromotion(PieceType.QUEEN));
 
         assertTrue(
                 "expected the move to confirm once the promotion is resolved",
@@ -386,15 +325,13 @@ public class PegasusGameBridgeTest {
         RecordingListener listener = new RecordingListener();
         PegasusGameBridge bridge = newBridgeOnMainThread(transport, listener);
 
-        InstrumentationRegistry.getInstrumentation()
-                .runOnMainSync(() -> bridge.connect(DEVICE_ADDRESS));
+        main.runSync(() -> bridge.connect(DEVICE_ADDRESS));
         assertTrue(listener.connected.await(TIMEOUT_SECONDS, TimeUnit.SECONDS));
 
         // White pawn e4 can capture the black pawn on d5; kings elsewhere,
         // out of the way.
         String captureFen = "k7/8/8/3p4/4P3/8/8/4K3 w - - 0 1";
-        InstrumentationRegistry.getInstrumentation()
-                .runOnMainSync(() -> bridge.syncBoardToPosition(captureFen));
+        main.runSync(() -> bridge.syncBoardToPosition(captureFen));
 
         byte[] payload = new byte[BoardState.SQUARE_COUNT];
         payload[BoardState.squareIndex("a8")] = 1;
@@ -429,13 +366,11 @@ public class PegasusGameBridgeTest {
         RecordingListener listener = new RecordingListener();
         PegasusGameBridge bridge = newBridgeOnMainThread(transport, listener);
 
-        InstrumentationRegistry.getInstrumentation()
-                .runOnMainSync(() -> bridge.connect(DEVICE_ADDRESS));
+        main.runSync(() -> bridge.connect(DEVICE_ADDRESS));
         assertTrue(listener.connected.await(TIMEOUT_SECONDS, TimeUnit.SECONDS));
 
         String captureFen = "k7/8/8/3p4/4P3/8/8/4K3 w - - 0 1";
-        InstrumentationRegistry.getInstrumentation()
-                .runOnMainSync(() -> bridge.syncBoardToPosition(captureFen));
+        main.runSync(() -> bridge.syncBoardToPosition(captureFen));
 
         byte[] payload = new byte[BoardState.SQUARE_COUNT];
         payload[BoardState.squareIndex("a8")] = 1;
@@ -458,7 +393,7 @@ public class PegasusGameBridgeTest {
     /**
      * Regression coverage for a fixed bug in engine-move LED guidance ({@link
      * PegasusGameBridge#guideEngineMove}): same root ambiguity as {@link
-     * #liftingACapturingPiece_asksForConfirmationInsteadOfAutoApplying}, but on the guidance path
+     * #liftingACapturingPieceAlone_staysPendingWithoutAutoApplying}, but on the guidance path
      * instead of move detection. A capture's destination square is occupied both before and after
      * the move (by the captured piece, then the attacker), so merely lifting the attacker off its
      * origin already matches the guide's target occupancy - the LEDs must keep indicating the
@@ -472,14 +407,12 @@ public class PegasusGameBridgeTest {
         RecordingListener listener = new RecordingListener();
         PegasusGameBridge bridge = newBridgeOnMainThread(transport, listener);
 
-        InstrumentationRegistry.getInstrumentation()
-                .runOnMainSync(() -> bridge.connect(DEVICE_ADDRESS));
+        main.runSync(() -> bridge.connect(DEVICE_ADDRESS));
         assertTrue(listener.connected.await(TIMEOUT_SECONDS, TimeUnit.SECONDS));
 
         // Black queen a5 can capture the white knight on a4; kings elsewhere.
         String captureFen = "7k/8/8/q7/N7/8/8/7K b - - 0 1";
-        InstrumentationRegistry.getInstrumentation()
-                .runOnMainSync(() -> bridge.syncBoardToPosition(captureFen));
+        main.runSync(() -> bridge.syncBoardToPosition(captureFen));
 
         byte[] payload = new byte[BoardState.SQUARE_COUNT];
         payload[BoardState.squareIndex("h8")] = 1;
@@ -489,8 +422,7 @@ public class PegasusGameBridgeTest {
         transport.feed(frame(PegasusMessageType.BOARD_DUMP, payload));
         assertTrue(listener.synced.await(TIMEOUT_SECONDS, TimeUnit.SECONDS));
 
-        InstrumentationRegistry.getInstrumentation()
-                .runOnMainSync(() -> bridge.guideEngineMove("a5a4"));
+        main.runSync(() -> bridge.guideEngineMove("a5a4"));
 
         // Lift the queen only; a4 (the knight it captures) is untouched, so
         // occupancy alone already matches "Qxa4 completed".
@@ -527,14 +459,12 @@ public class PegasusGameBridgeTest {
         RecordingListener listener = new RecordingListener();
         PegasusGameBridge bridge = newBridgeOnMainThread(transport, listener);
 
-        InstrumentationRegistry.getInstrumentation()
-                .runOnMainSync(() -> bridge.connect(DEVICE_ADDRESS));
+        main.runSync(() -> bridge.connect(DEVICE_ADDRESS));
         assertTrue(listener.connected.await(TIMEOUT_SECONDS, TimeUnit.SECONDS));
 
         // Black queen a5 can capture the white knight on a4; kings elsewhere.
         String captureFen = "7k/8/8/q7/N7/8/8/7K b - - 0 1";
-        InstrumentationRegistry.getInstrumentation()
-                .runOnMainSync(() -> bridge.syncBoardToPosition(captureFen));
+        main.runSync(() -> bridge.syncBoardToPosition(captureFen));
 
         byte[] payload = new byte[BoardState.SQUARE_COUNT];
         payload[BoardState.squareIndex("h8")] = 1;
@@ -545,8 +475,7 @@ public class PegasusGameBridgeTest {
         assertTrue(listener.synced.await(TIMEOUT_SECONDS, TimeUnit.SECONDS));
         transport.written.clear();
 
-        InstrumentationRegistry.getInstrumentation()
-                .runOnMainSync(() -> bridge.guideEngineMove("a5a4"));
+        main.runSync(() -> bridge.guideEngineMove("a5a4"));
 
         byte[] expected =
                 PegasusCommands.encodeLeds(
@@ -586,13 +515,11 @@ public class PegasusGameBridgeTest {
         RecordingListener listener = new RecordingListener();
         PegasusGameBridge bridge = newBridgeOnMainThread(transport, listener);
 
-        InstrumentationRegistry.getInstrumentation()
-                .runOnMainSync(() -> bridge.connect(DEVICE_ADDRESS));
+        main.runSync(() -> bridge.connect(DEVICE_ADDRESS));
         assertTrue(listener.connected.await(TIMEOUT_SECONDS, TimeUnit.SECONDS));
 
         String captureFen = "7k/8/8/q7/N7/8/8/7K b - - 0 1";
-        InstrumentationRegistry.getInstrumentation()
-                .runOnMainSync(() -> bridge.syncBoardToPosition(captureFen));
+        main.runSync(() -> bridge.syncBoardToPosition(captureFen));
 
         byte[] payload = new byte[BoardState.SQUARE_COUNT];
         payload[BoardState.squareIndex("h8")] = 1;
@@ -602,8 +529,7 @@ public class PegasusGameBridgeTest {
         transport.feed(frame(PegasusMessageType.BOARD_DUMP, payload));
         assertTrue(listener.synced.await(TIMEOUT_SECONDS, TimeUnit.SECONDS));
 
-        InstrumentationRegistry.getInstrumentation()
-                .runOnMainSync(() -> bridge.guideEngineMove("a5a4"));
+        main.runSync(() -> bridge.guideEngineMove("a5a4"));
         drain(transport); // discard the initial guide-start commands
 
         transport.feed(fieldUpdateFrame("a5", 0)); // lift the attacker
@@ -640,13 +566,11 @@ public class PegasusGameBridgeTest {
         RecordingListener listener = new RecordingListener();
         PegasusGameBridge bridge = newBridgeOnMainThread(transport, listener);
 
-        InstrumentationRegistry.getInstrumentation()
-                .runOnMainSync(() -> bridge.connect(DEVICE_ADDRESS));
+        main.runSync(() -> bridge.connect(DEVICE_ADDRESS));
         assertTrue(listener.connected.await(TIMEOUT_SECONDS, TimeUnit.SECONDS));
 
         String captureFen = "7k/8/8/q7/N7/8/8/7K b - - 0 1";
-        InstrumentationRegistry.getInstrumentation()
-                .runOnMainSync(() -> bridge.syncBoardToPosition(captureFen));
+        main.runSync(() -> bridge.syncBoardToPosition(captureFen));
 
         byte[] payload = new byte[BoardState.SQUARE_COUNT];
         payload[BoardState.squareIndex("h8")] = 1;
@@ -656,8 +580,7 @@ public class PegasusGameBridgeTest {
         transport.feed(frame(PegasusMessageType.BOARD_DUMP, payload));
         assertTrue(listener.synced.await(TIMEOUT_SECONDS, TimeUnit.SECONDS));
 
-        InstrumentationRegistry.getInstrumentation()
-                .runOnMainSync(() -> bridge.guideEngineMove("a5a4"));
+        main.runSync(() -> bridge.guideEngineMove("a5a4"));
 
         // Only the origin ever changes: the knight on a4 was swapped for the
         // queen without a4 ever being reported empty in between.
@@ -682,13 +605,11 @@ public class PegasusGameBridgeTest {
         RecordingListener listener = new RecordingListener();
         PegasusGameBridge bridge = newBridgeOnMainThread(transport, listener);
 
-        InstrumentationRegistry.getInstrumentation()
-                .runOnMainSync(() -> bridge.connect(DEVICE_ADDRESS));
+        main.runSync(() -> bridge.connect(DEVICE_ADDRESS));
         assertTrue(listener.connected.await(TIMEOUT_SECONDS, TimeUnit.SECONDS));
 
         String captureFen = "7k/8/8/q7/N7/8/8/7K b - - 0 1";
-        InstrumentationRegistry.getInstrumentation()
-                .runOnMainSync(() -> bridge.syncBoardToPosition(captureFen));
+        main.runSync(() -> bridge.syncBoardToPosition(captureFen));
 
         byte[] payload = new byte[BoardState.SQUARE_COUNT];
         payload[BoardState.squareIndex("h8")] = 1;
@@ -698,8 +619,7 @@ public class PegasusGameBridgeTest {
         transport.feed(frame(PegasusMessageType.BOARD_DUMP, payload));
         assertTrue(listener.synced.await(TIMEOUT_SECONDS, TimeUnit.SECONDS));
 
-        InstrumentationRegistry.getInstrumentation()
-                .runOnMainSync(() -> bridge.guideEngineMove("a5a4"));
+        main.runSync(() -> bridge.guideEngineMove("a5a4"));
 
         transport.feed(fieldUpdateFrame("a5", 0)); // a4 swapped without ever reading empty
         transport.feed(fieldUpdateFrame("h1", 0)); // White already lifts the king
@@ -725,15 +645,13 @@ public class PegasusGameBridgeTest {
         RecordingListener listener = new RecordingListener();
         PegasusGameBridge bridge = newBridgeOnMainThread(transport, listener);
 
-        InstrumentationRegistry.getInstrumentation()
-                .runOnMainSync(() -> bridge.connect(DEVICE_ADDRESS));
+        main.runSync(() -> bridge.connect(DEVICE_ADDRESS));
         assertTrue(listener.connected.await(TIMEOUT_SECONDS, TimeUnit.SECONDS));
         transport.feed(startingBoardDumpFrame());
         assertTrue(listener.synced.await(TIMEOUT_SECONDS, TimeUnit.SECONDS));
 
         transport.feed(fieldUpdateFrame("e2", 0)); // pawn picked up before the line starts
-        InstrumentationRegistry.getInstrumentation()
-                .runOnMainSync(() -> bridge.guideEngineMove("e2e4"));
+        main.runSync(() -> bridge.guideEngineMove("e2e4"));
 
         transport.feed(fieldUpdateFrame("e4", 1));
         assertTrue(
@@ -754,13 +672,11 @@ public class PegasusGameBridgeTest {
         RecordingListener listener = new RecordingListener();
         PegasusGameBridge bridge = newBridgeOnMainThread(transport, listener);
 
-        InstrumentationRegistry.getInstrumentation()
-                .runOnMainSync(() -> bridge.connect(DEVICE_ADDRESS));
+        main.runSync(() -> bridge.connect(DEVICE_ADDRESS));
         assertTrue(listener.connected.await(TIMEOUT_SECONDS, TimeUnit.SECONDS));
 
         String castlingFen = "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1";
-        InstrumentationRegistry.getInstrumentation()
-                .runOnMainSync(() -> bridge.syncBoardToPosition(castlingFen));
+        main.runSync(() -> bridge.syncBoardToPosition(castlingFen));
 
         byte[] payload = new byte[BoardState.SQUARE_COUNT];
         for (String square : new String[] {"a8", "e8", "h8", "a1", "e1", "h1"}) {
@@ -769,8 +685,7 @@ public class PegasusGameBridgeTest {
         transport.feed(frame(PegasusMessageType.BOARD_DUMP, payload));
         assertTrue(listener.synced.await(TIMEOUT_SECONDS, TimeUnit.SECONDS));
 
-        InstrumentationRegistry.getInstrumentation()
-                .runOnMainSync(() -> bridge.guideEngineMove("e1g1"));
+        main.runSync(() -> bridge.guideEngineMove("e1g1"));
         transport.feed(fieldUpdateFrame("e1", 0));
         transport.feed(fieldUpdateFrame("g1", 1));
         transport.feed(fieldUpdateFrame("h1", 0));

@@ -12,10 +12,10 @@ import de.schliweb.chessnut.core.game.InvalidPositionException;
 import de.schliweb.chessnut.core.game.NewGamePressGate;
 import de.schliweb.chessnut.core.protocol.ChessnutUuids;
 import de.schliweb.moveapiece.board.ChessnutBoardAdapter;
+import de.schliweb.moveapiece.board.ChessnutGameBridge;
 import de.schliweb.moveapiece.board.PegasusBoardAdapter;
+import de.schliweb.moveapiece.board.PegasusGameBridge;
 import de.schliweb.moveapiece.board.PhysicalBoardBridge;
-import de.schliweb.moveapiece.desktop.chessnut.DesktopChessnutGameBridge;
-import de.schliweb.moveapiece.desktop.pegasus.DesktopPegasusGameBridge;
 import de.schliweb.moveapiece.desktop.pegasus.LinuxPegasusBleTransport;
 import de.schliweb.moveapiece.desktop.pegasus.MacosPegasusBleTransport;
 import de.schliweb.moveapiece.desktop.pegasus.WindowsPegasusBleTransport;
@@ -113,8 +113,8 @@ import javafx.util.Duration;
 final class GameController
         implements BoardCanvas.MoveSource,
                 EngineListener,
-                DesktopPegasusGameBridge.Listener,
-                DesktopChessnutGameBridge.Listener {
+                PegasusGameBridge.Listener,
+                ChessnutGameBridge.Listener {
 
     private static final Logger LOG = Logger.getLogger(GameController.class.getName());
 
@@ -428,8 +428,16 @@ final class GameController
         }
         PhysicalBoardBridge bridge =
                 type == BoardType.CHESSNUT
-                        ? new ChessnutBoardAdapter(new DesktopChessnutGameBridge(transport, this))
-                        : new PegasusBoardAdapter(new DesktopPegasusGameBridge(transport, this));
+                        ? new ChessnutBoardAdapter(
+                                new ChessnutGameBridge(
+                                        transport,
+                                        new FxBoardScheduler("chessnut-bridge-timer"),
+                                        this))
+                        : new PegasusBoardAdapter(
+                                new PegasusGameBridge(
+                                        transport,
+                                        new FxBoardScheduler("pegasus-bridge-timer"),
+                                        this));
         maybeStartBoardRecording(bridge, type);
         return bridge;
     }
@@ -910,7 +918,7 @@ final class GameController
     /**
      * Keeps the Pegasus bridge's own position tracking current whenever {@link #game} changes
      * without it observing the move itself (tap-to-move, undo, PGN import) - see {@link
-     * DesktopPegasusGameBridge#syncBoardToPosition} for why this is needed.
+     * PegasusGameBridge#syncBoardToPosition} for why this is needed.
      */
     private void syncPegasusPosition() {
         if (pegasusBridge != null
@@ -922,7 +930,7 @@ final class GameController
     /**
      * Physical-board promotion: the board can only report that a pawn reached the back rank
      * (occupancy-only, never piece identity), so the choice always comes from here - resolved via
-     * {@link DesktopPegasusGameBridge#selectPromotion}, reusing the same on-screen picker {@link
+     * {@link PegasusGameBridge#selectPromotion}, reusing the same on-screen picker {@link
      * #askPromotionPiece} shows for a tapped promotion.
      */
     private void showPhysicalPromotionDialog() {
@@ -943,8 +951,8 @@ final class GameController
 
     /**
      * Physical occupancy matches several legal moves at once (structurally near-unreachable in
-     * practice - see {@link DesktopPegasusGameBridge.Listener#onAmbiguousMove}), resolved via
-     * {@link DesktopPegasusGameBridge#selectCandidate}.
+     * practice - see {@link PegasusGameBridge.Listener#onAmbiguousMove}), resolved via {@link
+     * PegasusGameBridge#selectCandidate}.
      */
     private void showAmbiguousMoveDialog(List<String> candidateUcis) {
         ChoiceDialog<String> dialog = new ChoiceDialog<>(candidateUcis.get(0), candidateUcis);
@@ -956,7 +964,7 @@ final class GameController
         showTracked(dialog).ifPresent(pegasusBridge::selectCandidate);
     }
 
-    // ---- DesktopPegasusGameBridge.Listener / DesktopChessnutGameBridge.Listener --------
+    // ---- PegasusGameBridge.Listener / ChessnutGameBridge.Listener --------
 
     @Override
     public void onConnectionStateChanged(ConnectionState state) {
@@ -968,7 +976,7 @@ final class GameController
             // guided engine moves); on-screen play while the board was disconnected
             // leaves its own position stale. Push the authoritative position on
             // every (re)connect so the board can resume physical play correctly -
-            // see DesktopPegasusGameBridge#syncBoardToPosition.
+            // see PegasusGameBridge#syncBoardToPosition.
             pegasusBridge.syncBoardToPosition(game.toFen());
             if (mode == Mode.TRAINING) {
                 maybeAdvanceTraining();

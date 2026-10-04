@@ -3,11 +3,8 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-package de.schliweb.moveapiece.chessnut;
+package de.schliweb.moveapiece.board;
 
-import android.os.Handler;
-import android.os.Looper;
-import android.util.Log;
 import de.schliweb.chessnut.core.game.ChessnutGameFlow;
 import de.schliweb.chessnut.core.game.InvalidPositionException;
 import de.schliweb.chessnut.core.protocol.ChessnutBatteryStatus;
@@ -16,7 +13,6 @@ import de.schliweb.chessnut.core.protocol.ChessnutDeviceListener;
 import de.schliweb.chessnut.core.protocol.ChessnutFrame;
 import de.schliweb.chessnut.core.protocol.ChessnutLedController;
 import de.schliweb.chessnut.core.protocol.ChessnutTones;
-import de.schliweb.moveapiece.board.ChessnutBridge;
 import de.schliweb.pegasus.core.chess.PieceColor;
 import de.schliweb.pegasus.core.protocol.BoardState;
 import de.schliweb.pegasus.core.record.SessionRecorder;
@@ -26,25 +22,28 @@ import de.schliweb.pegasus.core.transport.ScanListener;
 import de.schliweb.pegasus.core.transport.TransportError;
 import de.schliweb.pegasus.core.transport.TransportListener;
 import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Bridges a physical Chessnut Air (via a {@link PegasusTransport} built for {@link
- * de.schliweb.chessnut.core.protocol.ChessnutUuids#PROFILE}) to MoveAPiece's own game state. The
- * game logic itself lives in {@link ChessnutGameFlow}; this class adds what is Android-specific:
- * marshalling every transport callback onto the main thread, the connect/init sequence, periodic
- * battery polling and optional raw-traffic recording.
+ * de.schliweb.chessnut.core.protocol.ChessnutUuids#PROFILE}) to MoveAPiece's own game state, on
+ * Android and desktop alike. The game logic itself lives in {@link ChessnutGameFlow}; this class
+ * marshals every transport callback onto the main thread, runs the connect/init sequence, polls the
+ * battery once a minute and records raw traffic on request.
  *
  * <p>Same public surface as the Pegasus bridge where the concepts overlap, minus promotion and
  * ambiguity resolution: the Chessnut reports piece identity, so neither can arise.
  *
- * <p>Runs entirely on the main thread; all transport callbacks are posted onto it.
+ * <p>Runs entirely on the main thread of the given {@link BoardScheduler}.
  */
-public class ChessnutGameBridge implements ChessnutBridge {
+public class ChessnutGameBridge {
 
-    private static final String TAG = "ChessnutGameBridge";
+    private static final Logger LOG = Logger.getLogger(ChessnutGameBridge.class.getName());
 
     /** Battery is not pushed by the board; poll it now and then. */
     private static final long BATTERY_POLL_INTERVAL_MS = 60_000;
@@ -66,19 +65,21 @@ public class ChessnutGameBridge implements ChessnutBridge {
     }
 
     private final PegasusTransport transport;
-    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final BoardScheduler scheduler;
     private final ChessnutDevice device;
     private final ChessnutLedController ledController;
     private final ChessnutGameFlow flow;
-    private final Runnable batteryPollRunnable = this::pollBattery;
 
+    private BoardScheduler.Task batteryPollTask;
     private boolean batteryReportPending;
     private boolean lastBatteryLow;
     private volatile Listener listener;
     private SessionRecorder sessionRecorder;
 
-    public ChessnutGameBridge(PegasusTransport transport, Listener listener) {
+    public ChessnutGameBridge(
+            PegasusTransport transport, BoardScheduler scheduler, Listener listener) {
         this.transport = transport;
+        this.scheduler = scheduler;
         this.listener = listener;
         ChessnutDevice.CommandSink sink =
                 command -> {
@@ -134,7 +135,10 @@ public class ChessnutGameBridge implements ChessnutBridge {
                         new ChessnutDeviceListener() {
                             @Override
                             public void onBoardState(BoardState state, long uptimeSeconds) {
-                                Log.i(TAG, "board (uptime " + uptimeSeconds + "s):\n" + state);
+                                LOG.log(
+                                        Level.INFO,
+                                        "board (uptime {0}s):\n{1}",
+                                        new Object[] {uptimeSeconds, state});
                                 flow.onPhysicalBoard(state);
                             }
 
@@ -145,7 +149,7 @@ public class ChessnutGameBridge implements ChessnutBridge {
 
                             @Override
                             public void onNewGameButton() {
-                                Log.i(TAG, "NEW GAME button");
+                                LOG.info("NEW GAME button");
                                 Listener l = listener();
                                 if (l != null) {
                                     l.onNewGameButton();
@@ -158,21 +162,24 @@ public class ChessnutGameBridge implements ChessnutBridge {
                             @Override
                             public void onUnknownFrame(
                                     String characteristicUuid, ChessnutFrame frame) {
-                                Log.i(TAG, "unknown frame on " + characteristicUuid + ": " + frame);
+                                LOG.log(
+                                        Level.INFO,
+                                        "unknown frame on {0}: {1}",
+                                        new Object[] {characteristicUuid, frame});
                             }
                         });
         transport.setListener(
                 new TransportListener() {
                     @Override
                     public void onConnectionStateChanged(ConnectionState state) {
-                        mainHandler.post(() -> onTransportState(state));
+                        scheduler.post(() -> onTransportState(state));
                     }
 
                     @Override
                     public void onDataReceived(String characteristicUuid, byte[] data) {
                         byte[] copy = data.clone();
                         recordIfActive(SessionRecorder.Direction.RX, characteristicUuid, copy);
-                        mainHandler.post(() -> device.onDataReceived(characteristicUuid, copy));
+                        scheduler.post(() -> device.onDataReceived(characteristicUuid, copy));
                     }
 
                     @Override
@@ -182,7 +189,7 @@ public class ChessnutGameBridge implements ChessnutBridge {
 
                     @Override
                     public void onError(TransportError error, String detail) {
-                        mainHandler.post(
+                        scheduler.post(
                                 () -> {
                                     Listener l = listener();
                                     if (l != null) {
@@ -194,7 +201,7 @@ public class ChessnutGameBridge implements ChessnutBridge {
     }
 
     private void onTransportState(ConnectionState state) {
-        mainHandler.removeCallbacks(batteryPollRunnable);
+        cancelBatteryPoll();
         if (state == ConnectionState.CONNECTED) {
             // Reconnect-safe: drop partial frames, the dedupe memory and transient game
             // state, keep the logical position; the first report re-syncs it.
@@ -203,11 +210,22 @@ public class ChessnutGameBridge implements ChessnutBridge {
             batteryReportPending = true;
             lastBatteryLow = false;
             device.initialize();
-            mainHandler.postDelayed(batteryPollRunnable, BATTERY_POLL_INTERVAL_MS);
+            scheduleBatteryPoll();
         }
         Listener l = listener();
         if (l != null) {
             l.onConnectionStateChanged(state);
+        }
+    }
+
+    private void scheduleBatteryPoll() {
+        batteryPollTask = scheduler.postDelayed(this::pollBattery, BATTERY_POLL_INTERVAL_MS);
+    }
+
+    private void cancelBatteryPoll() {
+        if (batteryPollTask != null) {
+            batteryPollTask.cancel();
+            batteryPollTask = null;
         }
     }
 
@@ -216,11 +234,11 @@ public class ChessnutGameBridge implements ChessnutBridge {
             return;
         }
         device.requestBattery();
-        mainHandler.postDelayed(batteryPollRunnable, BATTERY_POLL_INTERVAL_MS);
+        scheduleBatteryPoll();
     }
 
     private void onBattery(ChessnutBatteryStatus status) {
-        Log.i(TAG, "battery: " + status);
+        LOG.log(Level.INFO, "battery: {0}", status);
         boolean newlyLow = status.isLow() && !lastBatteryLow;
         boolean shouldNotify = batteryReportPending || newlyLow;
         batteryReportPending = false;
@@ -235,11 +253,6 @@ public class ChessnutGameBridge implements ChessnutBridge {
 
     public void setListener(Listener listener) {
         this.listener = listener;
-    }
-
-    @Override
-    public void detachListener() {
-        setListener(null);
     }
 
     private Listener listener() {
@@ -265,19 +278,14 @@ public class ChessnutGameBridge implements ChessnutBridge {
     }
 
     public void shutdown() {
-        mainHandler.removeCallbacksAndMessages(null);
+        cancelBatteryPoll();
+        scheduler.shutdown();
         transport.disconnect();
         stopRecording();
     }
 
     public ConnectionState getConnectionState() {
         return transport.getConnectionState();
-    }
-
-    /** Asks the board for its battery level; answered via {@link Listener#onBatteryStatus}. */
-    public void requestBattery() {
-        batteryReportPending = true;
-        device.requestBattery();
     }
 
     /** Plays the tones one after the other on the board's speaker; ignored while not connected. */
@@ -287,7 +295,7 @@ public class ChessnutGameBridge implements ChessnutBridge {
             if (delayMs == 0) {
                 device.beep(tone.frequencyHz, tone.durationMs);
             } else {
-                mainHandler.postDelayed(
+                scheduler.postDelayed(
                         () -> device.beep(tone.frequencyHz, tone.durationMs), delayMs);
             }
             delayMs += tone.durationMs + ChessnutTones.GAP_MS;
@@ -302,7 +310,8 @@ public class ChessnutGameBridge implements ChessnutBridge {
      */
     public void startRecording(File file) throws IOException {
         stopRecording();
-        sessionRecorder = new SessionRecorder(new FileWriter(file, false));
+        sessionRecorder =
+                new SessionRecorder(Files.newBufferedWriter(file.toPath(), StandardCharsets.UTF_8));
     }
 
     /** Stops and flushes the current recording, if any. Safe to call repeatedly. */
@@ -313,7 +322,7 @@ public class ChessnutGameBridge implements ChessnutBridge {
             try {
                 recorder.close();
             } catch (IOException e) {
-                Log.w(TAG, "stopRecording: close failed", e);
+                LOG.log(Level.WARNING, "stopRecording: close failed", e);
             }
         }
     }
@@ -327,19 +336,17 @@ public class ChessnutGameBridge implements ChessnutBridge {
         try {
             recorder.record(dir, characteristicUuid, data);
         } catch (IOException e) {
-            Log.w(TAG, "recording: write failed, stopping", e);
+            LOG.log(Level.WARNING, "recording: write failed, stopping", e);
             stopRecording();
         }
     }
 
     // ------------------------------------------------------------ game flow
 
-    /** See {@link ChessnutGameFlow#guideEngineMove(String)}. */
     public void guideEngineMove(String uciMove) {
         flow.guideEngineMove(uciMove);
     }
 
-    /** See {@link ChessnutGameFlow#guideEngineMove(String, boolean)}. */
     public void guideEngineMove(String uciMove, boolean showLed) {
         flow.guideEngineMove(uciMove, showLed);
     }
@@ -365,18 +372,16 @@ public class ChessnutGameBridge implements ChessnutBridge {
         return flow.mismatchSquares();
     }
 
-    public void resetForNewGame() {
-        flow.resetForNewGame();
+    public int promotionSquareAwaitingPiece() {
+        return flow.promotionSquareAwaitingPiece();
     }
 
-    /** See {@link ChessnutGameFlow#physicalPositionFen}. */
     public String physicalPositionFen(PieceColor sideToMove) throws InvalidPositionException {
         return flow.physicalPositionFen(sideToMove);
     }
 
-    /** See {@link ChessnutGameFlow#promotionSquareAwaitingPiece()}. */
-    public int promotionSquareAwaitingPiece() {
-        return flow.promotionSquareAwaitingPiece();
+    public void resetForNewGame() {
+        flow.resetForNewGame();
     }
 
     public void syncBoardToPosition(String fen) {
