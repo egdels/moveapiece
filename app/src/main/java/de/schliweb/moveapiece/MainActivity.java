@@ -42,8 +42,8 @@ import com.google.android.material.button.MaterialButton;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import de.schliweb.chessnut.core.game.NewGamePressGate;
 import de.schliweb.chessnut.core.protocol.ChessnutUuids;
+import de.schliweb.moveapiece.analysis.EngineSearchFlow;
 import de.schliweb.moveapiece.analysis.MoveQuality;
-import de.schliweb.moveapiece.analysis.MultiPvCandidates;
 import de.schliweb.moveapiece.analysis.PostGameReport;
 import de.schliweb.moveapiece.board.AndroidBoardScheduler;
 import de.schliweb.moveapiece.board.ChessnutBoardAdapter;
@@ -61,7 +61,6 @@ import de.schliweb.moveapiece.engine.MaiaEngineListener;
 import de.schliweb.moveapiece.engine.MaiaRatings;
 import de.schliweb.moveapiece.engine.NnueAssets;
 import de.schliweb.moveapiece.engine.StockfishEngine;
-import de.schliweb.moveapiece.engine.UciInfoParser;
 import de.schliweb.moveapiece.logic.BoardType;
 import de.schliweb.moveapiece.logic.BoardTypeDetection;
 import de.schliweb.moveapiece.logic.ChessGame;
@@ -88,11 +87,9 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.OptionalInt;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class MainActivity extends AppCompatActivity
@@ -100,14 +97,12 @@ public class MainActivity extends AppCompatActivity
                 BoardView.OnMoveListener,
                 EngineListener,
                 PegasusGameBridge.Listener,
-                ChessnutGameBridge.Listener {
+                ChessnutGameBridge.Listener,
+                EngineSearchFlow.Host {
 
     private static final int ELO_MIN = 1320;
     private static final int ELO_MAX = 3190;
     private static final int ENGINE_MOVETIME_MS = 1200;
-    private static final int ANALYSIS_MOVETIME_MS = 1500;
-    private static final int HINT_MOVETIME_MS = 1500;
-    private static final int HINT_MULTI_PV_LINES = 3;
     private static final long PEGASUS_SCAN_TIMEOUT_MS = 15000;
     // Maia's own forward pass is near-instant (no search - see MaiaEngine's Javadoc), which reads
     // as inhumanly fast next to Stockfish's fixed ENGINE_MOVETIME_MS think time. #scheduleMaiaMove
@@ -145,6 +140,7 @@ public class MainActivity extends AppCompatActivity
     // this safe to call unconditionally even if the tracked dialog already closed itself normally.
     private Dialog currentDialog;
     private final ChessGame game = new ChessGame();
+    private final EngineSearchFlow searchFlow = new EngineSearchFlow(game, this);
     private StockfishEngine engine;
     // Loaded fresh whenever a Maia game starts or the "New Game"/"Continue free play" dialog picks
     // a different rating, unlike engine above which is started once in onCreate and lives for the
@@ -156,7 +152,8 @@ public class MainActivity extends AppCompatActivity
     private final NewGamePressGate newGameGate = new NewGamePressGate();
     private boolean maiaReady = false;
     private int currentMaiaRating;
-    // Bridges a #maybeTriggerEngineMove call's searchGeneration snapshot and go()-start time across
+    // Bridges a #maybeTriggerEngineMove call's searchFlow.generation() snapshot and go()-start time
+    // across
     // to the Maia listener's onBestMove and #finishMaiaMove, which run later and can't otherwise
     // tell a fresh reply from one that's since been left behind by a new game/PGN import/... - see
     // #scheduleMaiaMove. A dedicated Handler (rather than reusing trainingHandler) so cancelling
@@ -204,7 +201,6 @@ public class MainActivity extends AppCompatActivity
     private int engineElo = 1500;
     private boolean engineReady = false;
     private boolean waitingForEngineMove = false;
-    private boolean waitingForHint = false;
     private volatile String nnuePath;
 
     // ---- Evaluation display state --------------------------------------------
@@ -215,35 +211,7 @@ public class MainActivity extends AppCompatActivity
      */
     private boolean evaluationEnabled = false;
 
-    /**
-     * Who was to move in the position the most recent (engine-move or analysis) search was started
-     * for.
-     */
-    private Side analysisSideToMove;
-
     // ---- Move-quality (blunder check) state ------------------------------------
-    /**
-     * Freshest known eval of the position currently on the board, from the side-to-move's own
-     * perspective (raw UCI score, unlike {@link #onInfo}'s white-relative display value) - updated
-     * from every "info" line regardless of which search it belongs to, since a deeper/more accurate
-     * number for the same position is always welcome. {@link #lastPositionEvalMoveCount} pins it to
-     * a specific ply ({@link de.schliweb.moveapiece.logic.ChessGame#moveCount()}); -1 means "none
-     * yet" (requires {@link #evaluationEnabled}, so a fresh game or a toggle-off leaves it stale
-     * until the next search completes).
-     */
-    private int lastPositionEvalCp;
-
-    private int lastPositionEvalMoveCount = -1;
-
-    /**
-     * Snapshot of {@link #lastPositionEvalCp}/{@link #lastPositionEvalMoveCount} taken by {@link
-     * #recordMoveQualityBaseline} right before a graded move is applied - compared against the eval
-     * of the resulting position once that comes in (see {@link #maybeFinalizeMoveQuality}) to
-     * classify the move's centipawn loss. -1 means "not currently grading a move".
-     */
-    private int moveQualityBaselineCp;
-
-    private int moveQualityBaselineMoveCount = -1;
 
     /**
      * The move-quality verdict for the move just played ("Blunder (-3.2)"), or null when the last
@@ -272,71 +240,6 @@ public class MainActivity extends AppCompatActivity
     private ColorStateList boardButtonDefaultIconTint;
 
     private ColorStateList boardButtonDefaultBackgroundTint;
-
-    // ---- Multi-PV hint state ----------------------------------------------------
-    /**
-     * True only while a {@link #requestHint} search (run with MultiPV raised to {@link
-     * #HINT_MULTI_PV_LINES}) is in flight - {@link #onInfo} routes every line to {@link
-     * #hintCandidates} instead of the single-eval/move-quality/post-game-analysis paths while this
-     * is set, since none of those want a non-PV-1 line's score.
-     */
-    private boolean multiPvSearchActive;
-
-    private final MultiPvCandidates hintCandidates = new MultiPvCandidates(HINT_MULTI_PV_LINES);
-
-    // ---- Post-game analysis state ------------------------------------------------
-    /**
-     * The game's UCI move list, split into individual moves, while a post-game analysis (see {@link
-     * #startPostGameAnalysis}) is replaying and grading it one ply at a time; null when idle.
-     */
-    private List<String> postGameUciMoves;
-
-    /** Raw (side-to-move-relative) eval collected so far, one per position (size = ply + 1). */
-    private List<Integer> postGamePositionEvals;
-
-    /**
-     * Latest raw score seen for the position currently being searched during post-game analysis.
-     */
-    private int postGameLiveScoreCp;
-
-    private static final int POST_GAME_MOVETIME_MS = 400;
-
-    // ---- Engine search bookkeeping --------------------------------------------
-    /**
-     * Analysis (evaluation display) and real-move searches share one Stockfish process, so a "go"
-     * for one can still be in flight when the other wants to search. Every {@link
-     * #startEngineSearch} call stops whatever's running first and records its purpose here;
-     * Stockfish always answers a stopped search with its own "bestmove" too, so replies arrive in
-     * exactly the order the searches were started in - {@link #onBestMove} pops this queue instead
-     * of relying on a single "am I waiting for a move" flag, which can't tell a stale analysis
-     * reply from the real one.
-     */
-    private enum SearchPurpose {
-        REAL_MOVE,
-        ANALYSIS,
-        HINT,
-        POST_GAME
-    }
-
-    private static final class PendingSearch {
-        final SearchPurpose purpose;
-        final int generation;
-
-        PendingSearch(SearchPurpose purpose, int generation) {
-            this.purpose = purpose;
-            this.generation = generation;
-        }
-    }
-
-    private final ArrayDeque<PendingSearch> pendingSearches = new ArrayDeque<>();
-
-    /**
-     * Bumped whenever outstanding searches are deliberately abandoned (new game, PGN import) so a
-     * cancelled search's eventual reply - still in {@link #pendingSearches} since it was stopped,
-     * not un-queued - is recognized as belonging to a position we've since left, even though its
-     * queue slot and purpose look otherwise valid.
-     */
-    private int searchGeneration = 0;
 
     // ---- Training mode state ------------------------------------------------
     private TrainingSession trainingSession;
@@ -459,7 +362,7 @@ public class MainActivity extends AppCompatActivity
         binding.undoButton.setOnClickListener(v -> undo());
         binding.redoButton.setOnClickListener(v -> redo());
         binding.flipBoardButton.setOnClickListener(v -> setBoardFlipped(!boardFlipped));
-        binding.hintButton.setOnClickListener(v -> requestHint());
+        binding.hintButton.setOnClickListener(v -> searchFlow.requestHint());
         binding.pegasusButton.setOnClickListener(v -> onPegasusButtonClicked());
         binding.pegasusMismatchText.setOnClickListener(v -> onMismatchBannerClicked());
         boardButtonDefaultIconTint = binding.pegasusButton.getIconTint();
@@ -522,6 +425,7 @@ public class MainActivity extends AppCompatActivity
                 getApplicationInfo().nativeLibraryDir + File.separator + "libstockfish.so";
         engine = new StockfishEngine(enginePath, new Handler(Looper.getMainLooper())::post);
         engine.setListener(this);
+        searchFlow.setEngine(engine);
 
         // The NNUE net (~99 MB) is shipped as an APK asset instead of being
         // embedded in the engine binary (see app/stockfish.gradle); extract
@@ -693,7 +597,7 @@ public class MainActivity extends AppCompatActivity
         popup.getMenu()
                 .findItem(R.id.menuAnalyzeGame)
                 .setVisible(!training)
-                .setEnabled(postGameUciMoves == null && engineReady && hasMoves);
+                .setEnabled(!searchFlow.isPostGameAnalysisRunning() && engineReady && hasMoves);
         popup.setOnMenuItemClickListener(
                 item -> {
                     int id = item.getItemId();
@@ -704,7 +608,7 @@ public class MainActivity extends AppCompatActivity
                     } else if (id == R.id.menuExportPgn) {
                         exportGamePgn();
                     } else if (id == R.id.menuAnalyzeGame) {
-                        startPostGameAnalysis();
+                        searchFlow.startPostGameAnalysis();
                     } else {
                         return false;
                     }
@@ -834,7 +738,7 @@ public class MainActivity extends AppCompatActivity
         Square from = Square.valueOf(uci.substring(0, 2).toUpperCase(Locale.ROOT));
         Square to = Square.valueOf(uci.substring(2, 4).toUpperCase(Locale.ROOT));
         boolean wasCapture = game.pieceAt(to) != Piece.NONE;
-        recordMoveQualityBaseline();
+        searchFlow.recordMoveQualityBaseline();
         if (!game.applyUciMove(uci)) {
             return false;
         }
@@ -1082,7 +986,7 @@ public class MainActivity extends AppCompatActivity
             Toast.makeText(this, messageRes, Toast.LENGTH_LONG).show();
             return;
         }
-        abandonPendingSearches();
+        searchFlow.abandonPendingSearches();
         game.loadFen(fen);
         setLastMove(null, null);
         binding.boardView.setCheckedKingSquare(null);
@@ -1458,7 +1362,7 @@ public class MainActivity extends AppCompatActivity
             int chosenMaiaRating,
             OpeningLine chosenOpening,
             boolean hintsEnabled) {
-        abandonPendingSearches();
+        searchFlow.abandonPendingSearches();
         trainingFlow.stop();
 
         // chosenSide is the engine's side for ENGINE/MAIA and the human's otherwise; the
@@ -1555,11 +1459,12 @@ public class MainActivity extends AppCompatActivity
                 || trainingFlow.isBookMoveScheduled()
                 // A move played here while game analysis is running would corrupt it: the analysis
                 // replays past positions through the same shared engine instance without going
-                // through abandonPendingSearches() per position (that would restart the whole
+                // through searchFlow.abandonPendingSearches() per position (that would restart the
+                // whole
                 // analysis on every single ply), so it has no way to notice its captured
-                // postGameUciMoves has gone stale, and its own in-flight search would race the
+                // captured move list has gone stale, and its own in-flight search would race the
                 // freshly triggered one for the new move on that one shared engine.
-                || postGameUciMoves != null) {
+                || searchFlow.isPostGameAnalysisRunning()) {
             return false;
         }
         switch (mode) {
@@ -1620,12 +1525,12 @@ public class MainActivity extends AppCompatActivity
             return;
         }
         String text;
-        if (postGameUciMoves != null) {
+        if (searchFlow.isPostGameAnalysisRunning()) {
             text =
                     getString(
                             R.string.action_analyzing_format,
-                            postGamePositionEvals.size(),
-                            postGameUciMoves.size() + 1);
+                            searchFlow.postGamePositionsDone(),
+                            searchFlow.postGamePositionsTotal());
         } else {
             text = hintAlternativesNote;
         }
@@ -1772,7 +1677,7 @@ public class MainActivity extends AppCompatActivity
         if (waitingForEngineMove) {
             return;
         }
-        abandonPendingSearches();
+        searchFlow.abandonPendingSearches();
         int before = game.moveCount();
         int reached = game.jumpToPly(targetPly);
         if (reached != targetPly) {
@@ -1844,7 +1749,7 @@ public class MainActivity extends AppCompatActivity
             undoTrainingMove();
             return;
         }
-        abandonPendingSearches();
+        searchFlow.abandonPendingSearches();
         game.undoLastMove();
         if (isPairedEngineMode() && game.moveCount() > 0 && game.sideToMove() == engineSide) {
             game.undoLastMove();
@@ -1868,7 +1773,7 @@ public class MainActivity extends AppCompatActivity
             redoTrainingMove();
             return;
         }
-        abandonPendingSearches();
+        searchFlow.abandonPendingSearches();
         if (!game.redoMove()) {
             return;
         }
@@ -1955,9 +1860,9 @@ public class MainActivity extends AppCompatActivity
      * Reading the picked URI can block on network I/O for cloud-backed providers (e.g. WebDAV), and
      * {@link ChessGame#loadPgn} itself can take a while for a pathologically large single game -
      * both would otherwise freeze the UI thread, so both run off it, with a progress dialog so the
-     * app doesn't look hung meanwhile. {@link #abandonPendingSearches()} runs first (on the UI
-     * thread) so a stray engine reply can't mutate {@link #game} concurrently with the background
-     * thread's own mutation of it via {@code loadPgn}.
+     * app doesn't look hung meanwhile. {@link EngineSearchFlow#abandonPendingSearches} runs first
+     * (on the UI thread) so a stray engine reply can't mutate {@link #game} concurrently with the
+     * background thread's own mutation of it via {@code loadPgn}.
      *
      * <p>A multi-game file (tournament/opening database) is offered as a pick list instead of
      * silently importing whatever chesslib happens to parse first - see {@link
@@ -1968,7 +1873,7 @@ public class MainActivity extends AppCompatActivity
         if (uri == null) {
             return;
         }
-        abandonPendingSearches();
+        searchFlow.abandonPendingSearches();
         AlertDialog progress =
                 new MaterialAlertDialogBuilder(this)
                         .setView(R.layout.dialog_pgn_import_progress)
@@ -2084,7 +1989,7 @@ public class MainActivity extends AppCompatActivity
             waitingForEngineMove = true;
             binding.boardView.setInteractive(false);
             updateStatusText();
-            maiaSearchGeneration = searchGeneration;
+            maiaSearchGeneration = searchFlow.generation();
             maiaRequestStartElapsedMs = SystemClock.elapsedRealtime();
             maiaEngine.setPosition(game.startFen(), game.toUciMoveList());
             maiaEngine.go();
@@ -2096,51 +2001,7 @@ public class MainActivity extends AppCompatActivity
         waitingForEngineMove = true;
         binding.boardView.setInteractive(false);
         updateStatusText();
-        startEngineSearch(true, ENGINE_MOVETIME_MS);
-    }
-
-    /**
-     * Stops whatever the engine is currently doing, queues the purpose of the search being started
-     * (see {@link PendingSearch}) and kicks it off from the current position. Shared by the
-     * real-move and analysis triggers so neither can silently run into the other's still-active
-     * "go".
-     */
-    private void startEngineSearch(boolean isRealMove, int movetimeMs) {
-        engine.stop();
-        pendingSearches.add(
-                new PendingSearch(
-                        isRealMove ? SearchPurpose.REAL_MOVE : SearchPurpose.ANALYSIS,
-                        searchGeneration));
-        analysisSideToMove = game.sideToMove();
-        engine.setPosition(game.startFen(), game.toUciMoveList());
-        engine.go(movetimeMs);
-    }
-
-    /**
-     * Asks Stockfish for the best move in the current position and shows it as a board highlight
-     * (reusing {@link BoardView#setTrainingHint}) without applying it - the human decides whether
-     * to play it. Always searches at full strength, regardless of {@link #engineElo}, then restores
-     * that strength for whatever search comes next (see {@link #onBestMove}), so a low-Elo opponent
-     * doesn't leak into the hint.
-     */
-    private void requestHint() {
-        if (!engineReady
-                || mode == GameMode.TRAINING
-                || waitingForHint
-                || postGameUciMoves != null
-                || !isBoardInteractiveNow()) {
-            return;
-        }
-        waitingForHint = true;
-        updateHintButtonState();
-        engine.stop();
-        pendingSearches.add(new PendingSearch(SearchPurpose.HINT, searchGeneration));
-        multiPvSearchActive = true;
-        hintCandidates.clear();
-        engine.setFullStrength();
-        engine.setMultiPv(HINT_MULTI_PV_LINES);
-        engine.setPosition(game.startFen(), game.toUciMoveList());
-        engine.go(HINT_MOVETIME_MS);
+        searchFlow.startEngineMoveSearch(ENGINE_MOVETIME_MS);
     }
 
     private void showHint(String uci) {
@@ -2150,21 +2011,22 @@ public class MainActivity extends AppCompatActivity
     }
 
     /**
-     * Shows the 2nd/3rd-best candidates collected in {@link #hintCandidates} during the hint search
-     * that just finished, as plain from-to text next to the board-highlighted best move (rank 1) -
-     * hidden if the engine didn't report that many distinct lines (e.g. very few legal moves).
+     * Shows the 2nd/3rd-best candidates collected in {@link EngineSearchFlow#hintCandidates} during
+     * the hint search that just finished, as plain from-to text next to the board-highlighted best
+     * move (rank 1) - hidden if the engine didn't report that many distinct lines (e.g. very few
+     * legal moves).
      */
     private void showHintAlternatives() {
         List<String> alternatives = new ArrayList<>();
-        for (int rank = 1; rank < HINT_MULTI_PV_LINES; rank++) {
-            if (hintCandidates.move(rank) == null) {
+        for (int rank = 1; rank < searchFlow.hintCandidates().lines(); rank++) {
+            if (searchFlow.hintCandidates().move(rank) == null) {
                 continue;
             }
             alternatives.add(
                     getString(
                             R.string.hint_alternative_format,
-                            hintCandidates.squares(rank),
-                            hintCandidates.cp(rank) / 100.0));
+                            searchFlow.hintCandidates().squares(rank),
+                            searchFlow.hintCandidates().cp(rank) / 100.0));
         }
         hintAlternativesNote =
                 alternatives.isEmpty()
@@ -2180,49 +2042,9 @@ public class MainActivity extends AppCompatActivity
         binding.hintButton.setVisibility(visibility);
         binding.hintButton.setEnabled(
                 engineReady
-                        && !waitingForHint
-                        && postGameUciMoves == null
+                        && !searchFlow.isWaitingForHint()
+                        && !searchFlow.isPostGameAnalysisRunning()
                         && isBoardInteractiveNow());
-    }
-
-    private void recordPositionEval(int rawCp) {
-        lastPositionEvalCp = rawCp;
-        lastPositionEvalMoveCount = game.moveCount();
-    }
-
-    /**
-     * Snapshots {@link #lastPositionEvalCp} for the position about to be left, so {@link
-     * #maybeFinalizeMoveQuality} can grade the move once a fresh eval for the resulting position
-     * comes in. Called right before any move is committed to {@link #game} (human tap or engine/
-     * physical-board move); silently skips grading this move (baseline left at -1) in training mode
-     * or when no eval is known for exactly the current position - e.g. right after toggling
-     * evaluation display back on, or the game's very first ply before any search has finished.
-     */
-    private void recordMoveQualityBaseline() {
-        if (mode == GameMode.TRAINING || lastPositionEvalMoveCount != game.moveCount()) {
-            moveQualityBaselineMoveCount = -1;
-            return;
-        }
-        moveQualityBaselineCp = lastPositionEvalCp;
-        moveQualityBaselineMoveCount = game.moveCount();
-        clearMoveQualityNote();
-    }
-
-    /**
-     * If a move is currently being graded and the eval that just finished belongs to the resulting
-     * position, classifies the move's centipawn loss (baseline eval minus the resulting position's
-     * eval, both from the mover's perspective - the latter is the raw, not-yet-flipped score of the
-     * position with the opponent to move, so adding rather than subtracting it does the flip) and
-     * shows a label for anything worse than a minor inaccuracy.
-     */
-    private void maybeFinalizeMoveQuality() {
-        if (moveQualityBaselineMoveCount < 0
-                || lastPositionEvalMoveCount != moveQualityBaselineMoveCount + 1) {
-            return;
-        }
-        int cpLoss = moveQualityBaselineCp + lastPositionEvalCp;
-        moveQualityBaselineMoveCount = -1;
-        showMoveQualityIfNotable(cpLoss);
     }
 
     private static int moveQualityLabelRes(MoveQuality quality) {
@@ -2236,8 +2058,8 @@ public class MainActivity extends AppCompatActivity
         }
     }
 
-    private void showMoveQualityIfNotable(int cpLoss) {
-        MoveQuality quality = MoveQuality.of(cpLoss);
+    @Override
+    public void onMoveQuality(MoveQuality quality, int cpLoss) {
         if (quality == null) {
             clearMoveQualityNote();
             return;
@@ -2248,92 +2070,6 @@ public class MainActivity extends AppCompatActivity
                         getString(moveQualityLabelRes(quality)),
                         -cpLoss / 100.0);
         updateInfoText();
-    }
-
-    /**
-     * Replays the game played so far from the start, one ply at a time, grading every move the same
-     * way live blunder-check does ({@link MoveQuality#of}) and showing a summary dialog once done.
-     * Works whether the game has actually ended or is still in progress - only {@link
-     * ChessGame#moveCount()} needs to be positive, there has to be something to replay. Always
-     * searches at full strength, restored afterwards in {@link #advancePostGameAnalysis}.
-     *
-     * <p>Unlike every other search this method starts, it doesn't call {@link
-     * StockfishEngine#newGame()} before replaying (which would send "isready" and re-enter {@link
-     * #onReadyOk}, undoing the full-strength setting and, if it were still someone's turn in a
-     * still-live game, firing off an unwanted real move) - so instead, if the game isn't actually
-     * over once the replay finishes, the live engine turn (if any) and live eval search that {@link
-     * #abandonPendingSearches} cancelled below are explicitly restarted at the end of {@link
-     * #recordPostGameEval}. {@link #isBoardInteractiveNow} blocks board taps for the whole replay,
-     * since a move played on the actual, live game mid-replay would go through the same shared
-     * engine instance without this method noticing.
-     */
-    private void startPostGameAnalysis() {
-        if (!engineReady
-                || mode == GameMode.TRAINING
-                || game.moveCount() == 0
-                || postGameUciMoves != null) {
-            return;
-        }
-        abandonPendingSearches();
-        postGameUciMoves = java.util.Arrays.asList(game.toUciMoveList().split(" "));
-        postGamePositionEvals = new ArrayList<>(postGameUciMoves.size() + 1);
-        updateHintButtonState();
-        updateNoteText();
-        engine.setFullStrength();
-        requestPostGameEvalFor(0);
-    }
-
-    /**
-     * The final replayed position is the live game's own current one - if it's checkmate/stalemate,
-     * it has no legal moves for Stockfish to search (in practice: no "info score" line ever
-     * arrives, silently leaving {@link #postGameLiveScoreCp} stuck on the previous position's stale
-     * value, which would badly mis-grade the final move). Score it directly from the game's own
-     * verdict instead: very bad for whoever's mated, neutral for a stalemate.
-     */
-    private void requestPostGameEvalFor(int positionIndex) {
-        if (positionIndex == postGameUciMoves.size()
-                && (game.isCheckmate() || game.isStalemate())) {
-            recordPostGameEval(game.isCheckmate() ? -MoveQuality.mateToCp(0) : 0);
-            return;
-        }
-        pendingSearches.add(new PendingSearch(SearchPurpose.POST_GAME, searchGeneration));
-        engine.setPosition(
-                game.startFen(), String.join(" ", postGameUciMoves.subList(0, positionIndex)));
-        engine.go(POST_GAME_MOVETIME_MS);
-    }
-
-    /** Called from {@link #onBestMove} once the search for one post-game position has finished. */
-    private void advancePostGameAnalysis() {
-        recordPostGameEval(postGameLiveScoreCp);
-    }
-
-    private void recordPostGameEval(int cp) {
-        postGamePositionEvals.add(cp);
-        int nextPositionIndex = postGamePositionEvals.size();
-        updateNoteText();
-        if (nextPositionIndex <= postGameUciMoves.size()) {
-            requestPostGameEvalFor(nextPositionIndex);
-            return;
-        }
-        List<String> uciMoves = postGameUciMoves;
-        List<Integer> evals = postGamePositionEvals;
-        postGameUciMoves = null;
-        postGamePositionEvals = null;
-        if (mode == GameMode.ENGINE) {
-            engine.setStrength(engineElo);
-        }
-        updateHintButtonState();
-        updateNoteText();
-        showPostGameReport(uciMoves, evals);
-        if (!game.isGameOver()) {
-            // The game was still live when analysis started (see startPostGameAnalysis) -
-            // abandonPendingSearches() there cancelled whatever live engine-move/eval search was
-            // in flight, so resume it now the same way startNewGame() kicks the engine off: a
-            // plain refresh (board interactivity, live eval) plus an explicit engine-move trigger,
-            // since refreshBoard() itself never starts one.
-            refreshBoard();
-            maybeTriggerEngineMove();
-        }
     }
 
     private void showPostGameReport(List<String> uciMoves, List<Integer> evals) {
@@ -2380,34 +2116,6 @@ public class MainActivity extends AppCompatActivity
     }
 
     /**
-     * Cancels any outstanding engine search and marks its eventual reply (and any other
-     * already-queued one) as belonging to a position we've since left - used wherever the game is
-     * reset out from under a possibly in-flight search (new game, PGN import).
-     */
-    private void abandonPendingSearches() {
-        engine.stop();
-        searchGeneration++;
-        waitingForEngineMove = false;
-        heldEngineMoveUci = null;
-        engineMoveSoundPending = false;
-        stopPendingMaiaMove();
-        waitingForHint = false;
-        if (multiPvSearchActive) {
-            // A hint search was interrupted mid-flight (new game/undo/PGN import/post-game analysis
-            // starting) - restore MultiPV so the next (unrelated) search's info lines aren't
-            // misrouted to hintCandidates forever.
-            multiPvSearchActive = false;
-            engine.setMultiPv(1);
-        }
-        lastPositionEvalMoveCount = -1;
-        moveQualityBaselineMoveCount = -1;
-        postGameUciMoves = null;
-        postGamePositionEvals = null;
-        clearMoveQualityNote();
-        updateNoteText();
-    }
-
-    /**
      * Starts a dedicated evaluation search when nothing else is already searching the current
      * position. If the engine is about to search for its own reply anyway ({@link
      * #maybeTriggerEngineMove}), that search's "info" stream already covers the evaluation display,
@@ -2422,30 +2130,7 @@ public class MainActivity extends AppCompatActivity
             binding.evaluationText.setText("");
             return;
         }
-        if (!engineReady) {
-            return;
-        }
-        // Skipped only when Stockfish is the paired engine and it's about to search for its own
-        // reply move anyway (#maybeTriggerEngineMove) - that search's own "info" stream already
-        // covers the evaluation display and move-quality grading, so a second, redundant search
-        // here would be wasted. MAIA doesn't get that for free: Maia's own move-generation never
-        // touches this Stockfish instance at all, and its reply is a near-instant single forward
-        // pass with no search - without #scheduleMaiaMove's deliberate humanlike pause there'd be
-        // no time for a fresh analysis search to produce anything before the position moved on.
-        // With that pause now in place there's genuine idle wall-clock time, so this search always
-        // runs for MAIA too - which is what lets #maybeFinalizeMoveQuality grade the human's move
-        // (blunder/mistake/inaccuracy) in Maia games as well, not just Stockfish ones. A slight
-        // mismatch is tolerated at the tail end: ANALYSIS_MOVETIME_MS (1.5s) can outlast
-        // #scheduleMaiaMove's pause (max 1.4s), so this search sometimes gets stopped by the next
-        // one (started for the post-reply position) before finishing - same "stopped and
-        // superseded" pattern already used everywhere else searches chain here, and harmless since
-        // grading only needs the first info line, which arrives in milliseconds.
-        boolean engineAboutToSearchAnyway =
-                mode == GameMode.ENGINE && game.sideToMove() == engineSide;
-        if (engineAboutToSearchAnyway) {
-            return;
-        }
-        startEngineSearch(false, ANALYSIS_MOVETIME_MS);
+        searchFlow.maybeStartAnalysis();
     }
 
     // ---- Training mode ------------------------------------------------------
@@ -2749,7 +2434,7 @@ public class MainActivity extends AppCompatActivity
 
     private void applyHumanMove(Square from, Square to, Piece promotion) {
         boolean wasCapture = game.pieceAt(to) != Piece.NONE;
-        recordMoveQualityBaseline();
+        searchFlow.recordMoveQualityBaseline();
         if (!game.applyMove(from, to, promotion)) {
             refreshBoard();
             return;
@@ -2780,6 +2465,120 @@ public class MainActivity extends AppCompatActivity
 
     // ---- EngineListener ---------------------------------------------------------
 
+    // ---- EngineSearchFlow.Host -------------------------------------------------
+
+    @Override
+    public boolean isEngineReady() {
+        return engineReady;
+    }
+
+    @Override
+    public boolean isTrainingMode() {
+        return mode == GameMode.TRAINING;
+    }
+
+    @Override
+    public boolean isEvaluationEnabled() {
+        return evaluationEnabled;
+    }
+
+    @Override
+    public boolean isBoardInteractive() {
+        return isBoardInteractiveNow();
+    }
+
+    @Override
+    public boolean isEngineAboutToMove() {
+        // Skipped only when Stockfish is the paired engine and it's about to search for its own
+        // reply move anyway (#maybeTriggerEngineMove) - that search's own "info" stream already
+        // covers the evaluation display and move-quality grading, so a second, redundant search
+        // here would be wasted. MAIA doesn't get that for free: Maia's own move-generation never
+        // touches this Stockfish instance at all, and its reply is a near-instant single forward
+        // pass with no search - without #scheduleMaiaMove's deliberate humanlike pause there'd be
+        // no time for a fresh analysis search to produce anything before the position moved on.
+        // With that pause now in place there's genuine idle wall-clock time, so this search always
+        // runs for MAIA too - which is what lets EngineSearchFlow grade the human's move
+        // (blunder/mistake/inaccuracy) in Maia games as well, not just Stockfish ones. A slight
+        // mismatch is tolerated at the tail end: the analysis search (1.5s) can outlast
+        // #scheduleMaiaMove's pause (max 1.4s), so this search sometimes gets stopped by the next
+        // one (started for the post-reply position) before finishing - same "stopped and
+        // superseded" pattern already used everywhere else searches chain here, and harmless since
+        // grading only needs the first info line, which arrives in milliseconds.
+        return mode == GameMode.ENGINE && game.sideToMove() == engineSide;
+    }
+
+    @Override
+    public void restoreEngineStrength() {
+        if (mode == GameMode.ENGINE) {
+            engine.setStrength(engineElo);
+        }
+    }
+
+    @Override
+    public void onEngineMove(String uci) {
+        waitingForEngineMove = false;
+        if (uci == null) {
+            refreshBoard();
+            return;
+        }
+        applyEngineReply(uci);
+    }
+
+    @Override
+    public void onHint(String bestMoveUci) {
+        if (bestMoveUci != null) {
+            showHint(bestMoveUci);
+        }
+        showHintAlternatives();
+    }
+
+    @Override
+    public void onHintAvailabilityChanged() {
+        updateHintButtonState();
+    }
+
+    @Override
+    public void onEvaluation(int whiteRelativeCp) {
+        binding.evaluationText.setText(
+                String.format(Locale.ROOT, "%+.1f", whiteRelativeCp / 100.0));
+    }
+
+    @Override
+    public void onEvaluationMate(int whiteRelativeMateIn) {
+        String side =
+                getString(whiteRelativeMateIn >= 0 ? R.string.color_white : R.string.color_black);
+        binding.evaluationText.setText(
+                getString(R.string.evaluation_mate_format, Math.abs(whiteRelativeMateIn), side));
+    }
+
+    @Override
+    public void onPostGameProgress() {
+        updateNoteText();
+    }
+
+    @Override
+    public void onPostGameReport(List<String> uciMoves, List<Integer> evals) {
+        showPostGameReport(uciMoves, evals);
+        if (!game.isGameOver()) {
+            // The game was still live when the analysis started, and starting it cancelled
+            // whatever live engine-move/eval search was in flight. Resume it the same way a new
+            // game kicks the engine off: a plain refresh (board interactivity, live eval) plus an
+            // explicit engine-move trigger, since the refresh itself never starts one.
+            refreshBoard();
+            maybeTriggerEngineMove();
+        }
+    }
+
+    @Override
+    public void onSearchesAbandoned() {
+        waitingForEngineMove = false;
+        heldEngineMoveUci = null;
+        engineMoveSoundPending = false;
+        stopPendingMaiaMove();
+        clearMoveQualityNote();
+        updateNoteText();
+    }
+
     @Override
     public void onUciOk() {
         if (nnuePath != null) {
@@ -2802,100 +2601,18 @@ public class MainActivity extends AppCompatActivity
 
     @Override
     public void onBestMove(String bestMoveUci, String ponderUci) {
-        PendingSearch search = pendingSearches.poll();
-        if (search == null || search.generation != searchGeneration) {
-            // Either unexpected (defensive only - every go() we send queues
-            // an entry), or a reply for a search abandoned by
-            // abandonPendingSearches() (new game, PGN import); discard it.
-            return;
-        }
-        maybeFinalizeMoveQuality();
-        if (search.purpose == SearchPurpose.ANALYSIS) {
-            // Analysis-only search; onInfo() already streamed eval updates for it.
-            return;
-        }
-        if (search.purpose == SearchPurpose.HINT) {
-            waitingForHint = false;
-            multiPvSearchActive = false;
-            engine.setMultiPv(1);
-            if (mode == GameMode.ENGINE) {
-                engine.setStrength(engineElo);
-            }
-            updateHintButtonState();
-            if (bestMoveUci != null && !bestMoveUci.equals("(none)")) {
-                showHint(bestMoveUci);
-            }
-            showHintAlternatives();
-            return;
-        }
-        if (search.purpose == SearchPurpose.POST_GAME) {
-            advancePostGameAnalysis();
-            return;
-        }
-        waitingForEngineMove = false;
-        if (bestMoveUci == null || bestMoveUci.equals("(none)")) {
-            refreshBoard();
-            return;
-        }
-        applyEngineReply(bestMoveUci);
+        searchFlow.onBestMove(bestMoveUci);
     }
 
     @Override
     public void onInfo(String infoLine) {
-        if (multiPvSearchActive) {
-            hintCandidates.capture(infoLine);
-            return;
-        }
-        OptionalInt mate = UciInfoParser.parseScoreMate(infoLine);
-        OptionalInt cp =
-                mate.isPresent() ? OptionalInt.empty() : UciInfoParser.parseScoreCp(infoLine);
-        if (mate.isEmpty() && cp.isEmpty()) {
-            return;
-        }
-        int rawCp = mate.isPresent() ? MoveQuality.mateToCp(mate.getAsInt()) : cp.getAsInt();
-        if (postGameUciMoves != null) {
-            // Post-game analysis replays past positions - never the live eval/move-quality state.
-            postGameLiveScoreCp = rawCp;
-            return;
-        }
-        // engine.stop() (see abandonPendingSearches()) is fire-and-forget - Stockfish can still
-        // emit a few more "info" lines for the search just abandoned before it finally replies
-        // with "bestmove" (which onBestMove() already discards via this same check). Without this,
-        // one of those stale lines could land here after analysisSideToMove has already moved on
-        // to a new position (e.g. one reached by undo/redo/a history click) and get displayed - and
-        // fed into recordPositionEval() below - as if it were a fresh eval for that new position.
-        PendingSearch activeSearch = pendingSearches.peek();
-        if (activeSearch == null || activeSearch.generation != searchGeneration) {
-            return;
-        }
-        if (!evaluationEnabled || mode == GameMode.TRAINING || analysisSideToMove == null) {
-            return;
-        }
-        recordPositionEval(rawCp);
-        if (mate.isPresent()) {
-            int whiteRelativeMate =
-                    analysisSideToMove == Side.BLACK ? -mate.getAsInt() : mate.getAsInt();
-            String side =
-                    getString(whiteRelativeMate >= 0 ? R.string.color_white : R.string.color_black);
-            binding.evaluationText.setText(
-                    getString(R.string.evaluation_mate_format, Math.abs(whiteRelativeMate), side));
-            return;
-        }
-        if (cp.isPresent()) {
-            int whiteRelativeCp = analysisSideToMove == Side.BLACK ? -cp.getAsInt() : cp.getAsInt();
-            binding.evaluationText.setText(
-                    String.format(Locale.ROOT, "%+.1f", whiteRelativeCp / 100.0));
-        }
+        searchFlow.onInfo(infoLine);
     }
 
     @Override
     public void onEngineError(Exception error) {
-        pendingSearches.clear();
+        searchFlow.onEngineError();
         waitingForEngineMove = false;
-        waitingForHint = false;
-        multiPvSearchActive = false;
-        postGameUciMoves = null;
-        postGamePositionEvals = null;
         updateHintButtonState();
         updateNoteText();
         binding.statusText.setText(R.string.status_engine_unavailable);
@@ -2943,7 +2660,7 @@ public class MainActivity extends AppCompatActivity
                             float drawProbability,
                             float lossProbability) {
                         if (maiaEngine != loadedEngine
-                                || maiaSearchGeneration != searchGeneration) {
+                                || maiaSearchGeneration != searchFlow.generation()) {
                             // Stale: the game moved on (new game/PGN import/...) while this reply
                             // was in flight - discard it rather than applying a move to a position
                             // it no longer matches.
@@ -3005,7 +2722,7 @@ public class MainActivity extends AppCompatActivity
 
     private void finishMaiaMove(String bestMoveUci) {
         pendingMaiaMove = null;
-        if (maiaSearchGeneration != searchGeneration) {
+        if (maiaSearchGeneration != searchFlow.generation()) {
             // Stale: a new game/PGN import/... reset the game while this pause was running.
             return;
         }

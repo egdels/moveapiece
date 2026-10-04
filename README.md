@@ -223,6 +223,9 @@ core/                    Platform-agnostic chess logic, shared by :app and
 │   │                     Maia (human-like opponent): ONNX position encoding/
 │   │                     policy decoding/engine + its bundled rating list
 │   ├── logic/             chesslib integration (ChessGame), PGN helpers
+│   ├── analysis/          EngineSearchFlow: everything the one Stockfish process is asked
+│   │                     to search (engine move, evaluation, hint, post-game analysis)
+│   │                     and the grading of its answers
 │   ├── board/             Physical boards: PegasusGameBridge and ChessnutGameBridge
 │   │                     (board <-> ChessGame, on the platform's BoardScheduler) and
 │   │                     PhysicalBoardBridge, one interface over both
