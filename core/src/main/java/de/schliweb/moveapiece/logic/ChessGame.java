@@ -134,6 +134,40 @@ public class ChessGame {
         return true;
     }
 
+    /**
+     * {@link #undoLastMove()} for a game against an opponent that moves by itself: if that leaves
+     * {@code autoSide} to move, its move is taken back too, so the player lands on their own turn
+     * rather than watching the opponent move again at once.
+     *
+     * @param autoSide the side that is not played by hand, or {@code null} if both are
+     * @return false if there was nothing to undo
+     */
+    public boolean undoLastMove(Side autoSide) {
+        if (!undoLastMove()) {
+            return false;
+        }
+        if (autoSide != null && moveCount() > 0 && sideToMove() == autoSide) {
+            undoLastMove();
+        }
+        return true;
+    }
+
+    /**
+     * Mirrors {@link #undoLastMove(Side)}: reapplies the player's move and, if that leaves {@code
+     * autoSide} to move and its reply was undone as well, that reply too.
+     *
+     * @return false if there was nothing to redo
+     */
+    public boolean redoMove(Side autoSide) {
+        if (!redoMove()) {
+            return false;
+        }
+        if (autoSide != null && canRedo() && sideToMove() == autoSide) {
+            redoMove();
+        }
+        return true;
+    }
+
     /** Whether {@link #redoMove()} has a move to reapply. */
     public boolean canRedo() {
         return !redoHistory.isEmpty();
@@ -156,6 +190,53 @@ public class ChessGame {
             // continue
         }
         return moveCount();
+    }
+
+    /**
+     * {@link #jumpToPly(int)} for a game against an opponent that moves by itself: landing on a
+     * position with {@code autoSide} to move goes one ply further, to its reply, wherever the jump
+     * came from. Pairing forward only makes the result depend on {@code targetPly} alone, so
+     * clicking the same history entry twice lands on the same position both times.
+     *
+     * @param autoSide the side that is not played by hand, or {@code null} if both are
+     * @return the ply reached, or -1 if {@code targetPly} is out of range (nothing was changed
+     *     beyond the clamping of {@link #jumpToPly(int)})
+     */
+    public int jumpToPly(int targetPly, Side autoSide) {
+        int before = moveCount();
+        int reached = jumpToPly(targetPly);
+        if (reached != targetPly) {
+            return -1;
+        }
+        if (reached != before && autoSide != null && sideToMove() == autoSide) {
+            redoMove();
+        }
+        return moveCount();
+    }
+
+    /** The move that led to the current position in UCI notation, or null at the start. */
+    public String lastMoveUci() {
+        return moveHistory.isEmpty() ? null : moveHistory.get(moveHistory.size() - 1).toString();
+    }
+
+    /** The square of the king that is in check, or null if the side to move is not in check. */
+    public Square checkedKingSquare() {
+        if (!isCheck()) {
+            return null;
+        }
+        Piece king = sideToMove() == Side.WHITE ? Piece.WHITE_KING : Piece.BLACK_KING;
+        for (Square square : Square.values()) {
+            if (square != Square.NONE && pieceAt(square) == king) {
+                return square;
+            }
+        }
+        return null;
+    }
+
+    /** Whether {@code square} holds a piece of the side to move. */
+    public boolean hasSideToMovePieceOn(Square square) {
+        Piece piece = pieceAt(square);
+        return piece != Piece.NONE && piece.getPieceSide() == sideToMove();
     }
 
     public boolean isCheckmate() {

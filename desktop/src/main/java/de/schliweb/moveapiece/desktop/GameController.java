@@ -34,6 +34,7 @@ import de.schliweb.moveapiece.logic.ChessGame;
 import de.schliweb.moveapiece.logic.GameSetup;
 import de.schliweb.moveapiece.logic.Opponent;
 import de.schliweb.moveapiece.logic.PgnGames;
+import de.schliweb.moveapiece.logic.UciMoves;
 import de.schliweb.moveapiece.training.OpeningLine;
 import de.schliweb.moveapiece.training.TrainingFlow;
 import de.schliweb.moveapiece.training.TrainingSession;
@@ -622,8 +623,7 @@ final class GameController
 
     @Override
     public boolean hasOwnPieceOn(Square square) {
-        Piece piece = game.pieceAt(square);
-        return piece != Piece.NONE && piece.getPieceSide() == game.sideToMove();
+        return game.hasSideToMovePieceOn(square);
     }
 
     // ---- move handling ----------------------------------------------------------
@@ -820,12 +820,6 @@ final class GameController
         return boardType.displayNameFor(boardDeviceName);
     }
 
-    /** True for the errors a transport raises when the connected device lacks the profile. */
-    private static boolean isWrongProfileError(TransportError error) {
-        return error == TransportError.SERVICE_NOT_FOUND
-                || error == TransportError.CHARACTERISTIC_NOT_FOUND;
-    }
-
     /**
      * Mirrors the Android app's icon-only Pegasus button: swaps to an "active" style class instead
      * of visible text to carry connect/disconnect state.
@@ -976,7 +970,7 @@ final class GameController
             refresh();
             return;
         }
-        Square to = Square.fromValue(uci.substring(2, 4).toUpperCase(Locale.ROOT));
+        Square to = UciMoves.to(uci);
         boolean wasCapture = game.pieceAt(to) != Piece.NONE;
         applyUciToGame(uci, false); // sound follows on physical confirmation
         pegasusBridge.guideEngineMove(uci);
@@ -1158,7 +1152,7 @@ final class GameController
     @Override
     public void onTransportError(TransportError error, String detail) {
         LOG.log(Level.WARNING, "Board transport error {0}: {1}", new Object[] {error, detail});
-        if (detection != null && isWrongProfileError(error)) {
+        if (detection != null && BoardTypeDetection.isWrongProfileError(error)) {
             BoardType next = detection.next();
             if (next != null) {
                 // Not this type: switchBoardType shuts the old bridge down (which also stops
@@ -1316,8 +1310,8 @@ final class GameController
     }
 
     private void showHint(String uci) {
-        Square from = Square.fromValue(uci.substring(0, 2).toUpperCase(Locale.ROOT));
-        Square to = Square.fromValue(uci.substring(2, 4).toUpperCase(Locale.ROOT));
+        Square from = UciMoves.from(uci);
+        Square to = UciMoves.to(uci);
         boardCanvas.setTrainingHint(from, to);
     }
 
@@ -1718,6 +1712,11 @@ final class GameController
      * paired engine reply as one unit: undo/redo, move-history highlighting, and history navigation
      * ({@link #jumpToPly}) all skip past the reply together rather than landing between the two.
      */
+    /** The side that moves by itself (Stockfish or Maia), or null in the other modes. */
+    private Side autoMoveSide() {
+        return isPairedEngineMode() ? humanSide.flip() : null;
+    }
+
     private boolean isPairedEngineMode() {
         return mode == Mode.HUMAN_VS_STOCKFISH || mode == Mode.HUMAN_VS_MAIA;
     }
@@ -1747,11 +1746,8 @@ final class GameController
             return;
         }
         searchFlow.abandonPendingSearches();
-        if (!game.undoLastMove()) {
+        if (!game.undoLastMove(autoMoveSide())) {
             return;
-        }
-        if (isPairedEngineMode() && game.moveCount() > 0 && game.sideToMove() != humanSide) {
-            game.undoLastMove();
         }
         boardCanvas.setLastMove(null, null);
         refresh();
@@ -1770,11 +1766,8 @@ final class GameController
             return;
         }
         searchFlow.abandonPendingSearches();
-        if (!game.redoMove()) {
+        if (!game.redoMove(autoMoveSide())) {
             return;
-        }
-        if (isPairedEngineMode() && game.canRedo() && game.sideToMove() != humanSide) {
-            game.redoMove();
         }
         boardCanvas.setLastMove(null, null);
         refresh();
@@ -1787,7 +1780,7 @@ final class GameController
             pieces[i] = game.pieceAt(Square.squareAt(i));
         }
         boardCanvas.setBoard(pieces);
-        boardCanvas.setCheckedKingSquare(findCheckedKingSquare());
+        boardCanvas.setCheckedKingSquare(game.checkedKingSquare());
         boardCanvas.setInteractive(isBoardInteractiveNow());
         maiaRatingSlider.setDisable(waitingForEngineMove);
         updateMoveHistory();
@@ -1908,21 +1901,12 @@ final class GameController
      */
     private void jumpToPly(int targetPly) {
         searchFlow.abandonPendingSearches();
-        int before = game.moveCount();
-        int reached = game.jumpToPly(targetPly);
-        if (reached != targetPly) {
+        if (game.jumpToPly(targetPly, autoMoveSide()) < 0) {
             return; // out of range; nothing changed
         }
-        if (reached != before && isPairedEngineMode() && game.sideToMove() != humanSide) {
-            game.redoMove();
-            reached = game.moveCount();
-        }
-        if (reached > 0) {
-            String[] uciMoves = game.toUciMoveList().split(" ");
-            String uci = uciMoves[reached - 1];
-            Square from = Square.valueOf(uci.substring(0, 2).toUpperCase(Locale.ROOT));
-            Square to = Square.valueOf(uci.substring(2, 4).toUpperCase(Locale.ROOT));
-            boardCanvas.setLastMove(from, to);
+        String uci = game.lastMoveUci();
+        if (uci != null) {
+            boardCanvas.setLastMove(UciMoves.from(uci), UciMoves.to(uci));
         } else {
             boardCanvas.setLastMove(null, null);
         }
@@ -1951,20 +1935,6 @@ final class GameController
                             && !trainingSession.isComplete()
                             && trainingSession.isHumanTurnNow();
         };
-    }
-
-    private Square findCheckedKingSquare() {
-        if (!game.isCheck()) {
-            return null;
-        }
-        Piece king = game.sideToMove() == Side.WHITE ? Piece.WHITE_KING : Piece.BLACK_KING;
-        for (int i = 0; i < 64; i++) {
-            Square square = Square.squareAt(i);
-            if (game.pieceAt(square) == king) {
-                return square;
-            }
-        }
-        return null;
     }
 
     private String statusText() {
@@ -2126,8 +2096,8 @@ final class GameController
             return;
         }
         String uci = trainingSession.currentExpectedUci();
-        Square from = Square.fromValue(uci.substring(0, 2).toUpperCase(Locale.ROOT));
-        Square to = Square.fromValue(uci.substring(2, 4).toUpperCase(Locale.ROOT));
+        Square from = UciMoves.from(uci);
+        Square to = UciMoves.to(uci);
         boardCanvas.setTrainingHint(from, to);
     }
 
@@ -2240,8 +2210,8 @@ final class GameController
 
     /** As {@link #applyUciToGame(String)}; {@code withSound=false} defers the move sound. */
     private boolean applyUciToGame(String uci, boolean withSound) {
-        Square from = Square.fromValue(uci.substring(0, 2).toUpperCase(Locale.ROOT));
-        Square to = Square.fromValue(uci.substring(2, 4).toUpperCase(Locale.ROOT));
+        Square from = UciMoves.from(uci);
+        Square to = UciMoves.to(uci);
         boolean wasCapture = game.pieceAt(to) != Piece.NONE;
         searchFlow.recordMoveQualityBaseline();
         if (!game.applyUciMove(uci)) {
@@ -2637,8 +2607,8 @@ final class GameController
 
         @Override
         public void moveApplied(String uci, boolean wasCapture, boolean withSound) {
-            Square from = Square.fromValue(uci.substring(0, 2).toUpperCase(Locale.ROOT));
-            Square to = Square.fromValue(uci.substring(2, 4).toUpperCase(Locale.ROOT));
+            Square from = UciMoves.from(uci);
+            Square to = UciMoves.to(uci);
             boardCanvas.setLastMove(from, to);
             if (withSound) {
                 GameController.this.playMoveSound(wasCapture);

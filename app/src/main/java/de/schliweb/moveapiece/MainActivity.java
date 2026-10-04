@@ -67,6 +67,7 @@ import de.schliweb.moveapiece.logic.ChessGame;
 import de.schliweb.moveapiece.logic.GameSetup;
 import de.schliweb.moveapiece.logic.Opponent;
 import de.schliweb.moveapiece.logic.PgnGames;
+import de.schliweb.moveapiece.logic.UciMoves;
 import de.schliweb.moveapiece.training.OpeningLine;
 import de.schliweb.moveapiece.training.OpeningRepository;
 import de.schliweb.moveapiece.training.TrainingFlow;
@@ -691,12 +692,6 @@ public class MainActivity extends AppCompatActivity
         return boardType.displayNameFor(boardDeviceName);
     }
 
-    /** True for the errors a transport raises when the connected device lacks the profile. */
-    private static boolean isWrongProfileError(TransportError error) {
-        return error == TransportError.SERVICE_NOT_FOUND
-                || error == TransportError.CHARACTERISTIC_NOT_FOUND;
-    }
-
     /**
      * Applies a move already confirmed as legal by an external source (the Stockfish engine, or the
      * physical board's own move detector) — shared by {@link #onBestMove} and {@link
@@ -705,7 +700,7 @@ public class MainActivity extends AppCompatActivity
      */
     private void applyConfirmedMove(String uci, boolean isEngineMove) {
         boolean guided = isEngineMove && board.getConnectionState() == ConnectionState.CONNECTED;
-        Square to = Square.valueOf(uci.substring(2, 4).toUpperCase(Locale.ROOT));
+        Square to = UciMoves.to(uci);
         boolean wasCapture = game.pieceAt(to) != Piece.NONE;
         // A guided engine move sounds on physical confirmation, not when applied.
         if (applyUciToGame(uci, !guided)) {
@@ -735,8 +730,8 @@ public class MainActivity extends AppCompatActivity
 
     /** As {@link #applyUciToGame(String)}; {@code withSound=false} defers the move sound. */
     private boolean applyUciToGame(String uci, boolean withSound) {
-        Square from = Square.valueOf(uci.substring(0, 2).toUpperCase(Locale.ROOT));
-        Square to = Square.valueOf(uci.substring(2, 4).toUpperCase(Locale.ROOT));
+        Square from = UciMoves.from(uci);
+        Square to = UciMoves.to(uci);
         boolean wasCapture = game.pieceAt(to) != Piece.NONE;
         searchFlow.recordMoveQualityBaseline();
         if (!game.applyUciMove(uci)) {
@@ -1024,7 +1019,7 @@ public class MainActivity extends AppCompatActivity
 
     @Override
     public void onTransportError(TransportError error, String detail) {
-        if (detection != null && isWrongProfileError(error)) {
+        if (detection != null && BoardTypeDetection.isWrongProfileError(error)) {
             BoardType next = detection.next();
             if (next != null) {
                 // Not this type: the old bridge is shut down by applyBoardType (which also
@@ -1429,6 +1424,11 @@ public class MainActivity extends AppCompatActivity
      * navigation ({@link #jumpToPly}) all skip past the reply together rather than landing between
      * the two.
      */
+    /** The side that moves by itself (Stockfish or Maia), or null in the other modes. */
+    private Side autoMoveSide() {
+        return isPairedEngineMode() ? engineSide : null;
+    }
+
     private boolean isPairedEngineMode() {
         return mode == GameMode.ENGINE || mode == GameMode.MAIA;
     }
@@ -1442,7 +1442,7 @@ public class MainActivity extends AppCompatActivity
         }
         binding.boardView.setBoard(pieces);
         binding.boardView.setInteractive(isBoardInteractiveNow());
-        binding.boardView.setCheckedKingSquare(findCheckedKingSquare());
+        binding.boardView.setCheckedKingSquare(game.checkedKingSquare());
         updateStatusText();
         updateMoveHistory();
         updateInfoText();
@@ -1555,8 +1555,8 @@ public class MainActivity extends AppCompatActivity
             return;
         }
         String uci = trainingSession.currentExpectedUci();
-        Square from = Square.valueOf(uci.substring(0, 2).toUpperCase(Locale.ROOT));
-        Square to = Square.valueOf(uci.substring(2, 4).toUpperCase(Locale.ROOT));
+        Square from = UciMoves.from(uci);
+        Square to = UciMoves.to(uci);
         binding.boardView.setTrainingHint(from, to);
     }
 
@@ -1678,40 +1678,17 @@ public class MainActivity extends AppCompatActivity
             return;
         }
         searchFlow.abandonPendingSearches();
-        int before = game.moveCount();
-        int reached = game.jumpToPly(targetPly);
-        if (reached != targetPly) {
+        if (game.jumpToPly(targetPly, autoMoveSide()) < 0) {
             return; // out of range; nothing changed
         }
-        if (reached != before && isPairedEngineMode() && game.sideToMove() == engineSide) {
-            game.redoMove();
-            reached = game.moveCount();
-        }
-        if (reached > 0) {
-            String[] uciMoves = game.toUciMoveList().split(" ");
-            String uci = uciMoves[reached - 1];
-            Square from = Square.valueOf(uci.substring(0, 2).toUpperCase(Locale.ROOT));
-            Square to = Square.valueOf(uci.substring(2, 4).toUpperCase(Locale.ROOT));
-            setLastMove(from, to);
+        String uci = game.lastMoveUci();
+        if (uci != null) {
+            setLastMove(UciMoves.from(uci), UciMoves.to(uci));
         } else {
             setLastMove(null, null);
         }
         refreshBoard();
         syncPegasusPosition();
-    }
-
-    private Square findCheckedKingSquare() {
-        if (!game.isCheck()) {
-            return null;
-        }
-        Piece king = game.sideToMove() == Side.WHITE ? Piece.WHITE_KING : Piece.BLACK_KING;
-        for (int i = 0; i < 64; i++) {
-            Square sq = Square.squareAt(i);
-            if (game.pieceAt(sq) == king) {
-                return sq;
-            }
-        }
-        return null;
     }
 
     private void updateStatusText() {
@@ -1750,10 +1727,7 @@ public class MainActivity extends AppCompatActivity
             return;
         }
         searchFlow.abandonPendingSearches();
-        game.undoLastMove();
-        if (isPairedEngineMode() && game.moveCount() > 0 && game.sideToMove() == engineSide) {
-            game.undoLastMove();
-        }
+        game.undoLastMove(autoMoveSide());
         setLastMove(null, null);
         refreshBoard();
         syncPegasusPosition();
@@ -1774,11 +1748,8 @@ public class MainActivity extends AppCompatActivity
             return;
         }
         searchFlow.abandonPendingSearches();
-        if (!game.redoMove()) {
+        if (!game.redoMove(autoMoveSide())) {
             return;
-        }
-        if (isPairedEngineMode() && game.canRedo() && game.sideToMove() == engineSide) {
-            game.redoMove();
         }
         setLastMove(null, null);
         refreshBoard();
@@ -2005,8 +1976,8 @@ public class MainActivity extends AppCompatActivity
     }
 
     private void showHint(String uci) {
-        Square from = Square.valueOf(uci.substring(0, 2).toUpperCase(Locale.ROOT));
-        Square to = Square.valueOf(uci.substring(2, 4).toUpperCase(Locale.ROOT));
+        Square from = UciMoves.from(uci);
+        Square to = UciMoves.to(uci);
         binding.boardView.setTrainingHint(from, to);
     }
 
@@ -2303,11 +2274,7 @@ public class MainActivity extends AppCompatActivity
 
     @Override
     public boolean hasOwnPieceOn(Square square) {
-        Piece piece = game.pieceAt(square);
-        if (piece == Piece.NONE) {
-            return false;
-        }
-        return piece.getPieceSide() == game.sideToMove();
+        return game.hasSideToMovePieceOn(square);
     }
 
     // ---- BoardView.OnMoveListener ----------------------------------------------
@@ -2797,8 +2764,8 @@ public class MainActivity extends AppCompatActivity
     private final class TrainingHostAdapter implements TrainingFlow.Host {
         @Override
         public void moveApplied(String uci, boolean wasCapture, boolean withSound) {
-            Square from = Square.valueOf(uci.substring(0, 2).toUpperCase(Locale.ROOT));
-            Square to = Square.valueOf(uci.substring(2, 4).toUpperCase(Locale.ROOT));
+            Square from = UciMoves.from(uci);
+            Square to = UciMoves.to(uci);
             setLastMove(from, to);
             if (withSound) {
                 MainActivity.this.playMoveSound(wasCapture);

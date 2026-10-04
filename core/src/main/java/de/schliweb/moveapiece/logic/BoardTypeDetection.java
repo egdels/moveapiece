@@ -5,6 +5,7 @@
 
 package de.schliweb.moveapiece.logic;
 
+import de.schliweb.pegasus.core.transport.TransportError;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -66,6 +67,15 @@ public final class BoardTypeDetection {
         }
         BoardType guess = BoardType.guessFromAdvertisement(deviceName, advertisedServiceUuids);
         return new BoardTypeDetection(address, configured, guess == null ? configured : guess);
+    }
+
+    /**
+     * True for the errors a transport raises when the connected device lacks the profile it was
+     * asked for, i.e. it is the other kind of board.
+     */
+    public static boolean isWrongProfileError(TransportError error) {
+        return error == TransportError.SERVICE_NOT_FOUND
+                || error == TransportError.CHARACTERISTIC_NOT_FOUND;
     }
 
     /** Address the detection is for; errors from other devices must not advance it. */

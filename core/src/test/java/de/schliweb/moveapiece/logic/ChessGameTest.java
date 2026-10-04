@@ -461,4 +461,93 @@ public class ChessGameTest {
         assertEquals(Side.WHITE, game.sideToMove());
         assertEquals(Piece.WHITE_PAWN, game.pieceAt(Square.E2));
     }
+
+    private static ChessGame gameAfter(String... uciMoves) {
+        ChessGame game = new ChessGame();
+        for (String uci : uciMoves) {
+            assertTrue(uci, game.applyUciMove(uci));
+        }
+        return game;
+    }
+
+    @Test
+    public void undoAgainstAnAutomaticOpponent_takesItsReplyBackToo() {
+        ChessGame game = gameAfter("e2e4", "e7e5", "g1f3", "b8c6");
+
+        assertTrue(game.undoLastMove(Side.BLACK));
+
+        // Black's reply and White's own move are both gone: White is to move again.
+        assertEquals(2, game.moveCount());
+        assertEquals(Side.WHITE, game.sideToMove());
+    }
+
+    @Test
+    public void undoAgainstAnAutomaticOpponent_stopsAtTheStartWhenItMovedFirst() {
+        ChessGame game = gameAfter("e2e4");
+
+        assertTrue(game.undoLastMove(Side.WHITE));
+
+        assertEquals(0, game.moveCount());
+        assertFalse(game.undoLastMove(Side.WHITE));
+    }
+
+    @Test
+    public void undoWithoutAnAutomaticOpponent_takesOneMoveBack() {
+        ChessGame game = gameAfter("e2e4", "e7e5");
+
+        assertTrue(game.undoLastMove(null));
+
+        assertEquals(1, game.moveCount());
+    }
+
+    @Test
+    public void redoAgainstAnAutomaticOpponent_reappliesItsReplyToo() {
+        ChessGame game = gameAfter("e2e4", "e7e5", "g1f3", "b8c6");
+        game.undoLastMove(Side.BLACK);
+
+        assertTrue(game.redoMove(Side.BLACK));
+
+        assertEquals(4, game.moveCount());
+        assertFalse(game.redoMove(Side.BLACK));
+    }
+
+    @Test
+    public void jumpToPlyAgainstAnAutomaticOpponent_landsOnThePlayersTurn() {
+        ChessGame game = gameAfter("e2e4", "e7e5", "g1f3", "b8c6");
+
+        // Ply 1 has Black, the automatic side, to move: go on to its reply.
+        assertEquals(2, game.jumpToPly(1, Side.BLACK));
+        assertEquals("e7e5", game.lastMoveUci());
+        // Same entry again: same position, however it was reached.
+        assertEquals(2, game.jumpToPly(2, Side.BLACK));
+        assertEquals(3, game.jumpToPly(3, null));
+        assertEquals("g1f3", game.lastMoveUci());
+    }
+
+    @Test
+    public void jumpToPly_reportsATargetOutOfRange() {
+        ChessGame game = gameAfter("e2e4", "e7e5");
+
+        assertEquals(-1, game.jumpToPly(5, null));
+        assertEquals(0, game.jumpToPly(0, Side.BLACK));
+        assertNull(game.lastMoveUci());
+    }
+
+    @Test
+    public void checkedKingSquare_isTheKingOfTheSideInCheck() {
+        assertNull(gameAfter("e2e4").checkedKingSquare());
+
+        ChessGame game = gameAfter("e2e4", "f7f6", "d1h5");
+
+        assertEquals(Square.E8, game.checkedKingSquare());
+    }
+
+    @Test
+    public void hasSideToMovePieceOn_knowsWhoseTurnItIs() {
+        ChessGame game = gameAfter("e2e4");
+
+        assertTrue(game.hasSideToMovePieceOn(Square.E7));
+        assertFalse(game.hasSideToMovePieceOn(Square.E4));
+        assertFalse(game.hasSideToMovePieceOn(Square.E5));
+    }
 }
