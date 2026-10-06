@@ -26,6 +26,7 @@ import java.util.OptionalInt;
 public final class EngineSearchFlow {
 
     private static final int ANALYSIS_MOVETIME_MS = 1500;
+    private static final int EVAL_BEFORE_MOVE_MOVETIME_MS = 400;
     private static final int HINT_MOVETIME_MS = 1500;
     private static final int HINT_MULTI_PV_LINES = 3;
     private static final int POST_GAME_MOVETIME_MS = 400;
@@ -46,8 +47,8 @@ public final class EngineSearchFlow {
         boolean isBoardInteractive();
 
         /**
-         * Whether Stockfish is the opponent and to move: its own search then covers the evaluation
-         * too, and a separate analysis search would be redundant.
+         * Whether Stockfish is the opponent and to move: {@link #startEngineMoveSearch} then
+         * evaluates the position itself, and a separate analysis search would be redundant.
          */
         boolean isEngineAboutToMove();
 
@@ -115,6 +116,7 @@ public final class EngineSearchFlow {
      */
     private enum SearchPurpose {
         REAL_MOVE,
+        EVAL_BEFORE_MOVE,
         ANALYSIS,
         HINT,
         POST_GAME
@@ -131,6 +133,9 @@ public final class EngineSearchFlow {
 
         /** A hint search given up for a newer search; its answer is no longer a hint. */
         boolean superseded;
+
+        /** For {@link SearchPurpose#EVAL_BEFORE_MOVE}: how long the move search after it gets. */
+        int engineMovetimeMs;
 
         PendingSearch(SearchPurpose purpose, int generation, int moveCount, Side sideToMove) {
             this.purpose = purpose;
@@ -235,16 +240,31 @@ public final class EngineSearchFlow {
 
     // ------------------------------------------------------------ searches
 
-    /** Searches the current position for the engine's own reply; see {@link Host#onEngineMove}. */
+    /**
+     * Searches the current position for the engine's own reply; see {@link Host#onEngineMove}.
+     *
+     * <p>With the evaluation switched on, a short search at full strength comes first. The move
+     * search runs at the opponent's limited strength, and what it reports is no evaluation: its
+     * last line is the score of the weaker move Stockfish picked on purpose. The number shown and
+     * the grade of the player's move both come from the search before it, so the engine answers
+     * that much later.
+     */
     public void startEngineMoveSearch(int movetimeMs) {
         PendingSearch newest = pendingSearches.peekLast();
         if (newest != null
-                && newest.purpose == SearchPurpose.REAL_MOVE
+                && (newest.purpose == SearchPurpose.REAL_MOVE
+                        || newest.purpose == SearchPurpose.EVAL_BEFORE_MOVE)
                 && newest.generation == generation
                 && newest.moveCount == game.moveCount()) {
             // Already searching for this very move: a new game asks for it once itself and once
             // more when the engine reports ready. A second search would cut the first one short,
             // and both answers would arrive as the engine's move.
+            return;
+        }
+        if (host.isEvaluationEnabled() && !host.isTrainingMode()) {
+            PendingSearch evaluation =
+                    startSearch(SearchPurpose.EVAL_BEFORE_MOVE, EVAL_BEFORE_MOVE_MOVETIME_MS);
+            evaluation.engineMovetimeMs = movetimeMs;
             return;
         }
         startSearch(SearchPurpose.REAL_MOVE, movetimeMs);
@@ -290,13 +310,15 @@ public final class EngineSearchFlow {
      * and kicks it off from the current position, so that neither a real-move nor an analysis
      * search can silently run into the other's still-active "go".
      */
-    private void startSearch(SearchPurpose purpose, int movetimeMs) {
+    private PendingSearch startSearch(SearchPurpose purpose, int movetimeMs) {
         engine.stop();
         supersedeHint();
-        pendingSearches.add(newSearch(purpose));
+        PendingSearch search = newSearch(purpose);
+        pendingSearches.add(search);
         setStrengthFor(purpose);
         engine.setPosition(game.startFen(), game.toUciMoveList());
         engine.go(movetimeMs);
+        return search;
     }
 
     /**
@@ -491,6 +513,9 @@ public final class EngineSearchFlow {
             case ANALYSIS:
                 // onInfo() already streamed the evaluation for it.
                 return;
+            case EVAL_BEFORE_MOVE:
+                startSearch(SearchPurpose.REAL_MOVE, search.engineMovetimeMs);
+                return;
             case HINT:
                 if (search.superseded) {
                     return;
@@ -520,6 +545,10 @@ public final class EngineSearchFlow {
             if (!search.superseded) {
                 hintCandidates.capture(infoLine);
             }
+            return;
+        }
+        if (search.purpose == SearchPurpose.REAL_MOVE) {
+            // The score of a search at the opponent's limited strength; see startEngineMoveSearch.
             return;
         }
         OptionalInt mate = UciInfoParser.parseScoreMate(infoLine);

@@ -172,6 +172,7 @@ public class EngineSearchFlowTest {
 
     @Test
     public void engineMoveSearch_reportsTheBestMove() {
+        host.evaluationEnabled = false;
         game.applyUciMove("e2e4");
 
         flow.startEngineMoveSearch(1200);
@@ -184,6 +185,7 @@ public class EngineSearchFlowTest {
 
     @Test
     public void engineMoveSearch_reportsNullWhenTheEngineHasNoMove() {
+        host.evaluationEnabled = false;
         flow.startEngineMoveSearch(1200);
         flow.onBestMove("(none)");
 
@@ -214,10 +216,12 @@ public class EngineSearchFlowTest {
 
     @Test
     public void evaluation_isSearchedAtFullStrengthWhateverTheOpponentsElo() {
+        host.evaluationEnabled = false;
         flow.startEngineMoveSearch(1200);
         flow.onBestMove("e2e4");
         game.applyUciMove("e2e4");
 
+        host.evaluationEnabled = true;
         flow.maybeStartAnalysis();
 
         assertEquals(
@@ -253,7 +257,9 @@ public class EngineSearchFlowTest {
         flow.onInfo("info depth 10 score cp 30 pv e2e4");
         flow.onBestMove("e2e4");
 
-        assertEquals(Arrays.asList("restoreStrength", "abandoned"), host.events);
+        // Neither an evaluation nor the move search that would have followed it.
+        assertEquals(Arrays.asList("abandoned"), host.events);
+        assertEquals(1, engine.count("go"));
     }
 
     @Test
@@ -261,6 +267,7 @@ public class EngineSearchFlowTest {
         // An analysis search is still running when the engine's own move is asked for: Stockfish
         // answers the stopped one first, and that answer must not be taken for the move.
         flow.maybeStartAnalysis();
+        host.evaluationEnabled = false;
         flow.startEngineMoveSearch(1200);
 
         flow.onBestMove("g1f3");
@@ -271,19 +278,46 @@ public class EngineSearchFlowTest {
     }
 
     @Test
+    public void engineMoveSearch_evaluatesThePositionAtFullStrengthFirst() {
+        game.applyUciMove("e2e4");
+
+        flow.startEngineMoveSearch(1200);
+
+        assertEquals(
+                Arrays.asList("stop", "fullStrength", "position e2e4", "go 400"), engine.commands);
+        flow.onInfo("info depth 12 score cp -20 pv e7e5");
+        flow.onBestMove("e7e5");
+
+        // Only now the move search, at the opponent's strength.
+        assertEquals(Arrays.asList("eval:20", "restoreStrength"), host.events);
+        assertEquals(
+                Arrays.asList("stop", "position e2e4", "go 1200"),
+                engine.commands.subList(4, engine.commands.size()));
+
+        // Its last line is the score of the weaker move picked on purpose: no evaluation.
+        flow.onInfo("info depth 9 score cp -700 pv a7a6");
+        flow.onBestMove("a7a6");
+
+        assertEquals(Arrays.asList("eval:20", "restoreStrength", "engineMove:a7a6"), host.events);
+    }
+
+    @Test
     public void engineMoveSearch_runsOncePerPosition() {
         // A new game asks for the engine's move itself and again when the engine reports ready.
         flow.startEngineMoveSearch(1200);
         flow.startEngineMoveSearch(1200);
 
         assertEquals(1, engine.count("go"));
+        flow.onBestMove("e2e4"); // the evaluation before the move search
+        flow.startEngineMoveSearch(1200);
+        assertEquals(2, engine.count("go"));
         flow.onBestMove("e2e4");
         assertEquals(Arrays.asList("restoreStrength", "engineMove:e2e4"), host.events);
 
         game.applyUciMove("e2e4");
         game.applyUciMove("e7e5");
         flow.startEngineMoveSearch(1200);
-        assertEquals(2, engine.count("go"));
+        assertEquals(3, engine.count("go"));
     }
 
     @Test
@@ -393,18 +427,22 @@ public class EngineSearchFlowTest {
         flow.startEngineMoveSearch(1200);
         flow.onInfo("info depth 10 score cp 130 pv e7e5");
         flow.onBestMove("e7e5");
+        // The weakened engine is about to play a move that does not punish f3; the grade has
+        // been taken from the full-strength evaluation before.
+        flow.onInfo("info depth 9 score cp -20 pv a7a6");
+        flow.onBestMove("a7a6");
         // What the host does with the engine's move:
         flow.recordMoveQualityBaseline();
-        game.applyUciMove("e7e5");
+        game.applyUciMove("a7a6");
 
         assertEquals(
                 Arrays.asList(
                         "eval:30",
                         "quality:null:0",
-                        "restoreStrength",
                         "eval:-130",
                         "quality:MISTAKE:160",
-                        "engineMove:e7e5"),
+                        "restoreStrength",
+                        "engineMove:a7a6"),
                 host.events);
 
         // The player's next move takes it down.

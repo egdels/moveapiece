@@ -1461,8 +1461,8 @@ final class GameController
     /**
      * Starts a dedicated evaluation search when nothing else is already searching the current
      * position. If the engine is about to search for its own reply anyway ({@link
-     * #maybeStartEngineMove}), that search's "info" stream already covers the evaluation display,
-     * so a second, redundant search is skipped.
+     * #maybeStartEngineMove}), {@link EngineSearchFlow#startEngineMoveSearch} evaluates the
+     * position first, so a second, redundant search is skipped.
      */
     private void maybeTriggerAnalysis() {
         boolean visible = mode != Mode.TRAINING;
@@ -2421,9 +2421,10 @@ final class GameController
     @Override
     public boolean isEngineAboutToMove() {
         // Skipped only when Stockfish is the paired engine and it's about to search for its own
-        // reply move anyway (#maybeStartEngineMove) - that search's own "info" stream already
-        // covers the evaluation display and move-quality grading, so a second, redundant search
-        // here would be wasted. HUMAN_VS_MAIA doesn't get that for free: Maia's own move-generation
+        // reply move anyway (#maybeStartEngineMove) - EngineSearchFlow evaluates the position
+        // right before that search, for the evaluation display and move-quality grading, so a
+        // second, redundant search here would be wasted. HUMAN_VS_MAIA doesn't get that for free:
+        // Maia's own move-generation
         // never touches this Stockfish instance at all, and its reply is a near-instant single
         // forward pass with no search - without #scheduleMaiaMove's deliberate humanlike pause
         // there'd be no time for a fresh analysis search to produce anything before the position
