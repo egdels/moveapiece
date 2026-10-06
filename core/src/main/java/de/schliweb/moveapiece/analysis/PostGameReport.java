@@ -77,12 +77,16 @@ public final class PostGameReport {
      * @param evals the engine's score for each position from its side to move, in centipawns: one
      *     more than {@code uciMoves}, starting with the position before the first move
      * @param sanMoves the same moves in SAN, for display; a move missing there is shown in UCI
+     * @param startPly the half-moves between White's move 1 and the first of {@code uciMoves}: 0
+     *     for a game from the initial position, odd when Black moved first (a position taken over
+     *     from the board)
      */
     public static PostGameReport of(
-            List<String> uciMoves, List<Integer> evals, List<String> sanMoves) {
+            List<String> uciMoves, List<Integer> evals, List<String> sanMoves, int startPly) {
         PostGameReport report = new PostGameReport();
         for (int ply = 0; ply < uciMoves.size(); ply++) {
-            SideSummary side = ply % 2 == 0 ? report.white : report.black;
+            int gamePly = startPly + ply;
+            SideSummary side = gamePly % 2 == 0 ? report.white : report.black;
             side.plies++;
             // Both scores are from their own side to move, so the second one is already the
             // mover's eval with the sign flipped: adding it is the subtraction.
@@ -94,7 +98,7 @@ public final class PostGameReport {
             }
             side.counts[quality.ordinal()]++;
             String san = ply < sanMoves.size() ? sanMoves.get(ply) : uciMoves.get(ply);
-            report.flaggedMoves.add(new FlaggedMove(ply, san, quality, cpLoss));
+            report.flaggedMoves.add(new FlaggedMove(gamePly, san, quality, cpLoss));
         }
         return report;
     }

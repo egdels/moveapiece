@@ -550,4 +550,21 @@ public class ChessGameTest {
         assertFalse(game.hasSideToMovePieceOn(Square.E4));
         assertFalse(game.hasSideToMovePieceOn(Square.E5));
     }
+
+    @Test
+    public void startPly_countsTheHalfMovesBeforeTheFirstMoveOfTheGame() {
+        ChessGame game = new ChessGame();
+        assertEquals(0, game.startPly());
+
+        // A position taken over from the board with Black to move.
+        game.loadFen("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1");
+        assertEquals(1, game.startPly());
+
+        game.loadFen("4k3/8/8/8/8/8/4P3/4K3 w - - 3 17");
+        assertEquals(32, game.startPly());
+
+        // No move counters: counted from move 1.
+        game.loadFen("4k3/8/8/8/8/8/4P3/4K3 b - -");
+        assertEquals(1, game.startPly());
+    }
 }

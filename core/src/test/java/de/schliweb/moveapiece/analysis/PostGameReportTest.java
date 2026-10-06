@@ -26,7 +26,7 @@ public class PostGameReportTest {
         List<Integer> evals = Arrays.asList(30, -30, 200, 150);
         List<String> san = Arrays.asList("e4", "f6", "Qh5");
 
-        PostGameReport report = PostGameReport.of(uci, evals, san);
+        PostGameReport report = PostGameReport.of(uci, evals, san, 0);
 
         assertEquals(0, report.white().count(MoveQuality.INACCURACY));
         assertEquals(0, report.white().count(MoveQuality.MISTAKE));
@@ -47,13 +47,33 @@ public class PostGameReportTest {
     }
 
     @Test
+    public void of_assignsTheMovesToTheRightSideWhenBlackMovedFirst() {
+        // A position taken over from the board with Black to move: ...e5 costs nothing, White's
+        // f3 then throws away 170.
+        PostGameReport report =
+                PostGameReport.of(
+                        Arrays.asList("e7e5", "f2f3"),
+                        Arrays.asList(0, 0, 170),
+                        Arrays.asList("e5", "f3"),
+                        1);
+
+        assertEquals(1, report.white().count(MoveQuality.MISTAKE));
+        assertEquals(1.7, report.white().averageLossPawns(), EPS);
+        assertEquals(0, report.black().count(MoveQuality.MISTAKE));
+        assertEquals(0.0, report.black().averageLossPawns(), EPS);
+        assertEquals("2.", report.flaggedMoves().get(0).plyLabel());
+        assertEquals("f3", report.flaggedMoves().get(0).san());
+    }
+
+    @Test
     public void of_neverCountsAnImprovementAsNegativeLoss() {
         // The eval swings in the mover's favour (engine depth noise): loss 0, not -40.
         PostGameReport report =
                 PostGameReport.of(
                         Collections.singletonList("e2e4"),
                         Arrays.asList(10, -50),
-                        Collections.singletonList("e4"));
+                        Collections.singletonList("e4"),
+                        0);
 
         assertEquals(0.0, report.white().averageLossPawns(), EPS);
         assertTrue(report.flaggedMoves().isEmpty());
@@ -65,7 +85,8 @@ public class PostGameReportTest {
                 PostGameReport.of(
                         Collections.singletonList("e2e4"),
                         Arrays.asList(400, 0),
-                        Collections.emptyList());
+                        Collections.emptyList(),
+                        0);
 
         assertEquals("e2e4", report.flaggedMoves().get(0).san());
         assertEquals("1.", report.flaggedMoves().get(0).plyLabel());

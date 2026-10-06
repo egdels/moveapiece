@@ -295,6 +295,25 @@ public class ChessGame {
         return startFen;
     }
 
+    /**
+     * How many half-moves lie between White's move 1 and this game's first move, per {@link
+     * #startFen()}: 0 for a game from the initial position, 1 when it starts with Black to move at
+     * move 1. Even means White moves first.
+     */
+    public int startPly() {
+        String[] fields = startFen.trim().split("\\s+");
+        int fullMove = 1;
+        if (fields.length > 5) {
+            try {
+                fullMove = Math.max(1, Integer.parseInt(fields[5]));
+            } catch (NumberFormatException ignored) {
+                // No usable move number in the FEN: count from move 1.
+            }
+        }
+        boolean blackFirst = fields.length > 1 && "b".equals(fields[1]);
+        return (fullMove - 1) * 2 + (blackFirst ? 1 : 0);
+    }
+
     /** Sets up an arbitrary position, clearing move history. */
     public void loadFen(String fen) {
         board.loadFromFen(fen);

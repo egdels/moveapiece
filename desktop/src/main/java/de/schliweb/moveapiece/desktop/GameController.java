@@ -1411,7 +1411,8 @@ final class GameController
 
     private void showPostGameReport(List<String> uciMoves, List<Integer> evals) {
         PostGameReport analysis =
-                PostGameReport.of(uciMoves, evals, PostGameReport.sanMoveList(game.toSan()));
+                PostGameReport.of(
+                        uciMoves, evals, PostGameReport.sanMoveList(game.toSan()), game.startPly());
         StringBuilder flaggedMoves = new StringBuilder();
         for (PostGameReport.FlaggedMove move : analysis.flaggedMoves()) {
             if (flaggedMoves.length() > 0) {
