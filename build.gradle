@@ -51,20 +51,23 @@ subprojects {
     }
 }
 
-// The plain-Java library modules compile with every javac lint enabled and warnings as errors.
-// :desktop and :app are left out: JavaFX 24 class files (version 66) and the Android toolchain
-// produce warnings of their own that these modules cannot fix.
+// The plain-Java library modules compile with every javac lint enabled. :desktop and :app are left
+// out: JavaFX 24 class files (version 66) and the Android toolchain produce warnings of their own
+// that these modules cannot fix.
 configure(subprojects.findAll { it.name in ['pegasus-core', 'chessnut-core', 'core'] }) {
     tasks.withType(JavaCompile).configureEach {
-        options.compilerArgs += ['-Xlint:all', '-Werror']
+        options.compilerArgs += ['-Xlint:all']
     }
 }
 
-// Error Prone is opt-in (-Perrorprone), so that release builds - F-Droid's in particular - compile
-// with plain javac and nothing else on the processor path. CI's code-quality job passes the flag.
-// Its warnings fail the build in the library modules through -Werror above, and in :desktop when
-// the build runs on JDK 22 or newer. On older JDKs javac warns about every JavaFX 24 class file
-// (version 66) it reads, which -Werror would turn into errors, so there they are only reported.
+// Error Prone and -Werror are opt-in (-Perrorprone), so that release builds - F-Droid's in
+// particular - compile with plain javac, nothing else on the processor path, and do not break over
+// a warning: which lints javac has depends on the JDK (25 reports dangling doc comments, 21 does
+// not), and a tag must stay buildable on JDKs newer than the ones CI knows. CI's error-prone job
+// passes the flag on JDK 21 and 25. With it, javac's and Error Prone's warnings fail the build in
+// the library modules, and in :desktop when the build runs on JDK 22 or newer. On older JDKs javac
+// warns about every JavaFX 24 class file (version 66) it reads, which -Werror would turn into
+// errors, so there they are only reported.
 if (project.hasProperty('errorprone')) {
     configure(subprojects.findAll { it.name in ['pegasus-core', 'chessnut-core', 'core', 'desktop'] }) {
         plugins.withId('java') {
@@ -79,7 +82,7 @@ if (project.hasProperty('errorprone')) {
                 options.fork = true
                 // :desktop's JavaFX class-file warnings alone would fill javac's default limit of 100.
                 options.compilerArgs += ['-Xmaxwarns', '1000']
-                if (project.name == 'desktop' && JavaVersion.current() >= JavaVersion.VERSION_22) {
+                if (project.name != 'desktop' || JavaVersion.current() >= JavaVersion.VERSION_22) {
                     options.compilerArgs += ['-Werror']
                 }
                 options.errorprone {

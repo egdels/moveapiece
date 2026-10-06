@@ -41,9 +41,10 @@ jobs:
           path: app/build/reports/lint-results-debug.html
 
   error-prone:
-    # Opt-in (-Perrorprone, see the root build.gradle). Findings fail the build in the library
-    # modules on either JDK, in :desktop only on 25 (see there). 25 is also what the desktop
-    # legs of desktop.yml and release.yml build with, and its javac has lint checks 21 lacks.
+    # Opt-in (-Perrorprone, see the root build.gradle), and the only job in which warnings are
+    # errors: javac's lints and Error Prone's findings fail the build in the library modules on
+    # either JDK, in :desktop only on 25 (see there). 25 is also what the desktop legs of
+    # desktop.yml and release.yml build with, and its javac has lint checks 21 lacks.
     name: Error Prone (JDK ${{ matrix.java }})
     runs-on: ubuntu-latest
     strategy:
