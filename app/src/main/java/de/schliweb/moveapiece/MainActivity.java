@@ -1428,11 +1428,6 @@ public class MainActivity extends AppCompatActivity
         return mode == GameMode.ENGINE || mode == GameMode.MAIA;
     }
 
-    /** The side that moves by itself (Stockfish or Maia), or null in the other modes. */
-    private Side autoMoveSide() {
-        return isPairedEngineMode() ? engineSide : null;
-    }
-
     // ---- Board <-> game glue -------------------------------------------------
 
     private void refreshBoard() {
@@ -2466,13 +2461,18 @@ public class MainActivity extends AppCompatActivity
         // no time for a fresh analysis search to produce anything before the position moved on.
         // With that pause now in place there's genuine idle wall-clock time, so this search always
         // runs for MAIA too - which is what lets EngineSearchFlow grade the human's move
-        // (blunder/mistake/inaccuracy) in Maia games as well, not just Stockfish ones. A slight
-        // mismatch is tolerated at the tail end: the analysis search (1.5s) can outlast
-        // #scheduleMaiaMove's pause (max 1.4s), so this search sometimes gets stopped by the next
+        // (blunder/mistake/inaccuracy) in Maia games as well, not just Stockfish ones. The analysis
+        // search (1.5s) outlasts #scheduleMaiaMove's pause (max 1.4s), so it is stopped by the next
         // one (started for the post-reply position) before finishing - same "stopped and
-        // superseded" pattern already used everywhere else searches chain here, and harmless since
-        // grading only needs the first info line, which arrives in milliseconds.
+        // superseded" pattern already used everywhere else searches chain here, and harmless: the
+        // flow grades the move when Maia's reply is applied, from what the search has found by
+        // then.
         return mode == GameMode.ENGINE && game.sideToMove() == engineSide;
+    }
+
+    @Override
+    public Side autoMoveSide() {
+        return isPairedEngineMode() ? engineSide : null;
     }
 
     @Override

@@ -10,6 +10,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+import com.github.bhlangonijr.chesslib.Side;
 import de.schliweb.moveapiece.engine.StockfishEngine;
 import de.schliweb.moveapiece.logic.ChessGame;
 import java.util.ArrayList;
@@ -76,6 +77,7 @@ public class EngineSearchFlowTest {
         boolean evaluationEnabled = true;
         boolean boardInteractive = true;
         boolean engineAboutToMove;
+        Side autoSide;
         List<String> reportMoves;
         List<Integer> reportEvals;
 
@@ -102,6 +104,11 @@ public class EngineSearchFlowTest {
         @Override
         public boolean isEngineAboutToMove() {
             return engineAboutToMove;
+        }
+
+        @Override
+        public Side autoMoveSide() {
+            return autoSide;
         }
 
         @Override
@@ -342,7 +349,67 @@ public class EngineSearchFlowTest {
         flow.onInfo("info depth 10 score cp 130 pv e7e5");
         flow.onBestMove("e7e5");
 
-        assertEquals(Arrays.asList("eval:-130"), host.events);
+        assertEquals(Arrays.asList("quality:null:0", "eval:-130"), host.events);
+    }
+
+    @Test
+    public void moveQuality_gradesThePlayersMoveWhenTheOpponentRepliesBeforeTheSearchIsThrough() {
+        // Maia answers within 1.4 s, the search of the position takes 1.5 s.
+        host.autoSide = Side.BLACK;
+        flow.maybeStartAnalysis();
+        flow.onInfo("info depth 10 score cp 30 pv e2e4");
+        flow.onBestMove("e2e4");
+        flow.recordMoveQualityBaseline();
+        game.applyUciMove("f2f3");
+        flow.maybeStartAnalysis();
+        flow.onInfo("info depth 10 score cp 130 pv e7e5");
+
+        flow.recordMoveQualityBaseline();
+        game.applyUciMove("e7e5");
+        flow.maybeStartAnalysis();
+        flow.onBestMove("e7e5");
+        flow.onInfo("info depth 10 score cp -140 pv d2d4");
+        flow.onBestMove("d2d4");
+
+        // The grade is White's; Black's reply is neither graded nor does it take the grade down.
+        assertEquals(
+                Arrays.asList(
+                        "eval:30",
+                        "quality:null:0",
+                        "eval:-130",
+                        "quality:MISTAKE:160",
+                        "eval:-140"),
+                host.events);
+    }
+
+    @Test
+    public void moveQuality_thePlayersGradeOutlastsTheEnginesOwnReply() {
+        host.autoSide = Side.BLACK;
+        flow.maybeStartAnalysis();
+        flow.onInfo("info depth 10 score cp 30 pv e2e4");
+        flow.onBestMove("e2e4");
+        flow.recordMoveQualityBaseline();
+        game.applyUciMove("f2f3");
+        flow.startEngineMoveSearch(1200);
+        flow.onInfo("info depth 10 score cp 130 pv e7e5");
+        flow.onBestMove("e7e5");
+        // What the host does with the engine's move:
+        flow.recordMoveQualityBaseline();
+        game.applyUciMove("e7e5");
+
+        assertEquals(
+                Arrays.asList(
+                        "eval:30",
+                        "quality:null:0",
+                        "restoreStrength",
+                        "eval:-130",
+                        "quality:MISTAKE:160",
+                        "engineMove:e7e5"),
+                host.events);
+
+        // The player's next move takes it down.
+        flow.recordMoveQualityBaseline();
+        assertEquals("quality:null:0", host.events.get(host.events.size() - 1));
     }
 
     @Test

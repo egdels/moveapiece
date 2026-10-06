@@ -52,6 +52,13 @@ public final class EngineSearchFlow {
         boolean isEngineAboutToMove();
 
         /**
+         * The side that moves by itself (Stockfish or Maia as the opponent), or {@code null} when
+         * both sides are played by hand. Only the player's own moves are graded against such an
+         * opponent.
+         */
+        Side autoMoveSide();
+
+        /**
          * Sets the engine to the opponent's strength, right before it searches for its own move.
          * Every other search (evaluation, hint, post-game analysis) runs at full strength.
          */
@@ -76,8 +83,9 @@ public final class EngineSearchFlow {
         void onEvaluationMate(int whiteRelativeMateIn);
 
         /**
-         * The move just played has been graded, or - with {@code quality == null} - an earlier
-         * grade no longer applies (the move was fine, or the next move is being made).
+         * A move has been graded, or - with {@code quality == null} - an earlier grade no longer
+         * applies (the move was fine, or the next move is being made). Against an opponent that
+         * moves by itself the grade is the player's and outlasts the opponent's reply.
          */
         void onMoveQuality(MoveQuality quality, int cpLoss);
 
@@ -363,22 +371,33 @@ public final class EngineSearchFlow {
      * the game; silently skips grading this move in training mode or when no eval is known for
      * exactly the current position - e.g. right after the evaluation was switched on, or on the
      * game's very first ply before any search has finished.
+     *
+     * <p>The reply of an opponent that moves by itself ({@link Host#autoMoveSide}) is not graded,
+     * and the grade of the player's move stays up through it. Should that grade still be
+     * outstanding - Maia answers before the search of the position is through - this is the last
+     * moment the position is on the board, and the move is graded from what the search has found so
+     * far.
      */
     public void recordMoveQualityBaseline() {
+        if (game.sideToMove() == host.autoMoveSide()) {
+            maybeFinalizeMoveQuality();
+            moveQualityBaselineMoveCount = -1;
+            return;
+        }
+        host.onMoveQuality(null, 0);
         if (host.isTrainingMode() || lastPositionEvalMoveCount != game.moveCount()) {
             moveQualityBaselineMoveCount = -1;
             return;
         }
         moveQualityBaselineCp = lastPositionEvalCp;
         moveQualityBaselineMoveCount = game.moveCount();
-        host.onMoveQuality(null, 0);
     }
 
     /**
-     * If a move is being graded and the eval that just finished belongs to the resulting position,
-     * reports the move's centipawn loss: baseline eval minus the resulting position's eval, both
-     * from the mover's perspective - the latter is the raw score of the position with the opponent
-     * to move, so adding rather than subtracting it does the flip.
+     * If a move is being graded and an eval of the resulting position is known, reports the move's
+     * centipawn loss: baseline eval minus the resulting position's eval, both from the mover's
+     * perspective - the latter is the raw score of the position with the opponent to move, so
+     * adding rather than subtracting it does the flip.
      */
     private void maybeFinalizeMoveQuality() {
         if (moveQualityBaselineMoveCount < 0
