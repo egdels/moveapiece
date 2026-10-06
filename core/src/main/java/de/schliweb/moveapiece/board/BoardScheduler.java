@@ -21,9 +21,13 @@ public interface BoardScheduler {
     /** Runs {@code action} on the main thread; callable from any thread. */
     void post(Runnable action);
 
-    /** Runs {@code action} on the main thread after {@code delayMs}. */
+    /** Runs {@code action} on the main thread after {@code delayMs}. Main thread only. */
     Task postDelayed(Runnable action, long delayMs);
 
-    /** Drops every pending delayed action. Nothing may be scheduled afterwards. */
+    /**
+     * Drops every pending delayed action, and every one scheduled from now on: a transport callback
+     * already on its way to the main thread can still reach the bridge and ask for a timer. Main
+     * thread only.
+     */
     void shutdown();
 }

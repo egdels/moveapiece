@@ -12,6 +12,7 @@ import android.os.Looper;
 public final class AndroidBoardScheduler implements BoardScheduler {
 
     private final Handler handler = new Handler(Looper.getMainLooper());
+    private boolean shutDown;
 
     @Override
     public void post(Runnable action) {
@@ -20,6 +21,9 @@ public final class AndroidBoardScheduler implements BoardScheduler {
 
     @Override
     public Task postDelayed(Runnable action, long delayMs) {
+        if (shutDown) {
+            return () -> {};
+        }
         // A Runnable of its own per call, so that cancelling removes this one posting only.
         Runnable posted = action::run;
         handler.postDelayed(posted, delayMs);
@@ -28,6 +32,7 @@ public final class AndroidBoardScheduler implements BoardScheduler {
 
     @Override
     public void shutdown() {
+        shutDown = true;
         handler.removeCallbacksAndMessages(null);
     }
 }

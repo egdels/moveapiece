@@ -40,6 +40,9 @@ public final class FxBoardScheduler implements BoardScheduler {
 
     @Override
     public Task postDelayed(Runnable action, long delayMs) {
+        if (timer.isShutdown()) {
+            return () -> {};
+        }
         // The flag is only touched on the FX thread: it closes the gap between the timer firing
         // and the action actually running there, in which cancelling the future is too late.
         boolean[] cancelled = {false};
