@@ -1712,13 +1712,13 @@ final class GameController
      * paired engine reply as one unit: undo/redo, move-history highlighting, and history navigation
      * ({@link #jumpToPly}) all skip past the reply together rather than landing between the two.
      */
+    private boolean isPairedEngineMode() {
+        return mode == Mode.HUMAN_VS_STOCKFISH || mode == Mode.HUMAN_VS_MAIA;
+    }
+
     /** The side that moves by itself (Stockfish or Maia), or null in the other modes. */
     private Side autoMoveSide() {
         return isPairedEngineMode() ? humanSide.flip() : null;
-    }
-
-    private boolean isPairedEngineMode() {
-        return mode == Mode.HUMAN_VS_STOCKFISH || mode == Mode.HUMAN_VS_MAIA;
     }
 
     /**

@@ -1424,13 +1424,13 @@ public class MainActivity extends AppCompatActivity
      * navigation ({@link #jumpToPly}) all skip past the reply together rather than landing between
      * the two.
      */
+    private boolean isPairedEngineMode() {
+        return mode == GameMode.ENGINE || mode == GameMode.MAIA;
+    }
+
     /** The side that moves by itself (Stockfish or Maia), or null in the other modes. */
     private Side autoMoveSide() {
         return isPairedEngineMode() ? engineSide : null;
-    }
-
-    private boolean isPairedEngineMode() {
-        return mode == GameMode.ENGINE || mode == GameMode.MAIA;
     }
 
     // ---- Board <-> game glue -------------------------------------------------
