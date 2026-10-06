@@ -264,6 +264,59 @@ public class EngineSearchFlowTest {
     }
 
     @Test
+    public void engineMoveSearch_runsOncePerPosition() {
+        // A new game asks for the engine's move itself and again when the engine reports ready.
+        flow.startEngineMoveSearch(1200);
+        flow.startEngineMoveSearch(1200);
+
+        assertEquals(1, engine.count("go"));
+        flow.onBestMove("e2e4");
+        assertEquals(Arrays.asList("restoreStrength", "engineMove:e2e4"), host.events);
+
+        game.applyUciMove("e2e4");
+        game.applyUciMove("e7e5");
+        flow.startEngineMoveSearch(1200);
+        assertEquals(2, engine.count("go"));
+    }
+
+    @Test
+    public void evaluation_ignoresLinesOfASearchReplacedByANewerOne() {
+        flow.maybeStartAnalysis();
+        flow.onInfo("info depth 10 score cp 200 pv e2e4");
+        flow.recordMoveQualityBaseline();
+        game.applyUciMove("e2e4");
+        flow.maybeStartAnalysis();
+        // Stockfish has not got round to the "stop" yet: one more line about the position before
+        // e4. It is neither Black's evaluation nor the result of White's move.
+        flow.onInfo("info depth 12 score cp 200 pv e2e4");
+        flow.onBestMove("e2e4");
+
+        assertEquals(Arrays.asList("eval:200", "quality:null:0"), host.events);
+
+        flow.onInfo("info depth 10 score cp -190 pv e7e5");
+        flow.onBestMove("e7e5");
+
+        assertEquals(
+                Arrays.asList("eval:200", "quality:null:0", "eval:190", "quality:null:10"),
+                host.events);
+    }
+
+    @Test
+    public void evaluation_ignoresALineArrivingAfterTheLastMoveOfTheGame() {
+        for (String uci : new String[] {"f2f3", "e7e5", "g2g4"}) {
+            game.applyUciMove(uci);
+        }
+        flow.maybeStartAnalysis();
+        flow.onInfo("info depth 10 score mate 1 pv d8h4");
+        game.applyUciMove("d8h4");
+        flow.maybeStartAnalysis(); // game over: nothing left to search
+
+        flow.onInfo("info depth 11 score mate 1 pv d8h4");
+
+        assertEquals(Arrays.asList("mate:-1"), host.events);
+    }
+
+    @Test
     public void moveQuality_gradesTheMoveOnceTheResultingPositionIsEvaluated() {
         flow.maybeStartAnalysis();
         flow.onInfo("info depth 10 score cp 30 pv e2e4");
@@ -310,6 +363,46 @@ public class EngineSearchFlowTest {
         assertEquals(Arrays.asList("hint:e2e4"), host.events);
         assertEquals("d2d4", flow.hintCandidates().move(1));
         assertEquals("multipv 1", engine.commands.get(engine.commands.size() - 1));
+    }
+
+    @Test
+    public void hint_isGivenUpWhenThePositionMovesOn() {
+        flow.requestHint();
+        flow.onInfo("info depth 10 multipv 1 score cp 40 pv e2e4 e7e5");
+        game.applyUciMove("d2d4");
+        flow.maybeStartAnalysis();
+
+        assertFalse(flow.isWaitingForHint());
+        // MultiPV is back to 1 before the new search's "go".
+        assertEquals(
+                Arrays.asList(
+                        "stop",
+                        "fullStrength",
+                        "multipv 3",
+                        "position ",
+                        "go 1500",
+                        "stop",
+                        "multipv 1",
+                        "fullStrength",
+                        "position d2d4",
+                        "go 1500"),
+                engine.commands);
+
+        flow.onInfo("info depth 11 multipv 2 score cp 10 pv d2d4 d7d5");
+        flow.onBestMove("e2e4");
+        flow.onInfo("info depth 10 multipv 1 score cp -20 pv d7d5");
+
+        // No arrow for the position left, and the stopped search's lines are no evaluation.
+        assertEquals(Arrays.asList("eval:20"), host.events);
+    }
+
+    @Test
+    public void hint_isNotCutShortByAnEvaluationOfTheSamePosition() {
+        flow.requestHint();
+        flow.maybeStartAnalysis();
+
+        assertTrue(flow.isWaitingForHint());
+        assertEquals(1, engine.count("go"));
     }
 
     @Test

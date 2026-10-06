@@ -116,9 +116,19 @@ public final class EngineSearchFlow {
         final SearchPurpose purpose;
         final int generation;
 
-        PendingSearch(SearchPurpose purpose, int generation) {
+        /** The position searched: its ply and who is to move there. */
+        final int moveCount;
+
+        final Side sideToMove;
+
+        /** A hint search given up for a newer search; its answer is no longer a hint. */
+        boolean superseded;
+
+        PendingSearch(SearchPurpose purpose, int generation, int moveCount, Side sideToMove) {
             this.purpose = purpose;
             this.generation = generation;
+            this.moveCount = moveCount;
+            this.sideToMove = sideToMove;
         }
     }
 
@@ -136,17 +146,11 @@ public final class EngineSearchFlow {
      */
     private int generation;
 
-    /** Who was to move in the position the most recent live search was started for. */
-    private Side analysisSideToMove;
-
-    private boolean waitingForHint;
-
     /**
-     * True only while a hint search (run with MultiPV raised) is in flight - {@link #onInfo} then
-     * routes every line to {@link #hintCandidates} instead of the evaluation, move-quality and
-     * post-game paths, none of which want a non-PV-1 line's score.
+     * The hint search in flight, or null. It runs with MultiPV raised, which has to be taken back
+     * before any other search starts: none of them wants a non-PV-1 line's score.
      */
-    private boolean multiPvSearchActive;
+    private PendingSearch hintSearch;
 
     private final MultiPvCandidates hintCandidates = new MultiPvCandidates(HINT_MULTI_PV_LINES);
 
@@ -197,7 +201,7 @@ public final class EngineSearchFlow {
     }
 
     public boolean isWaitingForHint() {
-        return waitingForHint;
+        return hintSearch != null;
     }
 
     public boolean isPostGameAnalysisRunning() {
@@ -225,7 +229,21 @@ public final class EngineSearchFlow {
 
     /** Searches the current position for the engine's own reply; see {@link Host#onEngineMove}. */
     public void startEngineMoveSearch(int movetimeMs) {
+        PendingSearch newest = pendingSearches.peekLast();
+        if (newest != null
+                && newest.purpose == SearchPurpose.REAL_MOVE
+                && newest.generation == generation
+                && newest.moveCount == game.moveCount()) {
+            // Already searching for this very move: a new game asks for it once itself and once
+            // more when the engine reports ready. A second search would cut the first one short,
+            // and both answers would arrive as the engine's move.
+            return;
+        }
         startSearch(SearchPurpose.REAL_MOVE, movetimeMs);
+    }
+
+    private PendingSearch newSearch(SearchPurpose purpose) {
+        return new PendingSearch(purpose, generation, game.moveCount(), game.sideToMove());
     }
 
     /**
@@ -252,6 +270,10 @@ public final class EngineSearchFlow {
         if (!host.isEngineReady() || host.isEngineAboutToMove()) {
             return;
         }
+        if (hintSearch != null && hintSearch.moveCount == game.moveCount()) {
+            // A hint is being searched for this very position; it is not cut short for a number.
+            return;
+        }
         startSearch(SearchPurpose.ANALYSIS, ANALYSIS_MOVETIME_MS);
     }
 
@@ -262,11 +284,26 @@ public final class EngineSearchFlow {
      */
     private void startSearch(SearchPurpose purpose, int movetimeMs) {
         engine.stop();
-        pendingSearches.add(new PendingSearch(purpose, generation));
-        analysisSideToMove = game.sideToMove();
+        supersedeHint();
+        pendingSearches.add(newSearch(purpose));
         setStrengthFor(purpose);
         engine.setPosition(game.startFen(), game.toUciMoveList());
         engine.go(movetimeMs);
+    }
+
+    /**
+     * A hint still being searched when another search starts is given up: the position has moved
+     * on, so its answer would be an arrow for a position no longer on the board. MultiPV goes back
+     * to 1 before the new search's "go", or that search would report three lines as well.
+     */
+    private void supersedeHint() {
+        if (hintSearch == null) {
+            return;
+        }
+        hintSearch.superseded = true;
+        hintSearch = null;
+        engine.setMultiPv(1);
+        host.onHintAvailabilityChanged();
     }
 
     /**
@@ -277,16 +314,15 @@ public final class EngineSearchFlow {
     public void requestHint() {
         if (!host.isEngineReady()
                 || host.isTrainingMode()
-                || waitingForHint
+                || hintSearch != null
                 || postGameUciMoves != null
                 || !host.isBoardInteractive()) {
             return;
         }
-        waitingForHint = true;
-        host.onHintAvailabilityChanged();
         engine.stop();
-        pendingSearches.add(new PendingSearch(SearchPurpose.HINT, generation));
-        multiPvSearchActive = true;
+        hintSearch = newSearch(SearchPurpose.HINT);
+        pendingSearches.add(hintSearch);
+        host.onHintAvailabilityChanged();
         hintCandidates.clear();
         setStrengthFor(SearchPurpose.HINT);
         engine.setMultiPv(HINT_MULTI_PV_LINES);
@@ -304,11 +340,10 @@ public final class EngineSearchFlow {
             engine.stop();
         }
         generation++;
-        waitingForHint = false;
-        if (multiPvSearchActive) {
+        if (hintSearch != null) {
             // A hint search was interrupted mid-flight - restore MultiPV so the next (unrelated)
-            // search's info lines are not misrouted to hintCandidates forever.
-            multiPvSearchActive = false;
+            // search does not report three lines as well.
+            hintSearch = null;
             if (engine != null) {
                 engine.setMultiPv(1);
             }
@@ -398,7 +433,7 @@ public final class EngineSearchFlow {
             recordPostGameEval(game.isCheckmate() ? -MoveQuality.mateToCp(0) : 0);
             return;
         }
-        pendingSearches.add(new PendingSearch(SearchPurpose.POST_GAME, generation));
+        pendingSearches.add(newSearch(SearchPurpose.POST_GAME));
         engine.setPosition(
                 game.startFen(), String.join(" ", postGameUciMoves.subList(0, positionIndex)));
         engine.go(POST_GAME_MOVETIME_MS);
@@ -438,8 +473,10 @@ public final class EngineSearchFlow {
                 // onInfo() already streamed the evaluation for it.
                 return;
             case HINT:
-                waitingForHint = false;
-                multiPvSearchActive = false;
+                if (search.superseded) {
+                    return;
+                }
+                hintSearch = null;
                 engine.setMultiPv(1);
                 host.onHintAvailabilityChanged();
                 host.onHint(move);
@@ -454,8 +491,16 @@ public final class EngineSearchFlow {
 
     /** To be called with every "info" line the engine reports. */
     public void onInfo(String infoLine) {
-        if (multiPvSearchActive) {
-            hintCandidates.capture(infoLine);
+        // Stockfish answers its searches in the order they were started in, so a line always
+        // belongs to the oldest search still unanswered.
+        PendingSearch search = pendingSearches.peek();
+        if (search == null || search.generation != generation) {
+            return;
+        }
+        if (search.purpose == SearchPurpose.HINT) {
+            if (!search.superseded) {
+                hintCandidates.capture(infoLine);
+            }
             return;
         }
         OptionalInt mate = UciInfoParser.parseScoreMate(infoLine);
@@ -465,26 +510,24 @@ public final class EngineSearchFlow {
             return;
         }
         int rawCp = mate.isPresent() ? MoveQuality.mateToCp(mate.getAsInt()) : cp.getAsInt();
-        if (postGameUciMoves != null) {
+        if (search.purpose == SearchPurpose.POST_GAME) {
             // Post-game analysis replays past positions - never the live eval/move-quality state.
             postGameLiveScoreCp = rawCp;
             return;
         }
         // engine.stop() is fire-and-forget - Stockfish can still emit a few more "info" lines for
-        // the search just abandoned before it finally replies with "bestmove" (which onBestMove()
-        // discards by this same check). Without it, one of those stale lines could land here after
-        // analysisSideToMove has moved on to a new position (one reached by undo, redo or a history
-        // click) and be shown and recorded as if it were a fresh eval for that position.
-        PendingSearch activeSearch = pendingSearches.peek();
-        if (activeSearch == null || activeSearch.generation != generation) {
+        // a search before it finally replies with "bestmove". Once a newer search is queued behind
+        // it, or a move was made without one (the last of a game), such a line is about a position
+        // no longer on the board and must be neither shown nor graded as the current one's.
+        if (pendingSearches.size() > 1 || search.moveCount != game.moveCount()) {
             return;
         }
-        if (!host.isEvaluationEnabled() || host.isTrainingMode() || analysisSideToMove == null) {
+        if (!host.isEvaluationEnabled() || host.isTrainingMode()) {
             return;
         }
         lastPositionEvalCp = rawCp;
-        lastPositionEvalMoveCount = game.moveCount();
-        int sign = analysisSideToMove == Side.BLACK ? -1 : 1;
+        lastPositionEvalMoveCount = search.moveCount;
+        int sign = search.sideToMove == Side.BLACK ? -1 : 1;
         if (mate.isPresent()) {
             host.onEvaluationMate(sign * mate.getAsInt());
         } else {
@@ -495,8 +538,7 @@ public final class EngineSearchFlow {
     /** The engine process failed: nothing queued will be answered any more. */
     public void onEngineError() {
         pendingSearches.clear();
-        waitingForHint = false;
-        multiPvSearchActive = false;
+        hintSearch = null;
         postGameUciMoves = null;
         postGamePositionEvals = null;
     }
