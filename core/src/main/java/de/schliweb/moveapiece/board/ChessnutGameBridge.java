@@ -135,10 +135,7 @@ public class ChessnutGameBridge {
                         new ChessnutDeviceListener() {
                             @Override
                             public void onBoardState(BoardState state, long uptimeSeconds) {
-                                LOG.log(
-                                        Level.INFO,
-                                        "board (uptime {0}s):\n{1}",
-                                        new Object[] {uptimeSeconds, state});
+                                LOG.info("board (uptime " + uptimeSeconds + "s):\n" + state);
                                 flow.onPhysicalBoard(state);
                             }
 
@@ -162,10 +159,7 @@ public class ChessnutGameBridge {
                             @Override
                             public void onUnknownFrame(
                                     String characteristicUuid, ChessnutFrame frame) {
-                                LOG.log(
-                                        Level.INFO,
-                                        "unknown frame on {0}: {1}",
-                                        new Object[] {characteristicUuid, frame});
+                                LOG.info("unknown frame on " + characteristicUuid + ": " + frame);
                             }
                         });
         transport.setListener(
@@ -238,7 +232,7 @@ public class ChessnutGameBridge {
     }
 
     private void onBattery(ChessnutBatteryStatus status) {
-        LOG.log(Level.INFO, "battery: {0}", status);
+        LOG.info("battery: " + status);
         boolean newlyLow = status.isLow() && !lastBatteryLow;
         boolean shouldNotify = batteryReportPending || newlyLow;
         batteryReportPending = false;
