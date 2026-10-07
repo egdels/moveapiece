@@ -229,7 +229,7 @@ public final class ChessnutGameFlow {
     /** Squares differing from the guide's target outside the guided move's own footprint. */
     private List<Integer> guideDeviationSquares() {
         if (!isGuideActive() || physicalBoard == null) {
-            return Collections.emptyList();
+            return new ArrayList<>();
         }
         List<Integer> squares = new ArrayList<>();
         for (int square : IdentityDiff.between(guideTargetBoard, physicalBoard).squares()) {

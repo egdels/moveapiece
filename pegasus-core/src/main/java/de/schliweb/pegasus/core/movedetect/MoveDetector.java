@@ -195,7 +195,7 @@ public final class MoveDetector {
             // first) and confirms immediately, not "maybe castling still
             // coming" - see isPlausibleIntermediate's excludeExactMatches
             // handling.
-            if (isPlausibleIntermediate(diff, physical, true)) {
+            if (isPlausibleIntermediate(diff, true)) {
                 pendingCandidates = candidates;
                 changeState(MoveDetectionState.MOVE_IN_PROGRESS);
                 listener.onMoveInProgress(diff);
@@ -205,7 +205,7 @@ public final class MoveDetector {
         }
 
         // 4. No final match: plausible intermediate state of a legal move?
-        if (isPlausibleIntermediate(diff, physical, false)) {
+        if (isPlausibleIntermediate(diff, false)) {
             pendingCandidates = new ArrayList<>();
             changeState(MoveDetectionState.MOVE_IN_PROGRESS);
             listener.onMoveInProgress(diff);
@@ -326,16 +326,15 @@ public final class MoveDetector {
      * {@link #MAX_LIFTED_PIECES} pieces lifted, or as progress towards one legal move (its
      * freed/gained squares) with up to {@link #MAX_UNRELATED_LIFTS} additional unrelated lifts.
      *
-     * @param excludeExactMatches if true, an exact candidate was already found for {@code physical}
-     *     (see evaluate(), step 3): only the "still in hand" ambiguity (unexpected empty -
+     * @param excludeExactMatches if true, an exact candidate was already found for the physical
+     *     board (see evaluate(), step 3): only the "still in hand" ambiguity (unexpected empty -
      *     occupancy can't tell a completed capture from the attacker merely being lifted) can still
      *     defer it. A non-empty {@code unexpected} means a square was observably newly occupied,
      *     i.e. something was actually placed down - the found candidate is complete on its own
      *     terms, so a different legal move's unrelated intermediate state (e.g. castling's
      *     rook-first step) is not grounds to withhold confirmation.
      */
-    private boolean isPlausibleIntermediate(
-            BoardMismatch diff, BoardState physical, boolean excludeExactMatches) {
+    private boolean isPlausibleIntermediate(BoardMismatch diff, boolean excludeExactMatches) {
         List<Integer> missing = diff.missingOccupied();
         List<Integer> unexpected = diff.unexpectedOccupied();
         if (unexpected.isEmpty()) {
@@ -346,9 +345,6 @@ public final class MoveDetector {
         }
         for (int i = 0; i < legalMoves.size(); i++) {
             BoardState after = legalOccupancies.get(i);
-            if (excludeExactMatches && after.equals(physical)) {
-                continue;
-            }
             boolean unexpectedExplained = true;
             for (int square : unexpected) {
                 if (!after.isOccupied(square)) {

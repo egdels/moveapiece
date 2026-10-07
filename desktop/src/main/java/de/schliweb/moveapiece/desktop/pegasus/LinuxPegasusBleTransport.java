@@ -250,6 +250,7 @@ public final class LinuxPegasusBleTransport implements PegasusTransport {
             try {
                 adapter.stopDiscovery();
             } catch (RuntimeException ignored) {
+                // Discovery already stopped, or BlueZ gone; nothing left to stop either way.
             }
             uiThread.execute(
                     () -> {
@@ -475,6 +476,7 @@ public final class LinuxPegasusBleTransport implements PegasusTransport {
             try {
                 device.disconnect();
             } catch (RuntimeException ignored) {
+                // The link is already down, which is what was asked for.
             }
         }
     }
@@ -488,6 +490,7 @@ public final class LinuxPegasusBleTransport implements PegasusTransport {
         try {
             blueZ.unRegisterPropertyHandler(propertiesHandler);
         } catch (DBusException ignored) {
+            // The connection is closed right below anyway.
         }
         blueZ.closeConnection();
     }

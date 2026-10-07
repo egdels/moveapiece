@@ -15,9 +15,9 @@ import java.io.IOException;
 import java.util.List;
 
 /**
- * What {@code MainActivity} needs from a physical board, whichever one is selected. Implemented by
- * thin adapters around the board-specific bridges so those stay untouched; see {@link
- * PegasusBoardAdapter} and {@link ChessnutBoardAdapter}.
+ * What the main screen ({@code MainActivity} on Android, {@code GameController} on desktop) needs
+ * from a physical board, whichever one is selected. Implemented by thin adapters around the
+ * board-specific bridges; see {@link PegasusBoardAdapter} and {@link ChessnutBoardAdapter}.
  */
 public interface PhysicalBoardBridge {
 
@@ -31,7 +31,7 @@ public interface PhysicalBoardBridge {
 
     void disconnect();
 
-    /** Stops delivering events to the activity, e.g. before {@link #shutdown()} on a switch. */
+    /** Stops delivering events to the main screen, e.g. before {@link #shutdown()} on a switch. */
     void detachListener();
 
     void shutdown();

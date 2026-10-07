@@ -15,10 +15,11 @@ import com.github.bhlangonijr.chesslib.move.MoveConversionException;
 import com.github.bhlangonijr.chesslib.move.MoveList;
 import com.github.bhlangonijr.chesslib.pgn.PgnHolder;
 import com.github.bhlangonijr.chesslib.pgn.PgnIterator;
-import java.text.SimpleDateFormat;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
@@ -133,6 +134,40 @@ public class ChessGame {
         return true;
     }
 
+    /**
+     * {@link #undoLastMove()} for a game against an opponent that moves by itself: if that leaves
+     * {@code autoSide} to move, its move is taken back too, so the player lands on their own turn
+     * rather than watching the opponent move again at once.
+     *
+     * @param autoSide the side that is not played by hand, or {@code null} if both are
+     * @return false if there was nothing to undo
+     */
+    public boolean undoLastMove(Side autoSide) {
+        if (!undoLastMove()) {
+            return false;
+        }
+        if (autoSide != null && moveCount() > 0 && sideToMove() == autoSide) {
+            undoLastMove();
+        }
+        return true;
+    }
+
+    /**
+     * Mirrors {@link #undoLastMove(Side)}: reapplies the player's move and, if that leaves {@code
+     * autoSide} to move and its reply was undone as well, that reply too.
+     *
+     * @return false if there was nothing to redo
+     */
+    public boolean redoMove(Side autoSide) {
+        if (!redoMove()) {
+            return false;
+        }
+        if (autoSide != null && canRedo() && sideToMove() == autoSide) {
+            redoMove();
+        }
+        return true;
+    }
+
     /** Whether {@link #redoMove()} has a move to reapply. */
     public boolean canRedo() {
         return !redoHistory.isEmpty();
@@ -155,6 +190,53 @@ public class ChessGame {
             // continue
         }
         return moveCount();
+    }
+
+    /**
+     * {@link #jumpToPly(int)} for a game against an opponent that moves by itself: landing on a
+     * position with {@code autoSide} to move goes one ply further, to its reply, wherever the jump
+     * came from. Pairing forward only makes the result depend on {@code targetPly} alone, so
+     * clicking the same history entry twice lands on the same position both times.
+     *
+     * @param autoSide the side that is not played by hand, or {@code null} if both are
+     * @return the ply reached, or -1 if {@code targetPly} is out of range (nothing was changed
+     *     beyond the clamping of {@link #jumpToPly(int)})
+     */
+    public int jumpToPly(int targetPly, Side autoSide) {
+        int before = moveCount();
+        int reached = jumpToPly(targetPly);
+        if (reached != targetPly) {
+            return -1;
+        }
+        if (reached != before && autoSide != null && sideToMove() == autoSide) {
+            redoMove();
+        }
+        return moveCount();
+    }
+
+    /** The move that led to the current position in UCI notation, or null at the start. */
+    public String lastMoveUci() {
+        return moveHistory.isEmpty() ? null : moveHistory.get(moveHistory.size() - 1).toString();
+    }
+
+    /** The square of the king that is in check, or null if the side to move is not in check. */
+    public Square checkedKingSquare() {
+        if (!isCheck()) {
+            return null;
+        }
+        Piece king = sideToMove() == Side.WHITE ? Piece.WHITE_KING : Piece.BLACK_KING;
+        for (Square square : Square.values()) {
+            if (square != Square.NONE && pieceAt(square) == king) {
+                return square;
+            }
+        }
+        return null;
+    }
+
+    /** Whether {@code square} holds a piece of the side to move. */
+    public boolean hasSideToMovePieceOn(Square square) {
+        Piece piece = pieceAt(square);
+        return piece != Piece.NONE && piece.getPieceSide() == sideToMove();
     }
 
     public boolean isCheckmate() {
@@ -213,6 +295,25 @@ public class ChessGame {
         return startFen;
     }
 
+    /**
+     * How many half-moves lie between White's move 1 and this game's first move, per {@link
+     * #startFen()}: 0 for a game from the initial position, 1 when it starts with Black to move at
+     * move 1. Even means White moves first.
+     */
+    public int startPly() {
+        String[] fields = startFen.trim().split("\\s+");
+        int fullMove = 1;
+        if (fields.length > 5) {
+            try {
+                fullMove = Math.max(1, Integer.parseInt(fields[5]));
+            } catch (NumberFormatException ignored) {
+                // No usable move number in the FEN: count from move 1.
+            }
+        }
+        boolean blackFirst = fields.length > 1 && "b".equals(fields[1]);
+        return (fullMove - 1) * 2 + (blackFirst ? 1 : 0);
+    }
+
     /** Sets up an arbitrary position, clearing move history. */
     public void loadFen(String fen) {
         board.loadFromFen(fen);
@@ -267,26 +368,55 @@ public class ChessGame {
         return sanOf(fullMoveList());
     }
 
+    /**
+     * Numbered movetext with the numbering counted from {@link #startPly()}: a game Black opens
+     * reads "1... c6 2. Nf3 d6", not chesslib's "1. c6 Nf3 2. d6" (its numbering assumes White
+     * moved first). Tokens are separated by single spaces; a move number is {@code N.} before a
+     * White move and {@code N...} before a Black move that follows no White move (only ever the
+     * first token).
+     */
     private String sanOf(List<Move> moves) {
         if (moves.isEmpty()) {
             return "";
         }
         MoveList moveList = new MoveList(startFen);
         moveList.addAll(moves);
+        String[] sans;
         try {
-            return moveList.toSanWithMoveNumbers().trim();
+            sans = moveList.toSanArray();
         } catch (MoveConversionException e) {
             return "";
         }
+        StringBuilder sb = new StringBuilder();
+        int ply = startPly();
+        for (String san : sans) {
+            if (sb.length() > 0) {
+                sb.append(' ');
+            }
+            if (ply % 2 == 0) {
+                sb.append(ply / 2 + 1).append(". ");
+            } else if (ply == startPly()) {
+                sb.append(ply / 2 + 1).append("... ");
+            }
+            sb.append(san);
+            ply++;
+        }
+        return sb.toString();
     }
 
+    /** Regex for a move-number token of {@link #toSan()} ("12." or "12..."). */
+    public static final String MOVE_NUMBER_TOKEN = "\\d+\\.(\\.\\.)?";
+
     /**
-     * Full PGN text (Seven Tag Roster header + movetext) for the game so far. {@code
-     * whiteName}/{@code blackName} are supplied by the caller, since this class has no notion of
-     * game mode or opponent strength.
+     * Full PGN text (Seven Tag Roster header + movetext) for the game so far, with {@code SetUp}
+     * and {@code FEN} tags when the game did not start from the initial position (a position taken
+     * over from the board) - {@link #loadPgn} reads them back. {@code whiteName}/{@code blackName}
+     * are supplied by the caller, since this class has no notion of game mode or opponent strength.
      */
     public String toPgn(String whiteName, String blackName) {
-        String date = new SimpleDateFormat("yyyy.MM.dd", Locale.ROOT).format(new Date());
+        String date =
+                LocalDate.now(ZoneId.systemDefault())
+                        .format(DateTimeFormatter.ofPattern("yyyy.MM.dd", Locale.ROOT));
         String result = pgnResult();
         StringBuilder sb = new StringBuilder();
         sb.append("[Event \"MoveAPiece-Partie\"]\n");
@@ -296,6 +426,10 @@ public class ChessGame {
         sb.append("[White \"").append(whiteName).append("\"]\n");
         sb.append("[Black \"").append(blackName).append("\"]\n");
         sb.append("[Result \"").append(result).append("\"]\n");
+        if (!START_FEN.equals(startFen)) {
+            sb.append("[SetUp \"1\"]\n");
+            sb.append("[FEN \"").append(startFen).append("\"]\n");
+        }
         sb.append('\n');
         String movetext = toSan();
         sb.append(movetext.isEmpty() ? result : movetext + " " + result);
@@ -358,6 +492,15 @@ public class ChessGame {
             return false;
         }
         reset();
+        String fen = pgnGame.getFen();
+        if (fen != null && !fen.isBlank()) {
+            try {
+                loadFen(fen);
+            } catch (RuntimeException e) {
+                reset();
+                return false;
+            }
+        }
         for (Move move : halfMoves) {
             if (!applyUciMove(move.toString())) {
                 reset();

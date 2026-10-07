@@ -146,6 +146,7 @@ jobs:
           name: desktop-test-results-${{ matrix.os }}
           path: |
             core/build/test-results/test
+            core/build/reports/jacoco/test
             desktop/build/test-results/test
 
       - name: Build desktop DEB (Linux)

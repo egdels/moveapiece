@@ -38,8 +38,8 @@ import javafx.application.Platform;
  * {@code PegasusBleMac.m}'s header comment: CoreBluetooth's delegate queue is {@code
  * dispatch_get_main_queue()}, which on macOS is the same thread JavaFX pins its Application Thread
  * to). Callback bodies are still wrapped in {@link Platform#runLater} defensively and for
- * consistency with {@code DesktopPegasusGameBridge}'s single-thread contract - a cheap no-op hop
- * when already on that thread.
+ * consistency with {@code PegasusGameBridge}'s single-thread contract - a cheap no-op hop when
+ * already on that thread.
  */
 public final class MacosPegasusBleTransport implements PegasusTransport {
 

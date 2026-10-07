@@ -2,6 +2,7 @@ plugins {
     //id 'com.android.application' version '9.3.1' apply false
     id 'com.android.application' version '9.1.0' apply false
     id 'com.diffplug.spotless' version '8.10.1' apply false
+    id 'net.ltgt.errorprone' version '4.2.0' apply false
 }
 
 // ONNX Runtime JVM artifact version shared by :core (compileOnly + tests) and :desktop (runtime).
@@ -46,6 +47,75 @@ subprojects {
         testLogging {
             events 'failed'
             exceptionFormat 'full'
+        }
+    }
+}
+
+// The plain-Java library modules compile with every javac lint enabled. :desktop and :app are left
+// out: JavaFX 24 class files (version 66) and the Android toolchain produce warnings of their own
+// that these modules cannot fix.
+configure(subprojects.findAll { it.name in ['pegasus-core', 'chessnut-core', 'core'] }) {
+    tasks.withType(JavaCompile).configureEach {
+        options.compilerArgs += ['-Xlint:all']
+    }
+}
+
+// Error Prone and -Werror are opt-in (-Perrorprone), so that release builds - F-Droid's in
+// particular - compile with plain javac, nothing else on the processor path, and do not break over
+// a warning: which lints javac has depends on the JDK (25 reports dangling doc comments, 21 does
+// not), and a tag must stay buildable on JDKs newer than the ones CI knows. CI's error-prone job
+// passes the flag on JDK 21 and 25. With it, javac's and Error Prone's warnings fail the build in
+// the library modules, and in :desktop when the build runs on JDK 22 or newer. On older JDKs javac
+// warns about every JavaFX 24 class file (version 66) it reads, which -Werror would turn into
+// errors, so there they are only reported.
+if (project.hasProperty('errorprone')) {
+    configure(subprojects.findAll { it.name in ['pegasus-core', 'chessnut-core', 'core', 'desktop'] }) {
+        plugins.withId('java') {
+            apply plugin: 'net.ltgt.errorprone'
+            dependencies {
+                errorprone 'com.google.errorprone:error_prone_core:2.48.0'
+            }
+            // Forked, because the daemon only carries the javac exports Spotless needs (see
+            // gradle.properties) and the plugin then wrongly assumes it can run in-process. The
+            // -XD flag is required by Error Prone on JDK 21; plugin 4.2.0 does not add it.
+            tasks.withType(JavaCompile).configureEach {
+                options.fork = true
+                // :desktop's JavaFX class-file warnings alone would fill javac's default limit of 100.
+                options.compilerArgs += ['-Xmaxwarns', '1000']
+                if (project.name != 'desktop' || JavaVersion.current() >= JavaVersion.VERSION_22) {
+                    options.compilerArgs += ['-Werror']
+                }
+                options.errorprone {
+                    // Pure style suggestions (newer syntax, Javadoc summaries) and two checks that do
+                    // not fit here: StringSplitter recommends Guava, and EnumOrdinal objects to
+                    // chesslib's File/Rank ordinals, which are their board coordinates.
+                    disable('StatementSwitchToExpressionSwitch', 'PatternMatchingInstanceof',
+                            'StringConcatToTextBlock', 'MissingSummary', 'StringSplitter',
+                            'EnumOrdinal')
+                }
+                options.compilerArgs += ['-XDaddTypeAnnotationsToSymbol=true']
+            }
+        }
+    }
+}
+
+// Coverage of the library modules' own unit tests, written next to every test run as
+// build/reports/jacoco/test (HTML and XML). A report only; no threshold fails the build.
+configure(subprojects.findAll { it.name in ['pegasus-core', 'chessnut-core', 'core'] }) {
+    plugins.withId('java') {
+        apply plugin: 'jacoco'
+        jacoco {
+            toolVersion = '0.8.14'
+        }
+        tasks.named('test') {
+            finalizedBy tasks.named('jacocoTestReport')
+        }
+        tasks.named('jacocoTestReport') {
+            dependsOn tasks.named('test')
+            reports {
+                xml.required = true
+                html.required = true
+            }
         }
     }
 }

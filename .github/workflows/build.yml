@@ -16,11 +16,6 @@ on:
   pull_request:
   workflow_dispatch:
 
-env:
-  NDK_VERSION: "28.0.13004108"
-  BUILD_TOOLS_VERSION: "36.1.0"
-  PLATFORM_VERSION: "android-36"
-
 jobs:
   code-quality:
     name: Code quality (Spotless + Lint)
@@ -30,22 +25,7 @@ jobs:
         with:
           submodules: recursive
 
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: "21"
-
-      # packages: platform-tools only - the action's default ("tools
-      # platform-tools") requests the legacy 'tools' package, which
-      # Google removed from the SDK repository; the platform/build-tools/
-      # ndk versions this workflow needs are pinned and installed
-      # explicitly in the next step.
-      - uses: android-actions/setup-android@v3
-        with:
-          packages: "platform-tools"
-
-      - name: Install pinned SDK components
-        run: sdkmanager --install "platforms;${PLATFORM_VERSION}" "build-tools;${BUILD_TOOLS_VERSION}" "ndk;${NDK_VERSION}"
+      - uses: ./.github/actions/setup-android-build
 
       - name: Check formatting (Spotless)
         run: ./gradlew --no-daemon spotlessCheck
@@ -60,6 +40,29 @@ jobs:
           name: lint-results
           path: app/build/reports/lint-results-debug.html
 
+  error-prone:
+    # Opt-in (-Perrorprone, see the root build.gradle), and the only job in which warnings are
+    # errors: javac's lints and Error Prone's findings fail the build in the library modules on
+    # either JDK, in :desktop only on 25 (see there). 25 is also what the desktop legs of
+    # desktop.yml and release.yml build with, and its javac has lint checks 21 lacks.
+    name: Error Prone (JDK ${{ matrix.java }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        java: ["21", "25"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: ./.github/actions/setup-android-build
+        with:
+          java-version: ${{ matrix.java }}
+
+      - name: Error Prone
+        run: ./gradlew --no-daemon -Perrorprone :pegasus-core:compileTestJava :chessnut-core:compileTestJava :core:compileTestJava :desktop:compileTestJava
+
   unit-tests:
     name: Unit tests
     runs-on: ubuntu-latest
@@ -68,25 +71,10 @@ jobs:
         with:
           submodules: recursive
 
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: "21"
-
-      # packages: platform-tools only - the action's default ("tools
-      # platform-tools") requests the legacy 'tools' package, which
-      # Google removed from the SDK repository; the platform/build-tools/
-      # ndk versions this workflow needs are pinned and installed
-      # explicitly in the next step.
-      - uses: android-actions/setup-android@v3
-        with:
-          packages: "platform-tools"
-
-      - name: Install pinned SDK components
-        run: sdkmanager --install "platforms;${PLATFORM_VERSION}" "build-tools;${BUILD_TOOLS_VERSION}" "ndk;${NDK_VERSION}"
+      - uses: ./.github/actions/setup-android-build
 
       - name: Run JVM unit tests
-        run: ./gradlew --no-daemon :pegasus-core:test :app:testDebugUnitTest
+        run: ./gradlew --no-daemon :pegasus-core:test :chessnut-core:test :app:testDebugUnitTest
 
       - name: Upload test report
         if: always()
@@ -96,6 +84,9 @@ jobs:
           path: |
             app/build/test-results/testDebugUnitTest
             pegasus-core/build/test-results/test
+            chessnut-core/build/test-results/test
+            pegasus-core/build/reports/jacoco/test
+            chessnut-core/build/reports/jacoco/test
 
   instrumented-tests:
     name: Instrumented tests (emulator)
@@ -108,22 +99,7 @@ jobs:
         with:
           submodules: recursive
 
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: "21"
-
-      # packages: platform-tools only - the action's default ("tools
-      # platform-tools") requests the legacy 'tools' package, which
-      # Google removed from the SDK repository; the platform/build-tools/
-      # ndk versions this workflow needs are pinned and installed
-      # explicitly in the next step.
-      - uses: android-actions/setup-android@v3
-        with:
-          packages: "platform-tools"
-
-      - name: Install pinned SDK components
-        run: sdkmanager --install "platforms;${PLATFORM_VERSION}" "build-tools;${BUILD_TOOLS_VERSION}" "ndk;${NDK_VERSION}"
+      - uses: ./.github/actions/setup-android-build
 
       - name: Enable KVM
         run: |
@@ -158,22 +134,7 @@ jobs:
         with:
           submodules: recursive
 
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: "21"
-
-      # packages: platform-tools only - the action's default ("tools
-      # platform-tools") requests the legacy 'tools' package, which
-      # Google removed from the SDK repository; the platform/build-tools/
-      # ndk versions this workflow needs are pinned and installed
-      # explicitly in the next step.
-      - uses: android-actions/setup-android@v3
-        with:
-          packages: "platform-tools"
-
-      - name: Install pinned SDK components
-        run: sdkmanager --install "platforms;${PLATFORM_VERSION}" "build-tools;${BUILD_TOOLS_VERSION}" "ndk;${NDK_VERSION}"
+      - uses: ./.github/actions/setup-android-build
 
       - name: Build debug APKs
         run: ./gradlew --no-daemon :app:assembleDebug
@@ -192,22 +153,7 @@ jobs:
         with:
           submodules: recursive
 
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: "21"
-
-      # packages: platform-tools only - the action's default ("tools
-      # platform-tools") requests the legacy 'tools' package, which
-      # Google removed from the SDK repository; the platform/build-tools/
-      # ndk versions this workflow needs are pinned and installed
-      # explicitly in the next step.
-      - uses: android-actions/setup-android@v3
-        with:
-          packages: "platform-tools"
-
-      - name: Install pinned SDK components
-        run: sdkmanager --install "platforms;${PLATFORM_VERSION}" "build-tools;${BUILD_TOOLS_VERSION}" "ndk;${NDK_VERSION}"
+      - uses: ./.github/actions/setup-android-build
 
       - name: Build debug APKs
         run: ./gradlew --no-daemon :app:assembleDebug

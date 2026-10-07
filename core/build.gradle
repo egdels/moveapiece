@@ -8,6 +8,9 @@ java {
 }
 
 dependencies {
+    // The board package (PhysicalBoardBridge and its adapters) is shared by :app and :desktop and
+    // speaks in the physical-board types of :chessnut-core and, through it, :pegasus-core.
+    api project(':chessnut-core')
     implementation 'com.github.bhlangonijr:chesslib:1.3.7'
     // MaiaEngine only needs the ai.onnxruntime.* API surface to compile here - compileOnly, not
     // implementation, because desktop and Android need genuinely different artifacts at runtime
@@ -29,8 +32,4 @@ dependencies {
     // platform as :desktop - the desktop JVM artifact is the correct runtime here regardless of
     // which platform's UI is being worked on.
     testImplementation "com.microsoft.onnxruntime:onnxruntime:${rootProject.ext.onnxruntimeVersion}"
-    // Cross-checks ChessGame's FEN output against pegasus-core's own FEN
-    // parser (see ChessGameTest#toFen_isParsableByPegasusCoreChessPosition);
-    // test-only, :core has no runtime dependency on the physical-board module.
-    testImplementation project(':pegasus-core')
 }

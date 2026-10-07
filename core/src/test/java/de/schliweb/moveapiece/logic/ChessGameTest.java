@@ -326,6 +326,43 @@ public class ChessGameTest {
         assertEquals("1. e4 e5", game.toSan());
     }
 
+    /** A position taken over from the board with Black to move: the first move is Black's. */
+    @Test
+    public void toSan_numbersAGameBlackOpensFromItsFirstMove() {
+        ChessGame game = new ChessGame();
+        game.loadFen("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1");
+        assertEquals("", game.toSan());
+
+        game.applyUciMove("c7c6");
+        assertEquals("1... c6", game.toSan());
+
+        game.applyUciMove("g1f3");
+        game.applyUciMove("d7d6");
+        game.applyUciMove("f1c4");
+        game.applyUciMove("d6d5");
+        assertEquals("1... c6 2. Nf3 d6 3. Bc4 d5", game.toSan());
+        assertEquals("1... c6 2. Nf3 d6 3. Bc4 d5", game.toFullSan());
+    }
+
+    @Test
+    public void toSan_countsFromTheMoveNumberOfTheStartPosition() {
+        ChessGame game = new ChessGame();
+        game.loadFen("r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3");
+        game.applyUciMove("f1b5");
+        game.applyUciMove("a7a6");
+        game.applyUciMove("b5a4");
+
+        assertEquals("3. Bb5 a6 4. Ba4", game.toSan());
+    }
+
+    @Test
+    public void moveNumberToken_matchesBothNumberForms() {
+        assertTrue("1.".matches(ChessGame.MOVE_NUMBER_TOKEN));
+        assertTrue("12...".matches(ChessGame.MOVE_NUMBER_TOKEN));
+        assertFalse("e4".matches(ChessGame.MOVE_NUMBER_TOKEN));
+        assertFalse("O-O".matches(ChessGame.MOVE_NUMBER_TOKEN));
+    }
+
     @Test
     public void toUciMoveList_isSpaceSeparatedUciMoves() {
         ChessGame game = new ChessGame();
@@ -385,6 +422,36 @@ public class ChessGameTest {
         assertTrue(pgn.contains("[Black \"Schwarz\"]"));
         assertTrue(pgn.contains("[Result \"*\"]"));
         assertTrue(pgn.contains("1. e4 e5 *"));
+    }
+
+    /** Without the start position in the header no reader could replay such a game. */
+    @Test
+    public void toPgn_fromATakenOverPosition_carriesTheStartFenAndReimports() {
+        ChessGame game = new ChessGame();
+        String fen = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1";
+        game.loadFen(fen);
+        game.applyUciMove("c7c6");
+        game.applyUciMove("g1f3");
+
+        String pgn = game.toPgn("Weiß", "Schwarz");
+
+        assertTrue(pgn.contains("[SetUp \"1\"]"));
+        assertTrue(pgn.contains("[FEN \"" + fen + "\"]"));
+        assertTrue(pgn.contains("1... c6 2. Nf3 *"));
+
+        ChessGame imported = new ChessGame();
+        assertTrue(imported.loadPgn(pgn));
+        assertEquals(fen, imported.startFen());
+        assertEquals("c7c6 g1f3", imported.toUciMoveList());
+        assertEquals(Side.BLACK, imported.sideToMove());
+    }
+
+    @Test
+    public void toPgn_fromTheStartingPosition_hasNoFenHeader() {
+        ChessGame game = new ChessGame();
+        game.applyUciMove("e2e4");
+
+        assertFalse(game.toPgn("Weiß", "Schwarz").contains("[FEN"));
     }
 
     @Test
@@ -460,5 +527,111 @@ public class ChessGameTest {
         assertEquals(0, game.moveCount());
         assertEquals(Side.WHITE, game.sideToMove());
         assertEquals(Piece.WHITE_PAWN, game.pieceAt(Square.E2));
+    }
+
+    private static ChessGame gameAfter(String... uciMoves) {
+        ChessGame game = new ChessGame();
+        for (String uci : uciMoves) {
+            assertTrue(uci, game.applyUciMove(uci));
+        }
+        return game;
+    }
+
+    @Test
+    public void undoAgainstAnAutomaticOpponent_takesItsReplyBackToo() {
+        ChessGame game = gameAfter("e2e4", "e7e5", "g1f3", "b8c6");
+
+        assertTrue(game.undoLastMove(Side.BLACK));
+
+        // Black's reply and White's own move are both gone: White is to move again.
+        assertEquals(2, game.moveCount());
+        assertEquals(Side.WHITE, game.sideToMove());
+    }
+
+    @Test
+    public void undoAgainstAnAutomaticOpponent_stopsAtTheStartWhenItMovedFirst() {
+        ChessGame game = gameAfter("e2e4");
+
+        assertTrue(game.undoLastMove(Side.WHITE));
+
+        assertEquals(0, game.moveCount());
+        assertFalse(game.undoLastMove(Side.WHITE));
+    }
+
+    @Test
+    public void undoWithoutAnAutomaticOpponent_takesOneMoveBack() {
+        ChessGame game = gameAfter("e2e4", "e7e5");
+
+        assertTrue(game.undoLastMove(null));
+
+        assertEquals(1, game.moveCount());
+    }
+
+    @Test
+    public void redoAgainstAnAutomaticOpponent_reappliesItsReplyToo() {
+        ChessGame game = gameAfter("e2e4", "e7e5", "g1f3", "b8c6");
+        game.undoLastMove(Side.BLACK);
+
+        assertTrue(game.redoMove(Side.BLACK));
+
+        assertEquals(4, game.moveCount());
+        assertFalse(game.redoMove(Side.BLACK));
+    }
+
+    @Test
+    public void jumpToPlyAgainstAnAutomaticOpponent_landsOnThePlayersTurn() {
+        ChessGame game = gameAfter("e2e4", "e7e5", "g1f3", "b8c6");
+
+        // Ply 1 has Black, the automatic side, to move: go on to its reply.
+        assertEquals(2, game.jumpToPly(1, Side.BLACK));
+        assertEquals("e7e5", game.lastMoveUci());
+        // Same entry again: same position, however it was reached.
+        assertEquals(2, game.jumpToPly(2, Side.BLACK));
+        assertEquals(3, game.jumpToPly(3, null));
+        assertEquals("g1f3", game.lastMoveUci());
+    }
+
+    @Test
+    public void jumpToPly_reportsATargetOutOfRange() {
+        ChessGame game = gameAfter("e2e4", "e7e5");
+
+        assertEquals(-1, game.jumpToPly(5, null));
+        assertEquals(0, game.jumpToPly(0, Side.BLACK));
+        assertNull(game.lastMoveUci());
+    }
+
+    @Test
+    public void checkedKingSquare_isTheKingOfTheSideInCheck() {
+        assertNull(gameAfter("e2e4").checkedKingSquare());
+
+        ChessGame game = gameAfter("e2e4", "f7f6", "d1h5");
+
+        assertEquals(Square.E8, game.checkedKingSquare());
+    }
+
+    @Test
+    public void hasSideToMovePieceOn_knowsWhoseTurnItIs() {
+        ChessGame game = gameAfter("e2e4");
+
+        assertTrue(game.hasSideToMovePieceOn(Square.E7));
+        assertFalse(game.hasSideToMovePieceOn(Square.E4));
+        assertFalse(game.hasSideToMovePieceOn(Square.E5));
+    }
+
+    @Test
+    public void startPly_countsTheHalfMovesBeforeTheFirstMoveOfTheGame() {
+        ChessGame game = new ChessGame();
+        assertEquals(0, game.startPly());
+
+        // A position taken over from the board with Black to move.
+        game.loadFen("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1");
+        assertEquals(1, game.startPly());
+
+        game.loadFen("4k3/8/8/8/8/8/4P3/4K3 w - - 3 17");
+        assertEquals(32, game.startPly());
+
+        // No move counters: counted from move 1.
+        game.loadFen("4k3/8/8/8/8/8/4P3/4K3 b - -");
+        assertEquals(1, game.startPly());
     }
 }

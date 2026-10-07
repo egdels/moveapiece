@@ -1,0 +1,41 @@
+name: Set up the Android build
+description: >-
+  JDK and the pinned Android SDK components that every job building or checking :app needs.
+  The repository must be checked out first.
+
+# The single place the SDK component versions are pinned for CI; app/build.gradle pins the same
+# ones for the build itself.
+inputs:
+  java-version:
+    description: JDK to build with
+    default: "21"
+  ndk-version:
+    description: Android NDK
+    default: "28.0.13004108"
+  build-tools-version:
+    description: Android build tools
+    default: "36.1.0"
+  platform-version:
+    description: Android platform
+    default: "android-36"
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-java@v5
+      with:
+        distribution: temurin
+        java-version: ${{ inputs.java-version }}
+
+    # packages: platform-tools only - the action's default ("tools
+    # platform-tools") requests the legacy 'tools' package, which
+    # Google removed from the SDK repository; the platform/build-tools/
+    # ndk versions are pinned above and installed explicitly in the
+    # next step.
+    - uses: android-actions/setup-android@v3
+      with:
+        packages: "platform-tools"
+
+    - name: Install pinned SDK components
+      shell: bash
+      run: sdkmanager --install "platforms;${{ inputs.platform-version }}" "build-tools;${{ inputs.build-tools-version }}" "ndk;${{ inputs.ndk-version }}"

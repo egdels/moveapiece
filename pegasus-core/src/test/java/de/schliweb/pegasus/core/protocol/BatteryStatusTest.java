@@ -34,13 +34,14 @@ public class BatteryStatusTest {
         assertFalse(status.isCriticallyLow());
     }
 
+    /** What the board sends at 6 %: "empty" on, "low" off again (hardware, 2026-10-07). */
     @Test
-    public void emptyBitAloneIsNotCriticallyLow() {
-        BatteryStatus status = withStatusBits(0x08);
+    public void emptyBitAloneIsCriticallyLow() {
+        BatteryStatus status = withStatusBits(0x02 | 0x08);
 
         assertFalse(status.isLow());
         assertTrue(status.isEmpty());
-        assertFalse(status.isCriticallyLow());
+        assertTrue(status.isCriticallyLow());
     }
 
     @Test

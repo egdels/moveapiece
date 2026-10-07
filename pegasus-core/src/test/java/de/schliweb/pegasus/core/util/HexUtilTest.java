@@ -8,6 +8,7 @@ package de.schliweb.pegasus.core.util;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 
+import java.util.Locale;
 import org.junit.Test;
 
 public class HexUtilTest {
@@ -26,7 +27,7 @@ public class HexUtilTest {
         String hex = HexUtil.toCompactHex(data);
         assertEquals("860043FF01", hex);
         assertArrayEquals(data, HexUtil.fromCompactHex(hex));
-        assertArrayEquals(data, HexUtil.fromCompactHex(hex.toLowerCase()));
+        assertArrayEquals(data, HexUtil.fromCompactHex(hex.toLowerCase(Locale.ROOT)));
     }
 
     @Test(expected = IllegalArgumentException.class)

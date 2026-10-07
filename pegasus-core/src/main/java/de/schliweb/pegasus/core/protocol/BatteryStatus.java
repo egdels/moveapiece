@@ -13,8 +13,11 @@ import de.schliweb.pegasus.core.util.HexUtil;
  * <p>Byte 0 (percentage) and byte 8 (status bits) are CONFIRMED_BY_MANUFACTURER_SPEC (DGT
  * Chessboard Communication Protocol v1.2.1): byte 0 is the charge percentage, byte 8 has bit 2 =
  * "battery low" (yellow) and bit 3 = "battery empty" (red). Per that document, if both bits are set
- * the board shuts itself down within about 3 minutes. The remaining bytes (running/on/standby time
- * fields) are documented as "currently not used" and kept only in the raw payload.
+ * the board shuts itself down within about 3 minutes. Real hardware (CONFIRMED_ON_HARDWARE
+ * 2026-10-07, discharging from 54 %) reports bit 1 throughout, adds bit 2 at 10 % and at 6 % swaps
+ * it for bit 3 - "low" and "empty" were never set together, so {@link #isCriticallyLow()} goes by
+ * the "empty" bit alone. The remaining bytes (running/on/standby time fields) are documented as
+ * "currently not used" and kept only in the raw payload.
  */
 public final class BatteryStatus {
 
@@ -59,11 +62,12 @@ public final class BatteryStatus {
     }
 
     /**
-     * Both the "low" and "empty" bits are set: per the manufacturer's protocol document, the board
-     * will shut itself down within about 3 minutes.
+     * The "empty" bit is set: the board will shut itself down within about 3 minutes. The protocol
+     * document describes this state as "low" and "empty" together; real hardware clears "low" when
+     * it sets "empty" (see the class javadoc), so "empty" alone counts.
      */
     public boolean isCriticallyLow() {
-        return isLow() && isEmpty();
+        return isEmpty();
     }
 
     /** Full raw payload for logging/verification. Defensive copy. */

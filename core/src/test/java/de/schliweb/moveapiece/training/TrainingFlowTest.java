@@ -100,7 +100,6 @@ public class TrainingFlowTest {
     private static final class FakeHost implements TrainingFlow.Host {
         final List<String> applied = new ArrayList<>(); // "uci/capture/sound"
         final List<Boolean> sounds = new ArrayList<>();
-        int refreshes;
         int rewrites;
         boolean completeShown;
         Runnable scheduled;
@@ -124,9 +123,7 @@ public class TrainingFlowTest {
         }
 
         @Override
-        public void refresh() {
-            refreshes++;
-        }
+        public void refresh() {}
 
         @Override
         public void showTrainingComplete() {

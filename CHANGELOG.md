@@ -8,6 +8,60 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versions follow [Semantic Versioning](https://semver.org/). Release
 candidates (`-rc`) and test tags are not listed.
 
+## [Unreleased]
+
+### Added
+
+- Pegasus: the app says when the board reports its battery as low, and
+  once the board reports it empty, the board line keeps saying so until the
+  board goes off; from that point the board shuts itself down within a few
+  minutes. The earlier warning waited for a combination of signals the
+  board never sends, so it never appeared.
+
+### Changed
+
+- Blunder warning against Stockfish or Maia: only your own moves are graded
+  now, and the note stays until your next move. Before, the opponent's reply
+  could replace or clear it.
+- Evaluation: the live evaluation, the blunder warning and the game analysis
+  always use Stockfish at full strength, whatever strength you play
+  against. With the evaluation switched on, Stockfish evaluates the position
+  before it searches its own move, so its reply arrives about half a second
+  later than before.
+- Move list and PGN: a game taken over from the board with Black to move
+  starts as "1... c6 2. Nf3" instead of counting Black's move as White's.
+  The exported PGN of such a game carries the start position (SetUp and FEN
+  tags), and PGN import reads them.
+
+### Fixed
+
+- Pegasus: a piece lifted or placed within the first seconds after
+  connecting - between the board's first position report and its switch to
+  move reporting - was never noticed, so a move started in that window hung
+  until the piece was put back. The app now asks for the position once more
+  after the switch.
+- Pegasus, desktop: on checkmate the king's square only lit up once the
+  game-over dialog had been dismissed; it now pulses as soon as the move is
+  on the board.
+- Evaluation: after an undo, a jump in the move list or a new game, the
+  tail of a search that had already been replaced could show up as the
+  evaluation or the grade of the new position.
+- Game analysis: a game Black opened (position taken over from the board)
+  had its moves attributed to the wrong side and numbered from White's move
+  one.
+- Hint: a hint the engine was still working on is dropped when another
+  search starts instead of appearing later for a position that has moved on.
+- Boards: a timer left over from a connection that had already been closed
+  could still fire afterwards.
+
+### Build
+
+- The board bridges, the engine search flow and the grading logic are now
+  shared between the Android and the desktop app (`core`), with JVM tests
+  for the bridges, the engine process and the search flow. Compiler lints
+  are on for the library modules; Error Prone and coverage reports run with
+  `-Perrorprone` and in CI, and plain builds (F-Droid) stay unchanged.
+
 ## [1.6.0] - 2026-10-07
 
 ### Changed

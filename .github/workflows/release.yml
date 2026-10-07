@@ -25,11 +25,6 @@ on:
     tags:
       - 'v*'
 
-env:
-  NDK_VERSION: "28.0.13004108"
-  BUILD_TOOLS_VERSION: "36.1.0"
-  PLATFORM_VERSION: "android-36"
-
 permissions:
   contents: write
 
@@ -132,22 +127,7 @@ jobs:
         with:
           submodules: recursive
 
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: "21"
-
-      # packages: platform-tools only - the action's default ("tools
-      # platform-tools") requests the legacy 'tools' package, which
-      # Google removed from the SDK repository; the platform/build-tools/
-      # ndk versions this workflow needs are pinned and installed
-      # explicitly in the next step.
-      - uses: android-actions/setup-android@v3
-        with:
-          packages: "platform-tools"
-
-      - name: Install pinned SDK components
-        run: sdkmanager --install "platforms;${PLATFORM_VERSION}" "build-tools;${BUILD_TOOLS_VERSION}" "ndk;${NDK_VERSION}"
+      - uses: ./.github/actions/setup-android-build
 
       - name: Decode release keystore
         env:

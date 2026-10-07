@@ -199,14 +199,20 @@ toolchains in the same job, see `desktop.yml`'s comments on that step).
 ```
 
 `:core:test` covers the chess logic, Stockfish engine wrapper, opening
-trainer library, and Maia's ONNX position encoding/policy decoding shared by
-both apps; `:chessnut-core:test` covers the Chessnut protocol (against frames
+trainer library, Maia's ONNX position encoding/policy decoding and the two
+physical-board bridges (against a fake transport) shared by both apps; `:chessnut-core:test` covers the Chessnut protocol (against frames
 captured from the real board) and the identity-based move detection; `:desktop:test` additionally golden-tests `MaiaEngine`'s actual
 ONNX Runtime output against the reference PyTorch implementation for several
 hundred positions (multi-ply history, castling, repetition, promotion) at five
 ratings from 800 to 2400; `:app:connectedDebugAndroidTest` covers the
 Android-only pieces (`StockfishEngine` against a real subprocess, `BoardView`
 real measure/layout/touch) that can't run on the plain JVM.
+
+The library modules compile with `-Xlint:all`. `-Perrorprone` adds
+[Error Prone](https://errorprone.info) to them and to `:desktop` and turns
+warnings into errors (CI runs it on JDK 21 and 25; release builds do not, so
+they never fail over a warning), and every `test` run of a library module writes a
+JaCoCo coverage report to `build/reports/jacoco/test`.
 
 ## Project structure
 
@@ -218,14 +224,18 @@ core/                    Platform-agnostic chess logic, shared by :app and
 │   │                     Maia (human-like opponent): ONNX position encoding/
 │   │                     policy decoding/engine + its bundled rating list
 │   ├── logic/             chesslib integration (ChessGame), PGN helpers
+│   ├── analysis/          EngineSearchFlow: everything the one Stockfish process is asked
+│   │                     to search (engine move, evaluation, hint, post-game analysis)
+│   │                     and the grading of its answers
+│   ├── board/             Physical boards: PegasusGameBridge and ChessnutGameBridge
+│   │                     (board <-> ChessGame, on the platform's BoardScheduler) and
+│   │                     PhysicalBoardBridge, one interface over both
 │   └── training/          Opening trainer: curated line library + session progress
 
 app/                    Android application module
 ├── src/main/java/de/schliweb/moveapiece/
 │   ├── ui/               Board view, sound effects, opening library/preview screens
-│   ├── board/            PhysicalBoardBridge: one interface over both boards, adapters
-│   ├── pegasus/          Bridge between the DGT Pegasus and ChessGame
-│   ├── chessnut/         Bridge between a Chessnut board and ChessGame (thin, logic in chessnut-core)
+│   ├── board/            AndroidBoardScheduler: BoardScheduler on the main thread
 │   └── MainActivity.java
 ├── src/main/java/de/schliweb/pegasus/bluetooth/  BLE transport (vendored, profile-aware)
 ├── src/main/cpp/stockfish/                       Stockfish, pinned git submodule
@@ -237,10 +247,8 @@ desktop/                JavaFX desktop application module
 │   ├── BoardCanvas.java       Board rendering + click-to-move (Canvas/GraphicsContext)
 │   ├── GameSetupDialog.java, BoardConnectDialog.java, OpeningLibraryWindow.java,
 │   │   OpeningPreviewWindow.java
-│   ├── board/            PhysicalBoardBridge: one interface over both boards, adapters
-│   ├── pegasus/          Bridge between the DGT Pegasus and ChessGame, plus the
-│   │                     per-OS BLE transports (macOS/Windows/Linux, profile-aware)
-│   ├── chessnut/         Bridge between a Chessnut board and ChessGame
+│   ├── pegasus/          Per-OS BLE transports (macOS/Windows/Linux, profile-aware)
+│   ├── FxBoardScheduler.java  BoardScheduler on the JavaFX Application Thread
 │   ├── Messages.java          Localized strings (i18n/Messages*.properties)
 │   └── DesktopApp.java, Launcher.java, Styles.java, MoveSoundPlayer.java, ...
 ├── src/main/native/macos/, src/main/native/windows/   Objective-C/JNI and C++/WinRT/JNI
@@ -259,7 +267,7 @@ pegasus-core/            DGT Pegasus protocol + chess-rules/move-detection
                          vendored — see Third-Party Notices); used by
                          :app and :desktop (Pegasus support), by
                          :chessnut-core (chess model, BoardState, BLE
-                         profile) and by :core's own tests
+                         profile) and by :core (board interface)
 
 chessnut-core/           Chessnut protocol, Air family (frames, board reports with
                          piece identity, LEDs, beep, battery, button) and

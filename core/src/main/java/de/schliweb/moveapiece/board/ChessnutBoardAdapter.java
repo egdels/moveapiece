@@ -3,11 +3,10 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-package de.schliweb.moveapiece.desktop.board;
+package de.schliweb.moveapiece.board;
 
 import de.schliweb.chessnut.core.game.InvalidPositionException;
 import de.schliweb.chessnut.core.protocol.ChessnutTones;
-import de.schliweb.moveapiece.desktop.chessnut.DesktopChessnutGameBridge;
 import de.schliweb.moveapiece.logic.BoardType;
 import de.schliweb.pegasus.core.chess.PieceColor;
 import de.schliweb.pegasus.core.chess.PieceType;
@@ -18,14 +17,14 @@ import java.io.IOException;
 import java.util.List;
 
 /**
- * {@link PhysicalBoardBridge} over {@link DesktopChessnutGameBridge}; promotion and ambiguity never
+ * {@link PhysicalBoardBridge} over the {@link ChessnutGameBridge}; promotion and ambiguity never
  * arise there, so those two resolvers are no-ops.
  */
 public final class ChessnutBoardAdapter implements PhysicalBoardBridge {
 
-    private final DesktopChessnutGameBridge bridge;
+    private final ChessnutGameBridge bridge;
 
-    public ChessnutBoardAdapter(DesktopChessnutGameBridge bridge) {
+    public ChessnutBoardAdapter(ChessnutGameBridge bridge) {
         this.bridge = bridge;
     }
 
