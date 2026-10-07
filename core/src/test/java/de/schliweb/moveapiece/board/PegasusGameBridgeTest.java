@@ -19,7 +19,9 @@ import de.schliweb.pegasus.core.protocol.PegasusMessageType;
 import de.schliweb.pegasus.core.transport.ConnectionState;
 import de.schliweb.pegasus.core.transport.PegasusTransport;
 import de.schliweb.pegasus.core.transport.TransportError;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -267,6 +269,57 @@ public class PegasusGameBridgeTest {
 
         assertTrue(listener.moveConfirmed.await(TIMEOUT_SECONDS, TimeUnit.SECONDS));
         assertEquals("g1f3", listener.confirmedUci.get());
+    }
+
+    /**
+     * The desktop shows its game-over dialog modally from the move callback; the king must already
+     * be pulsing on the board by then, not only once the dialog is gone.
+     */
+    @Test
+    public void physicalCheck_lightsTheKingBeforeTheHostHearsOfTheMove()
+            throws InterruptedException {
+        FakeTransport transport = new FakeTransport();
+        List<byte[]> writtenAtCallback = new ArrayList<>();
+        RecordingListener listener =
+                new RecordingListener() {
+                    @Override
+                    public void onPhysicalMoveConfirmed(String uci) {
+                        writtenAtCallback.addAll(transport.written);
+                        super.onPhysicalMoveConfirmed(uci);
+                    }
+                };
+        PegasusGameBridge bridge = newBridgeOnMainThread(transport, listener);
+
+        main.runSync(() -> bridge.connect(DEVICE_ADDRESS));
+        assertTrue(listener.connected.await(TIMEOUT_SECONDS, TimeUnit.SECONDS));
+
+        // White queen h5 to e5 checks the black king on e8 along the open e-file.
+        String fen = "4k3/8/8/7Q/8/8/8/4K3 w - - 0 1";
+        main.runSync(() -> bridge.syncBoardToPosition(fen));
+        byte[] payload = new byte[BoardState.SQUARE_COUNT];
+        payload[BoardState.squareIndex("e8")] = 1;
+        payload[BoardState.squareIndex("h5")] = 1;
+        payload[BoardState.squareIndex("e1")] = 1;
+        transport.feed(frame(PegasusMessageType.BOARD_DUMP, payload));
+        assertTrue(listener.synced.await(TIMEOUT_SECONDS, TimeUnit.SECONDS));
+        transport.written.clear();
+
+        transport.feed(fieldUpdateFrame("h5", 0));
+        transport.feed(fieldUpdateFrame("e5", 1));
+        assertTrue(listener.moveConfirmed.await(TIMEOUT_SECONDS, TimeUnit.SECONDS));
+        assertEquals("h5e5", listener.confirmedUci.get());
+
+        byte[] kingPulsing =
+                PegasusCommands.encodeLeds(
+                        PegasusLedController.SPEED_PULSE,
+                        PegasusLedController.MODE_STEADY,
+                        PegasusLedController.DEFAULT_INTENSITY,
+                        BoardState.squareIndex("e8"));
+        boolean lit = false;
+        for (byte[] command : writtenAtCallback) {
+            lit |= Arrays.equals(kingPulsing, command);
+        }
+        assertTrue("expected the king on e8 to pulse before onPhysicalMoveConfirmed", lit);
     }
 
     @Test

@@ -782,6 +782,10 @@ public class PegasusGameBridge {
         LOG.info("detection result: " + result.kind());
         if (result.kind() == MoveDetectionResult.Kind.CONFIRMED) {
             squaresSeenEmpty.clear();
+            // Show the check indicator before the host hears of the move: a host may block in
+            // the callback (the desktop shows its game-over dialog modally), and the board would
+            // otherwise only learn of the check once that dialog is gone.
+            updateCheckIndicator();
             Listener l = listener();
             if (l != null) {
                 l.onPhysicalMoveConfirmed(result.move().uci());
