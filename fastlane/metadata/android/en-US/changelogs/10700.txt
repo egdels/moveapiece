@@ -1,0 +1,6 @@
+Sharper evaluation, fixes for the Pegasus.
+
+* Blunder warning: only your own moves are graded; the note stays until your next move.
+* Evaluation and analysis always at full strength.
+* Pegasus: a move made right after connecting is no longer lost; low and empty battery are announced.
+* Games Black opens are numbered "1..." and export with their FEN.
