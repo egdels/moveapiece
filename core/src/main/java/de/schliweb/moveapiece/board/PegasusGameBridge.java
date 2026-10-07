@@ -422,6 +422,13 @@ public class PegasusGameBridge {
      * — DGT Chessboard Communication Protocol v1.2.1) is not part of that captured burst; it is a
      * read-only status request, so inserting it does not change what the official app itself writes
      * to the board. Its response is handled in {@link #onProtocolData}.
+     *
+     * <p>The second board-state request at the end is not part of the captured burst either. The
+     * board only reports changes by itself once update mode is on, three seconds after the first
+     * request was answered: a piece lifted in between was never reported, the bridge kept taking
+     * its square for occupied, and a move begun there could not complete (seen on hardware
+     * 2026-10-06, a move played right after a reconnect). Asking again once update mode is on
+     * closes that gap.
      */
     private void sendOfficialInitSequence() {
         byte[][] seq = {
@@ -433,6 +440,7 @@ public class PegasusGameBridge {
             PegasusCommands.encodeBoardStateRequest(),
             {0x4C},
             PegasusCommands.encodeUpdateMode(),
+            PegasusCommands.encodeBoardStateRequest(),
         };
         for (int i = 0; i < seq.length; i++) {
             byte[] cmd = seq[i];

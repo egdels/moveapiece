@@ -184,6 +184,91 @@ public class PegasusGameBridgeTest {
         assertTrue("expected the DevKey command among the init sequence writes", found);
     }
 
+    /**
+     * The board reports changes by itself only once update mode is on; a piece lifted between the
+     * first board-state request and that point is never reported. The burst therefore asks for the
+     * board once more after switching update mode on.
+     */
+    @Test
+    public void connect_asksForTheBoardAgainOnceUpdateModeIsOn() throws InterruptedException {
+        FakeTransport transport = new FakeTransport();
+        RecordingListener listener = new RecordingListener();
+        PegasusGameBridge bridge = newBridgeOnMainThread(transport, listener);
+
+        main.runSync(() -> bridge.connect(DEVICE_ADDRESS));
+        assertTrue(listener.connected.await(TIMEOUT_SECONDS, TimeUnit.SECONDS));
+
+        byte[] updateMode = PegasusCommands.encodeUpdateMode();
+        byte[] boardRequest = PegasusCommands.encodeBoardStateRequest();
+        boolean updateModeSeen = false;
+        boolean askedAgain = false;
+        // Nine commands, 1.5 s apart.
+        long deadline = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(20);
+        while (!askedAgain && System.currentTimeMillis() < deadline) {
+            byte[] sent = transport.written.poll(500, TimeUnit.MILLISECONDS);
+            if (sent == null) {
+                continue;
+            }
+            if (Arrays.equals(sent, updateMode)) {
+                updateModeSeen = true;
+            } else if (updateModeSeen && Arrays.equals(sent, boardRequest)) {
+                askedAgain = true;
+            }
+        }
+        assertTrue("expected a board-state request after the update-mode command", askedAgain);
+    }
+
+    /** The starting position after the knight went from g1 to f3, as a board dump. */
+    private static byte[] boardDumpAfterKnightToF3() {
+        BoardState occupancy = OccupancyProjection.occupancyOf(ChessPosition.starting());
+        byte[] payload = new byte[BoardState.SQUARE_COUNT];
+        for (int i = 0; i < BoardState.SQUARE_COUNT; i++) {
+            payload[i] = (byte) occupancy.pieceCodeAt(i);
+        }
+        payload[BoardState.squareIndex("f3")] = payload[BoardState.squareIndex("g1")];
+        payload[BoardState.squareIndex("g1")] = 0;
+        return frame(PegasusMessageType.BOARD_DUMP, payload);
+    }
+
+    /**
+     * What that second request is for, as seen on hardware: a guided move begun before update mode
+     * was on. The knight's lift from g1 was never reported, only its arrival on f3, and the guide
+     * kept waiting. The board dump answering the second request shows g1 empty and completes it.
+     */
+    @Test
+    public void guidedMove_aLiftMissedBeforeUpdateModeIsPickedUpFromTheNextBoardDump()
+            throws InterruptedException {
+        FakeTransport transport = new FakeTransport();
+        RecordingListener listener = new RecordingListener();
+        PegasusGameBridge bridge = newBridgeOnMainThread(transport, listener);
+        connectAndSyncStartingPosition(bridge, transport, listener);
+        main.runSync(() -> bridge.guideEngineMove("g1f3"));
+
+        transport.feed(fieldUpdateFrame("f3", 1));
+        assertFalse(
+                "f3 occupied with g1 still taken for occupied is not the move",
+                listener.guidanceComplete.await(300, TimeUnit.MILLISECONDS));
+
+        transport.feed(boardDumpAfterKnightToF3());
+
+        assertTrue(listener.guidanceComplete.await(TIMEOUT_SECONDS, TimeUnit.SECONDS));
+    }
+
+    /** A whole move played before update mode was on reaches the app with that board dump. */
+    @Test
+    public void physicalMove_playedBeforeUpdateModeIsPickedUpFromTheNextBoardDump()
+            throws InterruptedException {
+        FakeTransport transport = new FakeTransport();
+        RecordingListener listener = new RecordingListener();
+        PegasusGameBridge bridge = newBridgeOnMainThread(transport, listener);
+        connectAndSyncStartingPosition(bridge, transport, listener);
+
+        transport.feed(boardDumpAfterKnightToF3());
+
+        assertTrue(listener.moveConfirmed.await(TIMEOUT_SECONDS, TimeUnit.SECONDS));
+        assertEquals("g1f3", listener.confirmedUci.get());
+    }
+
     @Test
     public void physicalPawnPush_isConfirmedWithCorrectUci() throws InterruptedException {
         FakeTransport transport = new FakeTransport();
