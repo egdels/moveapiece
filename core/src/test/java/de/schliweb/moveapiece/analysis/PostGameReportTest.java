@@ -98,6 +98,9 @@ public class PostGameReportTest {
         assertEquals(
                 Arrays.asList("e4", "e5", "Nf3", "O-O"),
                 PostGameReport.sanMoveList("1. e4 e5 2. Nf3  3. O-O"));
+        assertEquals(
+                java.util.List.of("c6", "Nf3", "d6"),
+                PostGameReport.sanMoveList("1... c6 2. Nf3 d6"));
         assertTrue(PostGameReport.sanMoveList("").isEmpty());
     }
 }

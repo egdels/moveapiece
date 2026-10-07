@@ -5,6 +5,7 @@
 
 package de.schliweb.moveapiece.analysis;
 
+import de.schliweb.moveapiece.logic.ChessGame;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -122,7 +123,7 @@ public final class PostGameReport {
     public static List<String> sanMoveList(String movetext) {
         List<String> moves = new ArrayList<>();
         for (String token : movetext.split("\\s+")) {
-            if (!token.isEmpty() && !token.matches("\\d+\\.")) {
+            if (!token.isEmpty() && !token.matches(ChessGame.MOVE_NUMBER_TOKEN)) {
                 moves.add(token);
             }
         }

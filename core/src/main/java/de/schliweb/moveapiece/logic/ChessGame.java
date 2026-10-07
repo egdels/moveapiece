@@ -368,23 +368,50 @@ public class ChessGame {
         return sanOf(fullMoveList());
     }
 
+    /**
+     * Numbered movetext with the numbering counted from {@link #startPly()}: a game Black opens
+     * reads "1... c6 2. Nf3 d6", not chesslib's "1. c6 Nf3 2. d6" (its numbering assumes White
+     * moved first). Tokens are separated by single spaces; a move number is {@code N.} before a
+     * White move and {@code N...} before a Black move that follows no White move (only ever the
+     * first token).
+     */
     private String sanOf(List<Move> moves) {
         if (moves.isEmpty()) {
             return "";
         }
         MoveList moveList = new MoveList(startFen);
         moveList.addAll(moves);
+        String[] sans;
         try {
-            return moveList.toSanWithMoveNumbers().trim();
+            sans = moveList.toSanArray();
         } catch (MoveConversionException e) {
             return "";
         }
+        StringBuilder sb = new StringBuilder();
+        int ply = startPly();
+        for (String san : sans) {
+            if (sb.length() > 0) {
+                sb.append(' ');
+            }
+            if (ply % 2 == 0) {
+                sb.append(ply / 2 + 1).append(". ");
+            } else if (ply == startPly()) {
+                sb.append(ply / 2 + 1).append("... ");
+            }
+            sb.append(san);
+            ply++;
+        }
+        return sb.toString();
     }
 
+    /** Regex for a move-number token of {@link #toSan()} ("12." or "12..."). */
+    public static final String MOVE_NUMBER_TOKEN = "\\d+\\.(\\.\\.)?";
+
     /**
-     * Full PGN text (Seven Tag Roster header + movetext) for the game so far. {@code
-     * whiteName}/{@code blackName} are supplied by the caller, since this class has no notion of
-     * game mode or opponent strength.
+     * Full PGN text (Seven Tag Roster header + movetext) for the game so far, with {@code SetUp}
+     * and {@code FEN} tags when the game did not start from the initial position (a position taken
+     * over from the board) - {@link #loadPgn} reads them back. {@code whiteName}/{@code blackName}
+     * are supplied by the caller, since this class has no notion of game mode or opponent strength.
      */
     public String toPgn(String whiteName, String blackName) {
         String date =
@@ -399,6 +426,10 @@ public class ChessGame {
         sb.append("[White \"").append(whiteName).append("\"]\n");
         sb.append("[Black \"").append(blackName).append("\"]\n");
         sb.append("[Result \"").append(result).append("\"]\n");
+        if (!START_FEN.equals(startFen)) {
+            sb.append("[SetUp \"1\"]\n");
+            sb.append("[FEN \"").append(startFen).append("\"]\n");
+        }
         sb.append('\n');
         String movetext = toSan();
         sb.append(movetext.isEmpty() ? result : movetext + " " + result);
@@ -461,6 +492,15 @@ public class ChessGame {
             return false;
         }
         reset();
+        String fen = pgnGame.getFen();
+        if (fen != null && !fen.isBlank()) {
+            try {
+                loadFen(fen);
+            } catch (RuntimeException e) {
+                reset();
+                return false;
+            }
+        }
         for (Move move : halfMoves) {
             if (!applyUciMove(move.toString())) {
                 reset();

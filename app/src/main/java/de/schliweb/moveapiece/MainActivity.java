@@ -1635,7 +1635,7 @@ public class MainActivity extends AppCompatActivity
             }
             int start = text.length();
             text.append(token);
-            if (!token.matches("\\d+\\.")) {
+            if (!token.matches(ChessGame.MOVE_NUMBER_TOKEN)) {
                 ply++;
                 int targetPly = ply;
                 boolean isCurrent = ply >= currentRoundStart && ply <= currentPly;

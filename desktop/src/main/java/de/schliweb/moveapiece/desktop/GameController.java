@@ -1858,7 +1858,7 @@ final class GameController
                     moveListFlow.getChildren().add(new Text(" "));
                 }
                 first = false;
-                if (token.matches("\\d+\\.")) {
+                if (token.matches(ChessGame.MOVE_NUMBER_TOKEN)) {
                     moveListFlow.getChildren().add(new Text(token));
                 } else {
                     ply++;
