@@ -12,6 +12,7 @@ import static org.junit.Assert.assertTrue;
 import de.schliweb.pegasus.core.chess.ChessPosition;
 import de.schliweb.pegasus.core.chess.OccupancyProjection;
 import de.schliweb.pegasus.core.chess.PieceType;
+import de.schliweb.pegasus.core.protocol.BatteryStatus;
 import de.schliweb.pegasus.core.protocol.BoardState;
 import de.schliweb.pegasus.core.protocol.PegasusCommands;
 import de.schliweb.pegasus.core.protocol.PegasusLedController;
@@ -137,9 +138,12 @@ public class PegasusGameBridgeTest {
             // Not exercised by these tests.
         }
 
+        final java.util.concurrent.LinkedBlockingQueue<String> batteryReports =
+                new java.util.concurrent.LinkedBlockingQueue<>();
+
         @Override
-        public void onBatteryStatus(int percent, boolean criticallyLow) {
-            // Not exercised by these tests.
+        public void onBatteryStatus(int percent, BatteryLevel level) {
+            batteryReports.add(percent + ":" + level);
         }
     }
 
@@ -320,6 +324,38 @@ public class PegasusGameBridgeTest {
             lit |= Arrays.equals(kingPulsing, command);
         }
         assertTrue("expected the king on e8 to pulse before onPhysicalMoveConfirmed", lit);
+    }
+
+    private static byte[] batteryFrame(int percent, int statusBits) {
+        byte[] payload = new byte[BatteryStatus.PAYLOAD_LENGTH];
+        payload[0] = (byte) percent;
+        payload[8] = (byte) statusBits;
+        return frame(PegasusMessageType.BATTERY_STATUS, payload);
+    }
+
+    /**
+     * The board pushes a reading at every 1 % change; the host hears the first one, then only each
+     * step to a worse level. Status bits as seen on real hardware on 2026-10-07: 0x02 while fine,
+     * 0x06 once "low" came on at 10 %, 0x0A from 6 % ("empty" on, "low" off again).
+     */
+    @Test
+    public void battery_isReportedOnConnectAndWheneverItGetsWorse() throws InterruptedException {
+        FakeTransport transport = new FakeTransport();
+        RecordingListener listener = new RecordingListener();
+        PegasusGameBridge bridge = newBridgeOnMainThread(transport, listener);
+        connectAndSyncStartingPosition(bridge, transport, listener);
+
+        transport.feed(batteryFrame(37, 0x02));
+        transport.feed(batteryFrame(36, 0x02));
+        transport.feed(batteryFrame(10, 0x06));
+        transport.feed(batteryFrame(9, 0x06));
+        transport.feed(batteryFrame(6, 0x0A));
+        transport.feed(batteryFrame(5, 0x0A));
+
+        assertEquals("37:OK", listener.batteryReports.poll(TIMEOUT_SECONDS, TimeUnit.SECONDS));
+        assertEquals("10:LOW", listener.batteryReports.poll(TIMEOUT_SECONDS, TimeUnit.SECONDS));
+        assertEquals("6:CRITICAL", listener.batteryReports.poll(TIMEOUT_SECONDS, TimeUnit.SECONDS));
+        assertEquals(null, listener.batteryReports.poll(300, TimeUnit.MILLISECONDS));
     }
 
     @Test

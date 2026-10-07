@@ -56,9 +56,10 @@ public class ChessnutGameBridge {
 
         /**
          * Reported once per connect and again on every transition into a low battery; routine
-         * readings in between are logged only.
+         * readings in between are logged only. The Chessnut only knows {@link BatteryLevel#OK} and
+         * {@link BatteryLevel#LOW}.
          */
-        void onBatteryStatus(int percent, boolean low);
+        void onBatteryStatus(int percent, BatteryLevel level);
 
         /** NEW GAME was pressed on the board (debounced). The host decides what that means. */
         void onNewGameButton();
@@ -240,7 +241,8 @@ public class ChessnutGameBridge {
         if (shouldNotify) {
             Listener l = listener();
             if (l != null) {
-                l.onBatteryStatus(status.percent(), status.isLow());
+                l.onBatteryStatus(
+                        status.percent(), status.isLow() ? BatteryLevel.LOW : BatteryLevel.OK);
             }
         }
     }

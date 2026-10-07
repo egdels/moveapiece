@@ -85,8 +85,8 @@ public class ChessnutGameBridgeTest {
         public void onTransportError(TransportError error, String detail) {}
 
         @Override
-        public void onBatteryStatus(int percent, boolean low) {
-            events.add("battery:" + percent + ":" + low);
+        public void onBatteryStatus(int percent, BatteryLevel level) {
+            events.add("battery:" + percent + ":" + level);
         }
 
         @Override
@@ -149,8 +149,8 @@ public class ChessnutGameBridgeTest {
         transport.feed(CMD, BATTERY_10);
         transport.feed(CMD, NEW_GAME);
 
-        assertEquals("battery:95:false", listener.events.poll(TIMEOUT_SECONDS, TimeUnit.SECONDS));
-        assertEquals("battery:10:true", listener.events.poll(TIMEOUT_SECONDS, TimeUnit.SECONDS));
+        assertEquals("battery:95:OK", listener.events.poll(TIMEOUT_SECONDS, TimeUnit.SECONDS));
+        assertEquals("battery:10:LOW", listener.events.poll(TIMEOUT_SECONDS, TimeUnit.SECONDS));
         // The button event after them shows that the second 95 % reading was not reported.
         assertEquals("newGame", listener.events.poll(TIMEOUT_SECONDS, TimeUnit.SECONDS));
     }

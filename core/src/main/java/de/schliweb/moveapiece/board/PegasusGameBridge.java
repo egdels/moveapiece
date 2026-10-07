@@ -105,15 +105,17 @@ public class PegasusGameBridge {
 
         /**
          * Reported once per connect (from the init sequence's battery request), and again on any
-         * later transition into a critically low battery. Real Pegasus hardware also pushes a fresh
-         * reading spontaneously whenever the percentage changes by 1% (CONFIRMED_ON_HARDWARE
+         * later transition into a worse {@link BatteryLevel}. Real Pegasus hardware also pushes a
+         * fresh reading spontaneously whenever the percentage changes by 1% (CONFIRMED_ON_HARDWARE
          * 2026-09-11) - those routine drift updates are intentionally not forwarded here (would
          * mean a UI notification every few minutes for the whole session); see {@code
-         * batteryReportPending} in the implementation for the exact gating. {@code criticallyLow}
-         * mirrors {@link BatteryStatus#isCriticallyLow()}: per DGT's protocol document, the board
-         * shuts itself down within about 3 minutes once this is true.
+         * batteryReportPending} in the implementation for the exact gating. {@link
+         * BatteryLevel#LOW} mirrors {@link BatteryStatus#isLow()} (seen at 10 % on real hardware,
+         * 2026-10-07), {@link BatteryLevel#CRITICAL} mirrors {@link
+         * BatteryStatus#isCriticallyLow()}: per DGT's protocol document, the board shuts itself
+         * down within about 3 minutes once that is true.
          */
-        void onBatteryStatus(int percent, boolean criticallyLow);
+        void onBatteryStatus(int percent, BatteryLevel level);
     }
 
     private static final long INIT_COMMAND_SPACING_MS = 1500;
@@ -206,15 +208,12 @@ public class PegasusGameBridge {
      * (CONFIRMED_ON_HARDWARE 2026-09-11, minutes apart, no re-request needed), not just once per
      * connect as originally assumed; reporting every one of those to the UI would mean a toast
      * every few minutes for the whole session, so only the first reading and later transitions into
-     * {@link BatteryStatus#isCriticallyLow()} are forwarded - see {@link #lastBatteryCritical}.
+     * a worse {@link BatteryLevel} are forwarded - see {@link #lastBatteryLevel}.
      */
     private boolean batteryReportPending;
 
-    /**
-     * Last {@link BatteryStatus#isCriticallyLow()} seen this connection; see {@link
-     * #batteryReportPending}.
-     */
-    private boolean lastBatteryCritical;
+    /** Worst {@link BatteryLevel} reported this connection; see {@link #batteryReportPending}. */
+    private BatteryLevel lastBatteryLevel = BatteryLevel.OK;
 
     /**
      * Whether the currently active guide (if any) is allowed to light LEDs for the plain expected
@@ -302,7 +301,7 @@ public class PegasusGameBridge {
                                         squaresSeenEmpty.clear();
                                         moveDetector.reset(moveDetector.position(), null);
                                         batteryReportPending = true;
-                                        lastBatteryCritical = false;
+                                        lastBatteryLevel = BatteryLevel.OK;
                                         cancel(keepaliveTask);
                                         sendOfficialInitSequence();
                                     }
@@ -537,16 +536,19 @@ public class PegasusGameBridge {
                         BatteryStatus status = BatteryStatus.fromPayload(frame.payload());
                         LOG.info("battery: " + status);
                         // Every 1%-change push is logged above for diagnostics, but only the
-                        // first reading of the connection and a fresh transition into
-                        // isCriticallyLow() reach the UI - see batteryReportPending's javadoc.
-                        boolean newlyCritical = status.isCriticallyLow() && !lastBatteryCritical;
-                        boolean shouldNotify = batteryReportPending || newlyCritical;
+                        // first reading of the connection and a fresh transition into a worse
+                        // level reach the UI - see batteryReportPending's javadoc.
+                        BatteryLevel level = levelOf(status);
+                        boolean shouldNotify =
+                                batteryReportPending || level.worseThan(lastBatteryLevel);
                         batteryReportPending = false;
-                        lastBatteryCritical = status.isCriticallyLow();
+                        if (level.worseThan(lastBatteryLevel)) {
+                            lastBatteryLevel = level;
+                        }
                         if (shouldNotify) {
                             Listener l = listener();
                             if (l != null) {
-                                l.onBatteryStatus(status.percent(), status.isCriticallyLow());
+                                l.onBatteryStatus(status.percent(), level);
                             }
                         }
                     }
@@ -770,6 +772,13 @@ public class PegasusGameBridge {
             names.add(BoardState.squareName(square));
         }
         return names;
+    }
+
+    private static BatteryLevel levelOf(BatteryStatus status) {
+        if (status.isCriticallyLow()) {
+            return BatteryLevel.CRITICAL;
+        }
+        return status.isLow() ? BatteryLevel.LOW : BatteryLevel.OK;
     }
 
     private void dispatchDetectionResult(MoveDetectionResult result) {

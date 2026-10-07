@@ -46,6 +46,7 @@ import de.schliweb.moveapiece.analysis.EngineSearchFlow;
 import de.schliweb.moveapiece.analysis.MoveQuality;
 import de.schliweb.moveapiece.analysis.PostGameReport;
 import de.schliweb.moveapiece.board.AndroidBoardScheduler;
+import de.schliweb.moveapiece.board.BatteryLevel;
 import de.schliweb.moveapiece.board.ChessnutBoardAdapter;
 import de.schliweb.moveapiece.board.ChessnutGameBridge;
 import de.schliweb.moveapiece.board.PegasusBoardAdapter;
@@ -169,6 +170,11 @@ public class MainActivity extends AppCompatActivity
 
     /** The selected physical board, see {@link #createBoardBridge}. */
     private PhysicalBoardBridge board;
+
+    /** The board said it is about to shut down; shown in the board line while connected. */
+    private boolean batteryCritical;
+
+    private int lastBatteryPercent;
 
     private BoardType boardType;
 
@@ -749,6 +755,9 @@ public class MainActivity extends AppCompatActivity
 
     @Override
     public void onConnectionStateChanged(ConnectionState state) {
+        if (state != ConnectionState.CONNECTED) {
+            batteryCritical = false; // the next connection reports afresh
+        }
         updatePegasusButtonLabel(state);
         updatePegasusMismatchText();
         // Real-hardware finding: with the screen off, this Samsung device's
@@ -882,6 +891,10 @@ public class MainActivity extends AppCompatActivity
                 binding.pegasusMismatchText.setVisibility(View.VISIBLE);
             } else if (liftedPiece >= 0) {
                 binding.pegasusMismatchText.setText(liftedPieceHint(liftedPiece));
+                binding.pegasusMismatchText.setVisibility(View.VISIBLE);
+            } else if (batteryCritical && board.getConnectionState() == ConnectionState.CONNECTED) {
+                binding.pegasusMismatchText.setText(
+                        getString(R.string.pegasus_battery_critical_format, lastBatteryPercent));
                 binding.pegasusMismatchText.setVisibility(View.VISIBLE);
             } else {
                 binding.pegasusMismatchText.setVisibility(View.GONE);
@@ -1043,19 +1056,22 @@ public class MainActivity extends AppCompatActivity
     }
 
     /**
-     * Shared by both listener interfaces. For the Pegasus {@code low} means critically low (the
-     * board shuts down within minutes, per DGT); for the Chessnut it is a plain low-battery hint.
+     * Shared by both listener interfaces. The reading on connect and a battery turning low are
+     * worth a toast; a board about to shut itself down stays in the board line (see {@link
+     * #updatePegasusMismatchText}) until the connection ends.
      */
     @Override
-    public void onBatteryStatus(int percent, boolean low) {
-        String message;
-        if (low && boardType == BoardType.PEGASUS) {
-            message = getString(R.string.pegasus_battery_critical_format, percent);
-        } else if (low) {
-            message = getString(R.string.board_battery_low_format, boardLabel(), percent);
-        } else {
-            message = getString(R.string.board_battery_format, boardLabel(), percent);
+    public void onBatteryStatus(int percent, BatteryLevel level) {
+        lastBatteryPercent = percent;
+        batteryCritical = level == BatteryLevel.CRITICAL;
+        if (batteryCritical) {
+            updatePegasusMismatchText();
+            return;
         }
+        String message =
+                level == BatteryLevel.LOW
+                        ? getString(R.string.board_battery_low_format, boardLabel(), percent)
+                        : getString(R.string.board_battery_format, boardLabel(), percent);
         Toast.makeText(this, message, Toast.LENGTH_LONG).show();
     }
 

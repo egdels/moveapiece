@@ -14,6 +14,7 @@ import de.schliweb.chessnut.core.protocol.ChessnutUuids;
 import de.schliweb.moveapiece.analysis.EngineSearchFlow;
 import de.schliweb.moveapiece.analysis.MoveQuality;
 import de.schliweb.moveapiece.analysis.PostGameReport;
+import de.schliweb.moveapiece.board.BatteryLevel;
 import de.schliweb.moveapiece.board.ChessnutBoardAdapter;
 import de.schliweb.moveapiece.board.ChessnutGameBridge;
 import de.schliweb.moveapiece.board.PegasusBoardAdapter;
@@ -279,6 +280,11 @@ final class GameController
     // ---- Physical board (DGT Pegasus or Chessnut) --------------------------------
     /** The selected board's bridge; null on hosts without a transport (see createBoardBridge). */
     private PhysicalBoardBridge pegasusBridge;
+
+    /** The board said it is about to shut down; shown in the board line while connected. */
+    private boolean batteryCritical;
+
+    private int lastBatteryPercent;
 
     private BoardType boardType;
 
@@ -890,6 +896,9 @@ final class GameController
 
     @Override
     public void onConnectionStateChanged(ConnectionState state) {
+        if (state != ConnectionState.CONNECTED) {
+            batteryCritical = false; // the next connection reports afresh
+        }
         updatePegasusButtonState(state);
         updatePegasusMismatchLabel();
         if (state == ConnectionState.CONNECTED) {
@@ -1011,6 +1020,12 @@ final class GameController
                 pegasusMismatchLabel.setVisible(true);
             } else if (liftedPiece >= 0) {
                 pegasusMismatchLabel.setText(liftedPieceHint(liftedPiece));
+                pegasusMismatchLabel.setVisible(true);
+            } else if (batteryCritical
+                    && pegasusBridge != null
+                    && pegasusBridge.getConnectionState() == ConnectionState.CONNECTED) {
+                pegasusMismatchLabel.setText(
+                        Messages.get("pegasus_battery_critical_format", lastBatteryPercent));
                 pegasusMismatchLabel.setVisible(true);
             } else {
                 pegasusMismatchLabel.setVisible(false);
@@ -1173,21 +1188,23 @@ final class GameController
     }
 
     /**
-     * Shared by both listener interfaces. For the Pegasus {@code low} means critically low (the
-     * board shuts down within minutes, per DGT); for the Chessnut it is a plain low-battery hint.
+     * Shared by both listener interfaces. The reading on connect and a battery turning low are
+     * worth a toast; a board about to shut itself down stays in the board line (see {@link
+     * #updatePegasusMismatchLabel}) until the connection ends.
      */
     @Override
-    public void onBatteryStatus(int percent, boolean low) {
-        LOG.log(Level.INFO, "Board battery: {0}% (low={1})", new Object[] {percent, low});
-        String message;
-        if (low && boardType == BoardType.PEGASUS) {
-            message = Messages.get("pegasus_battery_critical_format", percent);
-        } else if (low) {
-            message = Messages.get("board_battery_low_format", boardLabel(), percent);
-        } else {
-            message = Messages.get("board_battery_format", boardLabel(), percent);
+    public void onBatteryStatus(int percent, BatteryLevel level) {
+        LOG.log(Level.INFO, "Board battery: {0}% ({1})", new Object[] {percent, level});
+        lastBatteryPercent = percent;
+        batteryCritical = level == BatteryLevel.CRITICAL;
+        if (batteryCritical) {
+            updatePegasusMismatchLabel();
+            return;
         }
-        showToast(message);
+        showToast(
+                level == BatteryLevel.LOW
+                        ? Messages.get("board_battery_low_format", boardLabel(), percent)
+                        : Messages.get("board_battery_format", boardLabel(), percent));
     }
 
     /** What to say about a piece held in the air for a while: whose it is and where it may go. */
