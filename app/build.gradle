@@ -187,8 +187,33 @@ def abiCodes = [
         "x86_64"    : 4
 ]
 
+// The privacy policy (PRIVACY.md in the repository root) and the help (help/HELP*.md, one file
+// per UI language) are maintained once, for GitHub and both apps alike; this copies them into the
+// app's assets at build time, where DocumentActivity shows them. The desktop app gets the same
+// files as resources (see desktop/build.gradle).
+abstract class CopyDocsTask extends DefaultTask {
+    @InputFiles
+    abstract ConfigurableFileCollection getSources()
+
+    @OutputDirectory
+    abstract DirectoryProperty getOutputDirectory()
+
+    @TaskAction
+    void copy() {
+        def target = outputDirectory.get().asFile
+        target.deleteDir() // no stale files from an earlier source list
+        target.mkdirs()
+        sources.files.each { file -> new File(target, file.name).bytes = file.bytes }
+    }
+}
+
 androidComponents {
     onVariants(selector().all()) { variant ->
+        def copyDocs = project.tasks.register("copyDocs${variant.name.capitalize()}", CopyDocsTask) {
+            sources.from(rootProject.file('PRIVACY.md'), rootProject.fileTree('help') { include '*.md' })
+        }
+        variant.sources.assets?.addGeneratedSourceDirectory(copyDocs, { it.outputDirectory })
+
         variant.outputs.forEach { output ->
             def abi = output.filters.find {
                 it.filterType == com.android.build.api.variant.FilterConfiguration.FilterType.ABI

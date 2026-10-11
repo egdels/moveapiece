@@ -256,3 +256,50 @@
     -fx-text-fill: -text;
     -fx-font-weight: 600;
 }
+
+/* ---- help and privacy policy (DocumentWindow) -------------------------*/
+
+.document-scroll,
+.document-scroll > .viewport {
+    -fx-background-color: -surface;
+}
+
+.document {
+    -fx-padding: 8 24 24 24;
+}
+
+.document-text {
+    -fx-font-size: 14px;
+    -fx-fill: -text;
+}
+
+.document-bold {
+    -fx-font-weight: bold;
+}
+
+.document-italic {
+    -fx-font-style: italic;
+}
+
+.document-code {
+    -fx-font-family: "Menlo", "Consolas", monospace;
+    -fx-font-size: 13px;
+}
+
+.document-heading {
+    -fx-padding: 18 0 2 0;
+}
+
+.document-heading .document-text {
+    -fx-font-size: 17px;
+    -fx-font-weight: bold;
+    -fx-fill: -primary-dark;
+}
+
+.document-paragraph {
+    -fx-padding: 10 0 0 0;
+}
+
+.document-bullet {
+    -fx-padding: 6 0 0 4;
+}

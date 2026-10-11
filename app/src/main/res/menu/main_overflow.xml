@@ -16,4 +16,10 @@
     <item
         android:id="@+id/menuAnalyzeGame"
         android:title="@string/action_analyze_game" />
+    <item
+        android:id="@+id/menuHelp"
+        android:title="@string/menu_help" />
+    <item
+        android:id="@+id/menuPrivacyPolicy"
+        android:title="@string/menu_privacy_policy" />
 </menu>

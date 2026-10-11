@@ -74,6 +74,7 @@ import de.schliweb.moveapiece.training.OpeningRepository;
 import de.schliweb.moveapiece.training.TrainingFlow;
 import de.schliweb.moveapiece.training.TrainingSession;
 import de.schliweb.moveapiece.ui.BoardView;
+import de.schliweb.moveapiece.ui.DocumentActivity;
 import de.schliweb.moveapiece.ui.MoveSoundPlayer;
 import de.schliweb.moveapiece.ui.OpeningLibraryActivity;
 import de.schliweb.moveapiece.ui.OpeningNames;
@@ -618,6 +619,10 @@ public class MainActivity extends AppCompatActivity
                         exportGamePgn();
                     } else if (id == R.id.menuAnalyzeGame) {
                         searchFlow.startPostGameAnalysis();
+                    } else if (id == R.id.menuHelp) {
+                        DocumentActivity.start(this, getString(R.string.help_asset));
+                    } else if (id == R.id.menuPrivacyPolicy) {
+                        DocumentActivity.start(this, DocumentActivity.PRIVACY_POLICY);
                     } else {
                         return false;
                     }

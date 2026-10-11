@@ -7,6 +7,9 @@
     <string name="menu_opening_library">Openingsbibliotheek</string>
     <string name="menu_hint">Hint</string>
     <string name="menu_more">Meer</string>
+    <string name="menu_help">Help</string>
+    <string name="menu_privacy_policy">Privacybeleid</string>
+    <string name="help_asset">HELP.nl.md</string>
     <string name="menu_opponent">Tegenstander</string>
     <string name="menu_board_connect">Bord verbinden…</string>
     <string name="menu_board_disconnect_format">%1$s loskoppelen</string>

@@ -7,6 +7,9 @@
     <string name="menu_opening_library">Eröffnungsbibliothek</string>
     <string name="menu_hint">Tipp</string>
     <string name="menu_more">Mehr</string>
+    <string name="menu_help">Hilfe</string>
+    <string name="menu_privacy_policy">Datenschutzerklärung</string>
+    <string name="help_asset">HELP.de.md</string>
     <string name="menu_opponent">Gegner</string>
     <string name="menu_board_connect">Brett verbinden…</string>
     <string name="menu_board_disconnect_format">%1$s trennen</string>

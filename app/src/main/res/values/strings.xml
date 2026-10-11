@@ -9,6 +9,10 @@
     <string name="menu_opening_library">Opening Library</string>
     <string name="menu_hint">Hint</string>
     <string name="menu_more">More</string>
+    <string name="menu_help">Help</string>
+    <string name="menu_privacy_policy">Privacy Policy</string>
+    <!-- The help page in this language, from help/ (copied into the assets by app/build.gradle). -->
+    <string name="help_asset">HELP.md</string>
     <string name="menu_opponent">Opponent</string>
     <string name="menu_board_connect">Connect board…</string>
     <string name="menu_board_disconnect_format">Disconnect %1$s</string>

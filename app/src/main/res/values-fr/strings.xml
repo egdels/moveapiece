@@ -7,6 +7,9 @@
     <string name="menu_opening_library">Bibliothèque d\'ouvertures</string>
     <string name="menu_hint">Indice</string>
     <string name="menu_more">Plus</string>
+    <string name="menu_help">Aide</string>
+    <string name="menu_privacy_policy">Politique de confidentialité</string>
+    <string name="help_asset">HELP.fr.md</string>
     <string name="menu_opponent">Adversaire</string>
     <string name="menu_board_connect">Connecter l\'échiquier…</string>
     <string name="menu_board_disconnect_format">Déconnecter %1$s</string>

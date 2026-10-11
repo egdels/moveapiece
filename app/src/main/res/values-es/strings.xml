@@ -7,6 +7,9 @@
     <string name="menu_opening_library">Biblioteca de aperturas</string>
     <string name="menu_hint">Pista</string>
     <string name="menu_more">Más</string>
+    <string name="menu_help">Ayuda</string>
+    <string name="menu_privacy_policy">Política de privacidad</string>
+    <string name="help_asset">HELP.es.md</string>
     <string name="menu_opponent">Rival</string>
     <string name="menu_board_connect">Conectar tablero…</string>
     <string name="menu_board_disconnect_format">Desconectar %1$s</string>

@@ -10,6 +10,15 @@ candidates (`-rc`) and test tags are not listed.
 
 ## [Unreleased]
 
+### Added
+
+- Help and Privacy Policy in the menu, on Android and the desktop. The help
+  is in all six UI languages and explains playing, the training and
+  analysis features, PGN and the electronic boards; both texts are shown
+  inside the app, so it stays offline. The privacy policy now also names
+  who is responsible, what the app reads and stores, and every Android
+  permission, as Google Play asks.
+
 ### Fixed
 
 - Android: the status bar icons were white on the light background, and in

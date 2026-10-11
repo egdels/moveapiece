@@ -195,6 +195,8 @@ final class GameController
     private final MenuItem importItem = new MenuItem(Messages.get("action_import_pgn"));
     private final MenuItem exportItem = new MenuItem(Messages.get("action_export_pgn"));
     private final MenuItem analyzeGameItem = new MenuItem(Messages.get("action_analyze_game"));
+    private final MenuItem helpItem = new MenuItem(Messages.get("menu_help"));
+    private final MenuItem privacyPolicyItem = new MenuItem(Messages.get("menu_privacy_policy"));
     // A plain icon button that pops a ContextMenu rather than a MenuButton: a MenuButton's
     // arrow region keeps its space even when hidden and pushes the glyph off-centre.
     private final Button moreButton = iconButton(MORE_ICON_PATH, Messages.get("menu_more"));
@@ -560,7 +562,17 @@ final class GameController
         exportItem.setOnAction(e -> exportPgn());
         analyzeGameItem.setOnAction(e -> searchFlow.startPostGameAnalysis());
         openingLibraryItem.setOnAction(e -> OpeningLibraryWindow.show(stage));
-        moreMenu.getItems().addAll(openingLibraryItem, importItem, exportItem, analyzeGameItem);
+        helpItem.setOnAction(e -> DocumentWindow.show(stage, Messages.get("help_file")));
+        privacyPolicyItem.setOnAction(
+                e -> DocumentWindow.show(stage, DocumentWindow.PRIVACY_POLICY));
+        moreMenu.getItems()
+                .addAll(
+                        openingLibraryItem,
+                        importItem,
+                        exportItem,
+                        analyzeGameItem,
+                        helpItem,
+                        privacyPolicyItem);
         moreMenu.setOnShowing(e -> updateOverflowMenuState());
         moreButton.setOnAction(
                 e -> {

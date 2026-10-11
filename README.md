@@ -274,6 +274,10 @@ chessnut-core/           Chessnut protocol, Air family (frames, board reports wi
                          the identity-based move detection/game flow shared
                          by :app and :desktop
 
+help/                    The in-app help, HELP.md plus one HELP.<lang>.md per UI
+                         language; copied into both apps by their builds together
+                         with PRIVACY.md and rendered by core's docs.MarkdownDocument
+
 tools/chessnut-sniffer/  Python/bleak capture tool used to verify the
                          Chessnut protocol on hardware, with the protocol
                          notes (CHESSNUT_PROTOCOL.md); not part of the build

@@ -7,6 +7,9 @@
     <string name="menu_opening_library">Libreria delle aperture</string>
     <string name="menu_hint">Suggerimento</string>
     <string name="menu_more">Altro</string>
+    <string name="menu_help">Guida</string>
+    <string name="menu_privacy_policy">Informativa sulla privacy</string>
+    <string name="help_asset">HELP.it.md</string>
     <string name="menu_opponent">Avversario</string>
     <string name="menu_board_connect">Connetti scacchiera…</string>
     <string name="menu_board_disconnect_format">Disconnetti %1$s</string>

@@ -79,6 +79,11 @@
             android:parentActivityName=".MainActivity" />
 
         <activity
+            android:name=".ui.DocumentActivity"
+            android:exported="false"
+            android:parentActivityName=".MainActivity" />
+
+        <activity
             android:name=".ui.OpeningPreviewActivity"
             android:exported="false"
             android:parentActivityName=".ui.OpeningLibraryActivity" />
