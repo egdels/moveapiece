@@ -77,6 +77,7 @@ import de.schliweb.moveapiece.ui.BoardView;
 import de.schliweb.moveapiece.ui.MoveSoundPlayer;
 import de.schliweb.moveapiece.ui.OpeningLibraryActivity;
 import de.schliweb.moveapiece.ui.OpeningNames;
+import de.schliweb.moveapiece.ui.SystemBars;
 import de.schliweb.pegasus.bluetooth.AndroidPegasusBleTransport;
 import de.schliweb.pegasus.bluetooth.BlePermissions;
 import de.schliweb.pegasus.core.protocol.BoardState;
@@ -290,6 +291,7 @@ public class MainActivity extends AppCompatActivity
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        SystemBars.enable(this);
         soundPlayer = new MoveSoundPlayer(getApplicationContext());
         settings = new Settings(getApplicationContext());
         engineElo = settings.getEngineElo(engineElo);

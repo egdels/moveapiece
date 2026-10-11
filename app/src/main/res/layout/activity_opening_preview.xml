@@ -4,8 +4,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:fitsSystemWindows="true">
+    android:layout_height="match_parent">
 
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/toolbar"
@@ -22,7 +21,7 @@
     <!-- Same "everything scrolls as one column" approach as activity_main.xml:
          board + move list can exceed a short/landscape viewport otherwise. -->
     <ScrollView
-        android:id="@+id/contentScroll"
+        android:id="@+id/screenContent"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:fillViewport="true"

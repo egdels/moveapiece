@@ -8,6 +8,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versions follow [Semantic Versioning](https://semver.org/). Release
 candidates (`-rc`) and test tags are not listed.
 
+## [Unreleased]
+
+### Fixed
+
+- Android: the status bar icons were white on the light background, and in
+  landscape the toolbars of the opening library and preview stopped short
+  of the camera cutout, leaving a strip. The toolbars now reach under the
+  status bar and the cutout, and the main screen's status bar icons follow
+  the light or dark theme.
+- Android, dark mode: the Next button of the opening preview had dark
+  purple text on green; text on the brand colours is now white in both
+  themes.
+
 ## [1.7.0] - 2026-10-10
 
 ### Added

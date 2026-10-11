@@ -36,6 +36,7 @@ public class OpeningLibraryActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         binding = ActivityOpeningLibraryBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
+        SystemBars.applyToolbarScreen(this, binding.toolbar, binding.screenContent);
         setSupportActionBar(binding.toolbar);
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);

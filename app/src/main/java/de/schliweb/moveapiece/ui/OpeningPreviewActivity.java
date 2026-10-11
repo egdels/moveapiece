@@ -42,6 +42,7 @@ public class OpeningPreviewActivity extends AppCompatActivity {
 
         binding = ActivityOpeningPreviewBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
+        SystemBars.applyToolbarScreen(this, binding.toolbar, binding.screenContent);
         setSupportActionBar(binding.toolbar);
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);

@@ -9,8 +9,8 @@
 
     <!-- No toolbar here (unlike portrait): the board is height-bound in
          landscape, so its ~56dp would come straight out of board size.
-         fitsSystemWindows still pads for the status bar; the app's theme
-         already colors it to match the brand, so branding isn't lost. -->
+         fitsSystemWindows still pads for the status bar, which is
+         transparent over the background (see ui.SystemBars). -->
 
     <!-- Side panel takes whatever width is left after the board (which
          self-limits to a square via BoardView's onMeasure, so on a short
