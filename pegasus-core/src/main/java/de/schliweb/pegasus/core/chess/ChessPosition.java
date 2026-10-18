@@ -559,16 +559,12 @@ public final class ChessPosition {
             without[king] = null;
             without[rookFrom] = null;
             without[rookTo] = rook;
+            // Every square from the one next to the king up to its destination; none if the king
+            // already stands there (its own square was checked above).
             boolean safe = true;
-            int step = Integer.signum(kingTo - king);
-            for (int square = king + step; step != 0; square += step) {
-                if (isAttacked(square, enemy, without)) {
-                    safe = false;
-                    break;
-                }
-                if (square == kingTo) {
-                    break;
-                }
+            for (int square = king; safe && square != kingTo; ) {
+                square += Integer.signum(kingTo - square);
+                safe = !isAttacked(square, enemy, without);
             }
             if (safe) {
                 moves.add(new Move(king, chess960 ? rookFrom : kingTo));

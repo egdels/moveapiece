@@ -6,6 +6,7 @@
 package de.schliweb.moveapiece.logic;
 
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
 
@@ -78,7 +79,7 @@ public final class Chess960 {
      * either case), or -1 if it is none of the 960.
      */
     public static int numberOf(String backRank) {
-        Integer number = backRank == null ? null : NUMBERS.get(backRank.toUpperCase());
+        Integer number = backRank == null ? null : NUMBERS.get(backRank.toUpperCase(Locale.ROOT));
         return number == null ? -1 : number;
     }
 
@@ -96,12 +97,12 @@ public final class Chess960 {
                 rights += (char) ('A' + file);
             }
         }
-        return white.toLowerCase()
+        return white.toLowerCase(Locale.ROOT)
                 + "/pppppppp/8/8/8/8/PPPPPPPP/"
                 + white
                 + " w "
                 + rights
-                + rights.toLowerCase()
+                + rights.toLowerCase(Locale.ROOT)
                 + " - 0 1";
     }
 

@@ -370,7 +370,7 @@ public class ChessGame {
         if (ranks.length != 8
                 || !"pppppppp".equals(ranks[1])
                 || !"PPPPPPPP".equals(ranks[6])
-                || !ranks[0].equals(ranks[7].toLowerCase())) {
+                || !ranks[0].equals(ranks[7].toLowerCase(Locale.ROOT))) {
             return -1;
         }
         return Chess960.numberOf(ranks[7]);
