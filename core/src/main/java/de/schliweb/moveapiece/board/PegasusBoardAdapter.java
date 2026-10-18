@@ -139,6 +139,11 @@ public final class PegasusBoardAdapter implements PhysicalBoardBridge {
     }
 
     @Override
+    public void resetForNewGame(String startFen) {
+        bridge.resetForNewGame(startFen);
+    }
+
+    @Override
     public void syncBoardToPosition(String fen) {
         bridge.syncBoardToPosition(fen);
     }

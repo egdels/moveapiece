@@ -1377,12 +1377,27 @@ public class PegasusGameBridge {
      * went dark and stayed dark: nothing lights it again until the next physical event.
      */
     public void resetForNewGame() {
+        resetForNewGame(ChessPosition.STARTING_FEN);
+    }
+
+    /**
+     * Like {@link #resetForNewGame()}, for a game starting from {@code startFen}, e.g. a Chess960
+     * starting position. Malformed FEN is logged and ignored.
+     */
+    public void resetForNewGame(String startFen) {
+        ChessPosition start;
+        try {
+            start = ChessPosition.fromFen(startFen);
+        } catch (IllegalArgumentException e) {
+            LOG.log(Level.WARNING, "resetForNewGame: malformed FEN " + startFen, e);
+            return;
+        }
         clearBoardHint();
         cancel(checkIndicatorTask);
         abortGuide();
         ledController.off();
         squaresSeenEmpty.clear();
-        MoveDetectionResult result = moveDetector.reset(ChessPosition.starting(), physicalBoard);
+        MoveDetectionResult result = moveDetector.reset(start, physicalBoard);
         if (result.kind() == MoveDetectionResult.Kind.BOARD_MISMATCH) {
             updateMismatchLeds(result);
         }

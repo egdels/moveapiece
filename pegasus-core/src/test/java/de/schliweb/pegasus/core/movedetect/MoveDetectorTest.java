@@ -367,6 +367,43 @@ public class MoveDetectorTest {
         assertCastling(fen, "e8c8", new String[] {"-e8", "-a8", "+c8", "+d8"});
     }
 
+    // Chess960: the king castles onto its own rook ("b1a1"). Done the way the FIDE rules recommend
+    // for a physical board - king off, rook over, king down - occupancy identifies every castle
+    // except one where king and rook merely swap squares, which leaves it unchanged.
+
+    private static final String CHESS960_KING_B1 =
+            "rk4r1/pppppppp/8/8/8/8/PPPPPPPP/RK4R1 w GAga - 0 1";
+
+    @Test
+    public void chess960QueensideCastling() {
+        assertCastling(CHESS960_KING_B1, "b1a1", new String[] {"-b1", "-a1", "+d1", "+c1"});
+    }
+
+    @Test
+    public void chess960KingsideCastlingOntoTheRooksSquare() {
+        assertCastling(CHESS960_KING_B1, "b1g1", new String[] {"-b1", "-g1", "+f1", "+g1"});
+    }
+
+    @Test
+    public void chess960CastlingWithTheKingAlreadyOnItsSquare() {
+        assertCastling(
+                "1r4kr/pppppppp/8/8/8/8/PPPPPPPP/1R4KR w HBhb - 0 1",
+                "g1h1",
+                new String[] {"-h1", "+f1"});
+    }
+
+    @Test
+    public void chess960KingStepToTheCastlingSquareIsAKingMove() {
+        // Kc1 is legal on its own, so putting the king down first confirms it right away.
+        ChessPosition position = ChessPosition.fromFen(CHESS960_KING_B1);
+        MoveDetector detector = new MoveDetector(position, null);
+        FakePhysicalBoard board = synced(detector, position);
+        board.lift("b1");
+        MoveDetectionResult result = board.place("c1");
+        assertEquals(MoveDetectionResult.Kind.CONFIRMED, result.kind());
+        assertEquals("b1c1", result.move().uci());
+    }
+
     private static void assertCastling(String fen, String expectedUci, String[] steps) {
         ChessPosition position = ChessPosition.fromFen(fen);
         MoveDetector detector = new MoveDetector(position, null);
