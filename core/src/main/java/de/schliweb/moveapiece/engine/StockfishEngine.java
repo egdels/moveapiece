@@ -34,6 +34,8 @@ public class StockfishEngine {
     private volatile EngineListener listener;
     private volatile boolean shuttingDown;
     private volatile String criticalError;
+    // UCI_Chess960 as last sent; the engine starts with it off.
+    private boolean chess960;
 
     public StockfishEngine(String enginePath, Consumer<Runnable> mainThreadDispatcher) {
         this.enginePath = enginePath;
@@ -115,6 +117,20 @@ public class StockfishEngine {
      * raise this for a one-off "show top moves" search should restore it to 1 afterwards, since
      * every extra line is extra search work.
      */
+    /**
+     * Switches Chess960 castling rules on or off, sending {@code UCI_Chess960} only when that
+     * changes. With it on, Stockfish reads and writes castling as the king moving onto its own rook
+     * ("b1a1"), as {@code ChessGame} does in Chess960. Call before {@link #setPosition(String,
+     * String)}, while the engine is not searching.
+     */
+    public void setChess960(boolean on) {
+        if (on == chess960) {
+            return;
+        }
+        chess960 = on;
+        writeLineAsync("setoption name UCI_Chess960 value " + on);
+    }
+
     public void setMultiPv(int lines) {
         writeLineAsync("setoption name MultiPV value " + lines);
     }

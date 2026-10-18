@@ -29,6 +29,7 @@ public class EngineSearchFlowTest {
     /** Records the commands instead of talking to a process. */
     private static final class FakeEngine extends StockfishEngine {
         final List<String> commands = new ArrayList<>();
+        private boolean chess960;
 
         FakeEngine() {
             super("unused", Runnable::run);
@@ -37,6 +38,15 @@ public class EngineSearchFlowTest {
         @Override
         public void stop() {
             commands.add("stop");
+        }
+
+        /** Recorded only when it changes, as the real engine only sends it then. */
+        @Override
+        public void setChess960(boolean on) {
+            if (on != chess960) {
+                chess960 = on;
+                commands.add("chess960 " + on);
+            }
         }
 
         @Override
@@ -181,6 +191,28 @@ public class EngineSearchFlowTest {
         assertEquals(Arrays.asList("stop", "position e2e4", "go 1200"), engine.commands);
         // Its own move is the one search that runs at the opponent's strength.
         assertEquals(Arrays.asList("restoreStrength", "engineMove:e7e5"), host.events);
+    }
+
+    @Test
+    public void engineMoveSearch_switchesChess960RulesWithTheGame() {
+        host.evaluationEnabled = false;
+        game.resetChess960(0);
+        flow.startEngineMoveSearch(1200);
+        flow.onBestMove("g1h1");
+        game.reset();
+        flow.startEngineMoveSearch(1200);
+
+        assertEquals(
+                Arrays.asList(
+                        "stop",
+                        "chess960 true",
+                        "position ",
+                        "go 1200",
+                        "stop",
+                        "chess960 false",
+                        "position ",
+                        "go 1200"),
+                engine.commands);
     }
 
     @Test

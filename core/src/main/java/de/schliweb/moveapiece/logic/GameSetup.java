@@ -26,8 +26,12 @@ import java.util.Objects;
  * @param side the human's colour; for the trainer, the side being trained
  * @param opening the line to drill; null unless {@code opponent} is {@link Opponent#TRAINER}
  * @param hintsEnabled trainer only: whether the expected next move is highlighted
+ * @param chess960 whether each game starts from a random Chess960 starting position; only with a
+ *     human or Stockfish as the opponent - Maia learnt from standard games only and the trainer's
+ *     lines start from the standard position, so it is always false for those
  */
-public record GameSetup(Opponent opponent, Side side, OpeningLine opening, boolean hintsEnabled) {
+public record GameSetup(
+        Opponent opponent, Side side, OpeningLine opening, boolean hintsEnabled, boolean chess960) {
 
     /** What both front ends start in: Human vs Stockfish, human as White. */
     public static final GameSetup DEFAULT =
@@ -41,6 +45,19 @@ public record GameSetup(Opponent opponent, Side side, OpeningLine opening, boole
         } else {
             opening = null;
         }
+        if (!supportsChess960(opponent)) {
+            chess960 = false;
+        }
+    }
+
+    /** A standard-chess setup. */
+    public GameSetup(Opponent opponent, Side side, OpeningLine opening, boolean hintsEnabled) {
+        this(opponent, side, opening, hintsEnabled, false);
+    }
+
+    /** Whether games against {@code opponent} can be played as Chess960. */
+    public static boolean supportsChess960(Opponent opponent) {
+        return opponent == Opponent.HUMAN || opponent == Opponent.STOCKFISH;
     }
 
     /** A non-trainer setup; {@code side} is the human's colour. */
@@ -62,10 +79,20 @@ public record GameSetup(Opponent opponent, Side side, OpeningLine opening, boole
      */
     public static GameSetup fromKeys(
             String opponentKey, String sideKey, String openingId, boolean hintsEnabled) {
+        return fromKeys(opponentKey, sideKey, openingId, hintsEnabled, false);
+    }
+
+    /** {@link #fromKeys(String, String, String, boolean)} with the persisted Chess960 choice. */
+    public static GameSetup fromKeys(
+            String opponentKey,
+            String sideKey,
+            String openingId,
+            boolean hintsEnabled,
+            boolean chess960) {
         Opponent opponent = Opponent.fromKey(opponentKey);
         Side side = Side.BLACK.name().equals(sideKey) ? Side.BLACK : Side.WHITE;
         if (opponent != Opponent.TRAINER) {
-            return new GameSetup(opponent, side, null, hintsEnabled);
+            return new GameSetup(opponent, side, null, hintsEnabled, chess960);
         }
         OpeningLine opening = openingId == null ? null : OpeningRepository.byId(openingId);
         if (opening == null) {

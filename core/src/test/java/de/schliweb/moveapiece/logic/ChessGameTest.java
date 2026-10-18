@@ -634,4 +634,141 @@ public class ChessGameTest {
         game.loadFen("4k3/8/8/8/8/8/4P3/4K3 b - -");
         assertEquals(1, game.startPly());
     }
+
+    // --- Chess960 -------------------------------------------------------------------------------
+
+    /** King b1 between rooks a1 and g1: Kc1 and O-O-O both bring the king to c1. */
+    private static final String KING_B1 = "rk4r1/pppppppp/8/8/8/8/PPPPPPPP/RK4R1 w GAga - 0 1";
+
+    private static ChessGame chess960(String fen) {
+        ChessGame game = new ChessGame();
+        game.loadFen(fen, true);
+        return game;
+    }
+
+    @Test
+    public void resetChess960_setsUpTheNumberedPosition() {
+        ChessGame game = new ChessGame();
+        game.resetChess960(0);
+        assertTrue(game.isChess960());
+        assertEquals(0, game.chess960Number());
+        assertEquals(Piece.WHITE_BISHOP, game.pieceAt(Square.A1));
+        assertEquals(Piece.WHITE_KING, game.pieceAt(Square.G1));
+        assertEquals(Piece.BLACK_ROOK, game.pieceAt(Square.H8));
+
+        game.reset();
+        assertFalse(game.isChess960());
+        assertEquals(-1, game.chess960Number());
+    }
+
+    @Test
+    public void resetChess960_standardArrayStillCastlesByChess960Rules() {
+        ChessGame game = new ChessGame();
+        game.resetChess960(Chess960.STANDARD);
+        assertTrue(game.isChess960());
+        assertEquals(Chess960.STANDARD, game.chess960Number());
+    }
+
+    @Test
+    public void chess960_kingOntoOwnRookCastles() {
+        ChessGame game = chess960(KING_B1);
+        assertTrue(game.applyMove(Square.B1, Square.A1, null));
+        assertEquals(Piece.WHITE_KING, game.pieceAt(Square.C1));
+        assertEquals(Piece.WHITE_ROOK, game.pieceAt(Square.D1));
+        assertEquals(Piece.NONE, game.pieceAt(Square.A1));
+        assertEquals("b1a1", game.lastMoveUci());
+        assertEquals("1. O-O-O", game.toSan());
+    }
+
+    @Test
+    public void chess960_plainKingStepToTheCastlingSquareStaysAKingMove() {
+        ChessGame game = chess960(KING_B1);
+        assertTrue(game.applyMove(Square.B1, Square.C1, null));
+        assertEquals(Piece.WHITE_KING, game.pieceAt(Square.C1));
+        assertEquals(Piece.WHITE_ROOK, game.pieceAt(Square.A1));
+        assertEquals("1. Kc1", game.toSan());
+    }
+
+    @Test
+    public void chess960_kingPutOnItsCastlingSquareCastlesWhenNoKingMoveGoesThere() {
+        ChessGame game = chess960("r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R w HAha - 0 1");
+        List<Square> destinations = game.legalDestinationsFrom(Square.E1);
+        assertTrue(destinations.contains(Square.G1));
+        assertTrue(destinations.contains(Square.H1));
+
+        assertTrue(game.applyMove(Square.E1, Square.G1, null));
+        assertEquals(Piece.WHITE_KING, game.pieceAt(Square.G1));
+        assertEquals(Piece.WHITE_ROOK, game.pieceAt(Square.F1));
+        assertEquals("e1h1", game.lastMoveUci());
+    }
+
+    @Test
+    public void chess960_engineCastleInUciChess960Notation() {
+        ChessGame game = chess960(KING_B1);
+        assertTrue(game.applyUciMove("b1g1"));
+        assertEquals(Piece.WHITE_KING, game.pieceAt(Square.G1));
+        assertEquals(Piece.WHITE_ROOK, game.pieceAt(Square.F1));
+        assertEquals("b1g1", game.toUciMoveList());
+    }
+
+    @Test
+    public void chess960_undoAndRedoOfACastle() {
+        ChessGame game = chess960(KING_B1);
+        String before = game.toFen();
+        assertTrue(game.applyMove(Square.B1, Square.A1, null));
+        String after = game.toFen();
+
+        assertTrue(game.undoLastMove());
+        assertEquals(before, game.toFen());
+        assertTrue(game.redoMove());
+        assertEquals(after, game.toFen());
+    }
+
+    @Test
+    public void chess960_pgnCarriesTheVariantAndReimports() {
+        ChessGame game = new ChessGame();
+        game.resetChess960(Chess960.STANDARD);
+        for (String uci : new String[] {"e2e4", "e7e5", "g1f3", "g8f6", "f1c4", "f8c5"}) {
+            assertTrue(uci, game.applyUciMove(uci));
+        }
+        assertTrue(game.applyMove(Square.E1, Square.H1, null));
+
+        String pgn = game.toPgn("Weiß", "Schwarz");
+        assertTrue(pgn, pgn.contains("[Variant \"Chess960\"]"));
+        assertTrue(pgn, pgn.contains("[FEN \"" + Chess960.startFen(Chess960.STANDARD) + "\"]"));
+        assertTrue(pgn, pgn.contains("4. O-O"));
+
+        ChessGame imported = new ChessGame();
+        assertTrue(imported.loadPgn(pgn));
+        assertTrue(imported.isChess960());
+        assertEquals(Chess960.STANDARD, imported.chess960Number());
+        assertEquals(game.toFen(), imported.toFen());
+    }
+
+    @Test
+    public void chess960_pgnWithXFenAndKingOnTheEFile() {
+        // Rooks on b1 and f1, so O-O is the king going to g1 and the f1 rook staying - read as
+        // standard chess, "KQkq" would mean rooks on a1 and h1 instead.
+        String pgn =
+                "[Event \"?\"]\n"
+                        + "[Variant \"Chess960\"]\n"
+                        + "[SetUp \"1\"]\n"
+                        + "[FEN \"nrbqkrnb/pppppppp/8/8/8/8/PPPPPPPP/NRBQKRNB w KQkq - 0 1\"]\n"
+                        + "\n"
+                        + "1. Nf3 Nf6 2. O-O O-O *\n";
+        ChessGame game = new ChessGame();
+        assertTrue(game.loadPgn(pgn));
+        assertTrue(game.isChess960());
+        assertEquals(Piece.WHITE_KING, game.pieceAt(Square.G1));
+        assertEquals(Piece.WHITE_ROOK, game.pieceAt(Square.F1));
+        assertEquals(Piece.BLACK_KING, game.pieceAt(Square.G8));
+        assertEquals(Piece.BLACK_ROOK, game.pieceAt(Square.F8));
+    }
+
+    @Test
+    public void standardGame_pgnHasNoVariantTag() {
+        ChessGame game = new ChessGame();
+        assertTrue(game.applyMove(Square.E2, Square.E4, null));
+        assertFalse(game.toPgn("Weiß", "Schwarz").contains("[Variant"));
+    }
 }

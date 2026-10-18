@@ -41,6 +41,23 @@ public class GameSetupTest {
     }
 
     @Test
+    public void chess960_onlyWithHumanOrStockfish() {
+        for (Opponent opponent : Opponent.values()) {
+            OpeningLine line = opponent == Opponent.TRAINER ? OpeningRepository.ALL.get(0) : null;
+            GameSetup setup = new GameSetup(opponent, Side.WHITE, line, true, true);
+            assertEquals(opponent.name(), GameSetup.supportsChess960(opponent), setup.chess960());
+        }
+    }
+
+    @Test
+    public void fromKeys_restoresChess960() {
+        GameSetup restored = GameSetup.fromKeys("stockfish", "BLACK", null, true, true);
+        assertEquals(new GameSetup(Opponent.STOCKFISH, Side.BLACK, null, true, true), restored);
+        assertFalse(GameSetup.fromKeys("maia", "WHITE", null, true, true).chess960());
+        assertFalse(GameSetup.fromKeys("stockfish", "WHITE", null, true).chess960());
+    }
+
+    @Test
     public void fromKeys_nothingPersistedYet_isTheDefault() {
         assertEquals(GameSetup.DEFAULT, GameSetup.fromKeys(null, null, null, true));
     }
