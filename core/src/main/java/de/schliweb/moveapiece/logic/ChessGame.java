@@ -69,7 +69,12 @@ public class ChessGame {
                 result.add(m.getTo());
             }
             Square castleTarget = chess960KingTarget(m);
-            if (m.getFrom() == from && castleTarget != null && !result.contains(castleTarget)) {
+            // Not when the king already stands there: clicking the king again deselects it, and
+            // that castle is still the king put onto its rook.
+            if (m.getFrom() == from
+                    && castleTarget != null
+                    && castleTarget != from
+                    && !result.contains(castleTarget)) {
                 result.add(castleTarget);
             }
         }
@@ -102,7 +107,7 @@ public class ChessGame {
         // Chess960: the king put on its castling square castles, unless a plain king move goes
         // there - that one keeps the square, castling is then the king put onto its rook.
         for (Move m : legalMoves) {
-            if (m.getFrom() == from && chess960KingTarget(m) == to) {
+            if (m.getFrom() == from && to != from && chess960KingTarget(m) == to) {
                 return play(m);
             }
         }

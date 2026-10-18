@@ -703,6 +703,18 @@ public class ChessGameTest {
     }
 
     @Test
+    public void chess960_kingAlreadyOnItsCastlingSquareIsNoDestinationOfItself() {
+        // King c1, rook b1: O-O-O leaves the king on c1. Selecting the king and clicking it again
+        // must deselect it, not castle; castling is the king put onto its rook.
+        ChessGame game = chess960("1rk1r3/pppppppp/8/8/8/8/PPPPPPPP/1RK1R3 w EBeb - 0 1");
+        assertFalse(game.legalDestinationsFrom(Square.C1).contains(Square.C1));
+        assertFalse(game.applyMove(Square.C1, Square.C1, null));
+        assertTrue(game.applyMove(Square.C1, Square.B1, null));
+        assertEquals(Piece.WHITE_KING, game.pieceAt(Square.C1));
+        assertEquals(Piece.WHITE_ROOK, game.pieceAt(Square.D1));
+    }
+
+    @Test
     public void chess960_engineCastleInUciChess960Notation() {
         ChessGame game = chess960(KING_B1);
         assertTrue(game.applyUciMove("b1g1"));
