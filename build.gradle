@@ -24,6 +24,14 @@ ext {
     onnxruntimeVersion = isIntelMac ? '1.16.3' : '1.29.0'
     // Logged so CI runs (.github/workflows/desktop.yml, release.yml) show which version a leg got.
     logger.lifecycle("ONNX Runtime JVM artifact: ${onnxruntimeVersion} (host ${hostOs}/${hostArch})")
+
+    // chesslib for :core, :app and :desktop. Temporarily a fork (branch moveapiece-dev
+    // of https://github.com/egdels/chesslib, built by JitPack): chesslib 1.3.7 plus the Chess960
+    // castling fix and the commons-lang3 3.18.0 fix, both offered upstream as pull requests. Back
+    // to 'com.github.bhlangonijr:chesslib:<release>' once upstream has released them; no
+    // MoveAPiece release before that. tools/chesslib-local stands in for it when chesslib.dir is
+    // set in local.properties.
+    chesslib = 'com.github.egdels:chesslib:5b370ac782c62931492e74a861af73b9b9ab6056'
 }
 
 subprojects {

@@ -24,7 +24,8 @@ include ':desktop'
 
 // Development only: with chesslib.dir=/path/to/chesslib in local.properties, chesslib is built from
 // that checkout instead of the published artifact (see tools/chesslib-local/build.gradle). CI and
-// F-Droid builds have no such entry and keep using the published version.
+// F-Droid builds have no such entry and keep using the published artifact (see the chesslib
+// entry in build.gradle).
 def localProps = new File(rootDir, 'local.properties')
 if (localProps.exists()) {
     def props = new Properties()
