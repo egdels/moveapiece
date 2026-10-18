@@ -21,3 +21,20 @@ include ':pegasus-core'
 include ':chessnut-core'
 include ':core'
 include ':desktop'
+
+// Development only: with chesslib.dir=/path/to/chesslib in local.properties, chesslib is built from
+// that checkout instead of the published artifact (see tools/chesslib-local/build.gradle). CI and
+// F-Droid builds have no such entry and keep using the published version.
+def localProps = new File(rootDir, 'local.properties')
+if (localProps.exists()) {
+    def props = new Properties()
+    localProps.withInputStream { props.load(it) }
+    def chesslibDir = props.getProperty('chesslib.dir')
+    if (chesslibDir) {
+        includeBuild('tools/chesslib-local')
+        // Loud on purpose: CI, F-Droid and release builds use the published chesslib, so anything
+        // that works only with the local checkout breaks there.
+        logger.warn("chesslib: built from local checkout ${chesslibDir}, NOT the published version " +
+                "used by CI, F-Droid and releases")
+    }
+}

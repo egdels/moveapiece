@@ -1,0 +1,35 @@
+// Builds chesslib from a local checkout (chesslib.dir in MoveAPiece's local.properties), so that
+// changes to chesslib can be tried in MoveAPiece without publishing them. MoveAPiece's
+// settings.gradle includes this build only when chesslib.dir is set; Gradle then substitutes it for
+// the com.github.bhlangonijr:chesslib dependency, whatever version that names. chesslib itself
+// builds with Maven, hence this stand-in.
+plugins {
+    id 'java-library'
+}
+
+group = 'com.github.bhlangonijr'
+
+def localProps = new Properties()
+new File(rootDir, '../../local.properties').withInputStream { localProps.load(it) }
+def chesslibDir = file(localProps.getProperty('chesslib.dir'))
+
+sourceSets {
+    main {
+        java.srcDirs = [new File(chesslibDir, 'src/main/java')]
+        resources.srcDirs = [new File(chesslibDir, 'src/main/resources')]
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // As in chesslib's pom.xml.
+    api 'org.apache.commons:commons-lang3:3.18.0'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    // chesslib targets Java 11.
+    options.release = 11
+}
