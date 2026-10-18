@@ -210,5 +210,19 @@
         app:layout_constraintStart_toEndOf="@id/columnGuideline"
         app:layout_constraintEnd_toEndOf="parent" />
 
+    <!-- Below the Elo slider: offered for a human or Stockfish opponent only (see
+         MainActivity#updateDialogVisibility). With the slider gone (human opponent) it moves up
+         to the top of the right-hand column. -->
+    <CheckBox
+        android:id="@+id/chess960CheckBox"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="12dp"
+        android:text="@string/dialog_chess960_checkbox"
+        app:layout_constraintTop_toBottomOf="@id/strengthSeekBar"
+        app:layout_constraintStart_toEndOf="@id/columnGuideline"
+        app:layout_constraintEnd_toEndOf="parent" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>
 </ScrollView>

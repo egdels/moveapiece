@@ -126,6 +126,9 @@ final class GameSetupDialog {
         CheckBox hintsBox = new CheckBox(Messages.get("dialog_training_hint_checkbox"));
         hintsBox.setSelected(initial.hintsEnabled());
 
+        CheckBox chess960Box = new CheckBox(Messages.get("dialog_chess960_checkbox"));
+        chess960Box.setSelected(initial.chess960());
+
         VBox content =
                 new VBox(
                         8,
@@ -134,6 +137,7 @@ final class GameSetupDialog {
                         maiaRadio,
                         trainerRadio,
                         colorBox,
+                        chess960Box,
                         openingBox,
                         hintsBox);
         // No explicit prefHeight: unlike the old opening-trainer-only dialog, this one's height
@@ -155,6 +159,9 @@ final class GameSetupDialog {
                     openingBox.setManaged(isTrainer);
                     hintsBox.setVisible(isTrainer);
                     hintsBox.setManaged(isTrainer);
+                    boolean offersChess960 = isHuman || stockfishRadio.isSelected();
+                    chess960Box.setVisible(offersChess960);
+                    chess960Box.setManaged(offersChess960);
                     if (content.getScene() != null) {
                         content.getScene().getWindow().sizeToScene();
                     }
@@ -208,7 +215,12 @@ final class GameSetupDialog {
                     if (opponent == Opponent.TRAINER && opening == null) {
                         return null;
                     }
-                    return new GameSetup(opponent, side, opening, hintsBox.isSelected());
+                    return new GameSetup(
+                            opponent,
+                            side,
+                            opening,
+                            hintsBox.isSelected(),
+                            chess960Box.isSelected());
                 });
 
         return dialog;

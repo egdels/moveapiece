@@ -31,6 +31,7 @@ import de.schliweb.moveapiece.engine.NnueAssets;
 import de.schliweb.moveapiece.engine.StockfishEngine;
 import de.schliweb.moveapiece.logic.BoardType;
 import de.schliweb.moveapiece.logic.BoardTypeDetection;
+import de.schliweb.moveapiece.logic.Chess960;
 import de.schliweb.moveapiece.logic.ChessGame;
 import de.schliweb.moveapiece.logic.GameSetup;
 import de.schliweb.moveapiece.logic.Opponent;
@@ -58,6 +59,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javafx.animation.PauseTransition;
@@ -1506,10 +1508,17 @@ final class GameController
 
     private void newGame() {
         searchFlow.abandonPendingSearches();
-        game.reset();
+        // lastSetup is what is being started (applyGameSetup remembers it first); a Chess960 setup
+        // gets a new starting position for every game, also for a rematch from the board's NEW
+        // GAME button.
+        if (lastSetup.chess960()) {
+            game.resetChess960(Chess960.random(ThreadLocalRandom.current()));
+        } else {
+            game.reset();
+        }
         boardCanvas.setLastMove(null, null);
         if (pegasusBridge != null) {
-            pegasusBridge.resetForNewGame();
+            pegasusBridge.resetForNewGame(game.startFen());
         }
         refresh();
     }
@@ -2097,6 +2106,14 @@ final class GameController
                             OpeningNames.displayName(trainingSession.line()),
                             shownPly,
                             trainingSession.totalPlies()));
+        } else if (game.isChess960()) {
+            // Which of the 960 starting positions this is, so the players can tell what to set up;
+            // its number is unknown for e.g. an imported game in progress.
+            int number = game.chess960Number();
+            infoLabel.setText(
+                    number >= 0
+                            ? Messages.get("status_chess960_format", number)
+                            : Messages.get("status_chess960"));
         } else {
             infoLabel.setText("");
         }

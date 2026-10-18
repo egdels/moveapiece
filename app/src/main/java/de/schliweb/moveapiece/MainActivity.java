@@ -64,6 +64,7 @@ import de.schliweb.moveapiece.engine.NnueAssets;
 import de.schliweb.moveapiece.engine.StockfishEngine;
 import de.schliweb.moveapiece.logic.BoardType;
 import de.schliweb.moveapiece.logic.BoardTypeDetection;
+import de.schliweb.moveapiece.logic.Chess960;
 import de.schliweb.moveapiece.logic.ChessGame;
 import de.schliweb.moveapiece.logic.GameSetup;
 import de.schliweb.moveapiece.logic.Opponent;
@@ -1159,7 +1160,8 @@ public class MainActivity extends AppCompatActivity
                 engineElo,
                 currentMaiaRating,
                 lastSetup.opening(),
-                lastSetup.hintsEnabled());
+                lastSetup.hintsEnabled(),
+                lastSetup.chess960());
     }
 
     private static GameMode modeFor(Opponent opponent) {
@@ -1234,6 +1236,7 @@ public class MainActivity extends AppCompatActivity
         int openingIndex = OpeningRepository.ALL.indexOf(lastSetup.opening());
         dialogBinding.openingSpinner.setSelection(Math.max(0, openingIndex));
         dialogBinding.hintCheckBox.setChecked(lastSetup.hintsEnabled());
+        dialogBinding.chess960CheckBox.setChecked(lastSetup.chess960());
 
         dialogBinding.opponentGroup.setOnCheckedChangeListener(
                 (group, checkedId) ->
@@ -1284,13 +1287,16 @@ public class MainActivity extends AppCompatActivity
                                                                     .getSelectedItemPosition())
                                                     : null;
                                     boolean chosenHints = dialogBinding.hintCheckBox.isChecked();
+                                    boolean chosenChess960 =
+                                            dialogBinding.chess960CheckBox.isChecked();
                                     startNewGame(
                                             chosenMode,
                                             chosenSide,
                                             chosenElo,
                                             chosenMaiaRating,
                                             chosenOpening,
-                                            chosenHints);
+                                            chosenHints,
+                                            chosenChess960);
                                 })
                         .setNegativeButton(R.string.action_cancel, null)
                         .show();
@@ -1342,6 +1348,10 @@ public class MainActivity extends AppCompatActivity
         dialogBinding.openingLabel.setVisibility(openingVisibility);
         dialogBinding.openingSpinner.setVisibility(openingVisibility);
         dialogBinding.hintCheckBox.setVisibility(openingVisibility);
+        dialogBinding.chess960CheckBox.setVisibility(
+                GameSetup.supportsChess960(opponentFor(dialogMode))
+                        ? android.view.View.VISIBLE
+                        : android.view.View.GONE);
     }
 
     /**
@@ -1379,7 +1389,8 @@ public class MainActivity extends AppCompatActivity
             int chosenElo,
             int chosenMaiaRating,
             OpeningLine chosenOpening,
-            boolean hintsEnabled) {
+            boolean hintsEnabled,
+            boolean chess960) {
         searchFlow.abandonPendingSearches();
         trainingFlow.stop();
 
@@ -1391,7 +1402,8 @@ public class MainActivity extends AppCompatActivity
                         opponentFor(chosenMode),
                         pairedEngine ? chosenSide.flip() : chosenSide,
                         chosenOpening,
-                        hintsEnabled));
+                        hintsEnabled,
+                        chess960));
 
         mode = chosenMode;
         engineSide =
@@ -1406,8 +1418,15 @@ public class MainActivity extends AppCompatActivity
         trainingSession = trainingFlow.session();
         binding.undoButton.setEnabled(true);
 
-        game.reset();
-        board.resetForNewGame();
+        if (lastSetup.chess960()) {
+            // A new starting position for every game, also for a rematch from the board's NEW
+            // GAME button.
+            game.resetChess960(Chess960.random(ThreadLocalRandom.current()));
+            board.resetForNewGame(game.startFen());
+        } else {
+            game.reset();
+            board.resetForNewGame();
+        }
         boolean flip =
                 (isPairedEngineMode() && engineSide == Side.WHITE)
                         || (mode == GameMode.TRAINING && chosenSide == Side.BLACK);
@@ -1520,12 +1539,30 @@ public class MainActivity extends AppCompatActivity
                             Math.min(trainingSession.plyIndex() + 1, trainingSession.totalPlies()),
                             trainingSession.totalPlies()));
         } else if (mode == GameMode.ENGINE) {
-            info.setText(getString(R.string.status_engine_strength_format, engineElo));
+            info.setText(
+                    withChess960(getString(R.string.status_engine_strength_format, engineElo)));
         } else if (mode == GameMode.MAIA) {
             info.setText(getString(R.string.status_maia_strength_format, currentMaiaRating));
         } else {
-            info.setText("");
+            info.setText(withChess960(""));
         }
+    }
+
+    /**
+     * {@code text} followed by the Chess960 starting position when this game is one (its number if
+     * known, e.g. not for an imported game in progress), so the players can tell which position
+     * they set up.
+     */
+    private String withChess960(String text) {
+        if (!game.isChess960()) {
+            return text;
+        }
+        int number = game.chess960Number();
+        String chess960 =
+                number >= 0
+                        ? getString(R.string.status_chess960_format, number)
+                        : getString(R.string.status_chess960);
+        return text.isEmpty() ? chess960 : text + " · " + chess960;
     }
 
     private void clearMoveQualityNote() {
@@ -2173,7 +2210,8 @@ public class MainActivity extends AppCompatActivity
                                                 engineElo,
                                                 currentMaiaRating,
                                                 line,
-                                                hintsEnabled))
+                                                hintsEnabled,
+                                                false))
                         .setNegativeButton(
                                 R.string.action_pick_opening, (d, w) -> showNewGameDialog())
                         .setNeutralButton(

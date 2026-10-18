@@ -45,6 +45,25 @@ souvient pour la prochaine fois.
 - La **Bibliothèque d'ouvertures** dans le menu montre chaque ouverture
   coup par coup, sans partie.
 
+## Chess960
+
+- Avec **Chess960** dans Nouvelle partie, chaque partie commence à partir
+  de l'une des 960 positions de départ, tirée au hasard : les pièces de
+  la première rangée sont mélangées, de la même façon pour les deux
+  camps, et les pions sont à leur place habituelle. Cela fonctionne
+  contre Stockfish et contre une deuxième personne ; l'application
+  affiche le numéro de la position.
+- Pour roquer, placez le roi sur sa propre tour. Roi et tour se
+  retrouvent alors comme aux échecs classiques : en g1 et f1 ou en c1 et
+  d1. Si aucun coup ordinaire du roi ne mène en g1 ou c1, vous pouvez
+  aussi y placer le roi directement.
+- Sur un échiquier électronique, installez les pièces comme à l'écran ;
+  tant qu'elles ne correspondent pas, les cases différentes s'allument.
+  Roquez comme le recommandent les règles de la FIDE : soulevez le roi,
+  déplacez la tour, posez le roi. Si roi et tour ne font qu'échanger
+  leurs cases, le Pegasus ne voit pas la différence ; jouez ce roque à
+  l'écran.
+
 ## Enregistrer et charger des parties
 
 - **Exporter en PGN** dans le menu transmet la partie en cours au format
