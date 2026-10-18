@@ -47,7 +47,7 @@ in het venster Nieuw spel, en de app onthoudt het voor de volgende keer.
 - Met **Chess960** bij Nieuw spel begint elke partij vanuit een van de
   960 beginopstellingen, willekeurig gekozen: de stukken op de achterste
   rij staan door elkaar, voor beide kanten gelijk, en de pionnen staan
-  zoals altijd. Dat kan tegen Stockfish en tegen een tweede persoon; de
+  zoals altijd. Dat kan tegen Stockfish, Maia of een tweede persoon; de
   app toont het nummer van de opstelling.
 - Om te rokeren zet je de koning op zijn eigen toren. Koning en toren
   staan daarna zoals bij gewoon schaken: op g1 en f1 of op c1 en d1. Leidt

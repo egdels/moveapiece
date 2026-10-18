@@ -26,9 +26,8 @@ import java.util.Objects;
  * @param side the human's colour; for the trainer, the side being trained
  * @param opening the line to drill; null unless {@code opponent} is {@link Opponent#TRAINER}
  * @param hintsEnabled trainer only: whether the expected next move is highlighted
- * @param chess960 whether each game starts from a random Chess960 starting position; only with a
- *     human or Stockfish as the opponent - Maia learnt from standard games only and the trainer's
- *     lines start from the standard position, so it is always false for those
+ * @param chess960 whether each game starts from a random Chess960 starting position; always false
+ *     for the trainer, whose lines start from the standard position
  */
 public record GameSetup(
         Opponent opponent, Side side, OpeningLine opening, boolean hintsEnabled, boolean chess960) {
@@ -55,9 +54,13 @@ public record GameSetup(
         this(opponent, side, opening, hintsEnabled, false);
     }
 
-    /** Whether games against {@code opponent} can be played as Chess960. */
+    /**
+     * Whether games against {@code opponent} can be played as Chess960. Maia learnt from standard
+     * games only, but measured on human Chess960 games it still predicts the player's move almost
+     * half the time (48 %, against 54 % in standard chess), lower mainly in the first moves.
+     */
     public static boolean supportsChess960(Opponent opponent) {
-        return opponent == Opponent.HUMAN || opponent == Opponent.STOCKFISH;
+        return opponent != Opponent.TRAINER;
     }
 
     /** A non-trainer setup; {@code side} is the human's colour. */

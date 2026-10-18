@@ -46,6 +46,41 @@ public class MaiaMoveIndexerTest {
         assertEquals(4 * 64 + 2, index("e8c8", Side.BLACK));
     }
 
+    private static int index(String fen, String uci) {
+        Board board = new Board();
+        board.loadFromFen(fen, true);
+        return MaiaMoveIndexer.indexOf(board, new Move(uci, board.getSideToMove()));
+    }
+
+    /** A Chess960 castle (king onto its rook) takes the slot of the king's move to g1/c1. */
+    @Test
+    public void chess960Castling_isTheKingMoveToItsCastlingSquare() {
+        String kingB1 = "rk4r1/pppppppp/8/8/8/8/PPPPPPPP/RK4R1 w GAga - 0 1";
+        // b1 = 1, c1 = 2, g1 = 6
+        assertEquals(1 * 64 + 2, index(kingB1, "b1a1")); // O-O-O
+        assertEquals(1 * 64 + 6, index(kingB1, "b1g1")); // O-O
+        // The plain king step b1c1 shares that slot: Maia never learnt to tell them apart.
+        assertEquals(1 * 64 + 2, index(kingB1, "b1c1"));
+        // Black, mirrored: b8a8 lands on the slot of b1c1.
+        String blackToMove = "rk4r1/pppppppp/8/8/8/8/PPPPPPPP/RK4R1 b GAga - 0 1";
+        assertEquals(1 * 64 + 2, index(blackToMove, "b8a8"));
+    }
+
+    /** With the king already on its castling square, the castle takes the rook's move slot. */
+    @Test
+    public void chess960CastlingWithTheKingStaying_isTheRookMove() {
+        // g1 = 6, h1 = 7, f1 = 5
+        assertEquals(7 * 64 + 5, index("1r4kr/8/8/8/8/8/8/1R4KR w HBhb - 0 1", "g1h1"));
+    }
+
+    /** In a standard game the board-aware lookup is the plain one. */
+    @Test
+    public void standardCastling_unchangedWithTheBoard() {
+        Board board = new Board();
+        board.loadFromFen("r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1");
+        assertEquals(4 * 64 + 6, MaiaMoveIndexer.indexOf(board, new Move("e1g1", Side.WHITE)));
+    }
+
     @Test
     public void promotions_haveTheirOwnSlots() {
         assertEquals(4096, index("a7a8q", Side.WHITE));

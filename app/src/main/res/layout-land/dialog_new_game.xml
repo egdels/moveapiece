@@ -210,9 +210,17 @@
         app:layout_constraintStart_toEndOf="@id/columnGuideline"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <!-- Below the Elo slider: offered for a human or Stockfish opponent only (see
-         MainActivity#updateDialogVisibility). With the slider gone (human opponent) it moves up
-         to the top of the right-hand column. -->
+    <!-- Below whichever of the opponent's controls are shown (Elo or Maia rating slider, colour
+         choice), so at the top of the right-hand column for a human opponent. The checkbox is
+         offered for every opponent but the trainer (see MainActivity#updateDialogVisibility). -->
+    <androidx.constraintlayout.widget.Barrier
+        android:id="@+id/chess960Barrier"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:barrierAllowsGoneWidgets="false"
+        app:barrierDirection="bottom"
+        app:constraint_referenced_ids="colorGroup,strengthSeekBar,maiaRatingSeekBar" />
+
     <CheckBox
         android:id="@+id/chess960CheckBox"
         android:layout_width="0dp"
@@ -220,7 +228,7 @@
         android:layout_marginStart="16dp"
         android:layout_marginTop="12dp"
         android:text="@string/dialog_chess960_checkbox"
-        app:layout_constraintTop_toBottomOf="@id/strengthSeekBar"
+        app:layout_constraintTop_toBottomOf="@id/chess960Barrier"
         app:layout_constraintStart_toEndOf="@id/columnGuideline"
         app:layout_constraintEnd_toEndOf="parent" />
 

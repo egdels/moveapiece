@@ -48,10 +48,10 @@ la próxima vez.
 ## Chess960
 
 - Con **Chess960** en Partida nueva, cada partida empieza desde una de
-  las 960 posiciones iniciales, elegida al azar: las piezas de la primera
-  fila están mezcladas, igual para ambos bandos, y los peones están como
-  siempre. Funciona contra Stockfish y contra otra persona; la aplicación
-  muestra el número de la posición.
+  las 960 posiciones iniciales, elegida al azar: las piezas de la
+  primera fila están mezcladas, igual para ambos bandos, y los peones
+  están como siempre. Funciona contra Stockfish, Maia u otra persona; la
+  aplicación muestra el número de la posición.
 - Para enrocar, mueve el rey sobre su propia torre. Después, rey y torre
   quedan como en el ajedrez normal: en g1 y f1 o en c1 y d1. Si ninguna
   jugada normal del rey lleva a g1 o c1, también puedes mover el rey

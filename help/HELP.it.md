@@ -46,10 +46,10 @@ successiva.
 
 ## Chess960
 
-- Con **Chess960** in Nuova partita, ogni partita inizia da una delle 960
-  posizioni iniziali, scelta a caso: i pezzi della prima traversa sono
-  mescolati, uguali per entrambi i colori, e i pedoni stanno come al
-  solito. Funziona contro Stockfish e contro un'altra persona; l'app
+- Con **Chess960** in Nuova partita, ogni partita inizia da una delle
+  960 posizioni iniziali, scelta a caso: i pezzi della prima traversa
+  sono mescolati, uguali per entrambi i colori, e i pedoni stanno come
+  al solito. Funziona contro Stockfish, Maia o un'altra persona; l'app
   mostra il numero della posizione.
 - Per arroccare, muovi il re sulla propria torre. Re e torre si trovano
   poi come negli scacchi normali: su g1 e f1 oppure su c1 e d1. Se nessuna

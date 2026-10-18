@@ -159,7 +159,7 @@ final class GameSetupDialog {
                     openingBox.setManaged(isTrainer);
                     hintsBox.setVisible(isTrainer);
                     hintsBox.setManaged(isTrainer);
-                    boolean offersChess960 = isHuman || stockfishRadio.isSelected();
+                    boolean offersChess960 = !isTrainer;
                     chess960Box.setVisible(offersChess960);
                     chess960Box.setManaged(offersChess960);
                     if (content.getScene() != null) {

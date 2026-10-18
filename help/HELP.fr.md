@@ -47,11 +47,11 @@ souvient pour la prochaine fois.
 
 ## Chess960
 
-- Avec **Chess960** dans Nouvelle partie, chaque partie commence à partir
-  de l'une des 960 positions de départ, tirée au hasard : les pièces de
-  la première rangée sont mélangées, de la même façon pour les deux
-  camps, et les pions sont à leur place habituelle. Cela fonctionne
-  contre Stockfish et contre une deuxième personne ; l'application
+- Avec **Chess960** dans Nouvelle partie, chaque partie commence à
+  partir de l'une des 960 positions de départ, tirée au hasard : les
+  pièces de la première rangée sont mélangées, de la même façon pour les
+  deux camps, et les pions sont à leur place habituelle. Cela fonctionne
+  contre Stockfish, Maia ou une deuxième personne ; l'application
   affiche le numéro de la position.
 - Pour roquer, placez le roi sur sa propre tour. Roi et tour se
   retrouvent alors comme aux échecs classiques : en g1 et f1 ou en c1 et

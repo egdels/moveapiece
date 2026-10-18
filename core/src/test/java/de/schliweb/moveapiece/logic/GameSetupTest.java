@@ -41,7 +41,7 @@ public class GameSetupTest {
     }
 
     @Test
-    public void chess960_onlyWithHumanOrStockfish() {
+    public void chess960_notForTheTrainer() {
         for (Opponent opponent : Opponent.values()) {
             OpeningLine line = opponent == Opponent.TRAINER ? OpeningRepository.ALL.get(0) : null;
             GameSetup setup = new GameSetup(opponent, Side.WHITE, line, true, true);
@@ -53,7 +53,8 @@ public class GameSetupTest {
     public void fromKeys_restoresChess960() {
         GameSetup restored = GameSetup.fromKeys("stockfish", "BLACK", null, true, true);
         assertEquals(new GameSetup(Opponent.STOCKFISH, Side.BLACK, null, true, true), restored);
-        assertFalse(GameSetup.fromKeys("maia", "WHITE", null, true, true).chess960());
+        assertTrue(GameSetup.fromKeys("maia", "WHITE", null, true, true).chess960());
+        assertFalse(GameSetup.fromKeys("trainer", "WHITE", null, true, true).chess960());
         assertFalse(GameSetup.fromKeys("stockfish", "WHITE", null, true).chess960());
     }
 

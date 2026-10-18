@@ -46,7 +46,7 @@ the New Game dialog, and the app remembers it for next time.
 - With **Chess960** in New Game, every game starts from one of the 960
   starting positions, picked at random: the back-rank pieces are
   shuffled, the same for both sides, and the pawns stand as usual. It
-  works against Stockfish and against a second person; the app shows the
+  works against Stockfish, Maia or a second person; the app shows the
   number of the position.
 - To castle, move the king onto its own rook. King and rook then stand as
   in standard chess: on g1 and f1 or on c1 and d1. If no ordinary king

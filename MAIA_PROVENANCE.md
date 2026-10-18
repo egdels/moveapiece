@@ -93,6 +93,39 @@ positions from twelve random move sequences.
 `MaiaMoveIndexerTest` and `MaiaPositionEncoderTest` cover the move slots and
 the input layout without the model.
 
+## Chess960
+
+Maia-3 was trained on standard games only. MoveAPiece still offers it as a
+Chess960 opponent, based on this measurement (2026-10-18): move-matching
+accuracy (the network's top legal move against the move actually played) on
+500 rated Lichess games each from August 2026, blitz and slower, with both
+players' ratings as input.
+
+| Plies | Standard | Chess960 |
+|---|---|---|
+| 0-9 | 49.9 % | 31.1 % |
+| 10-29 | 52.4 % | 45.1 % |
+| 30+ | 56.5 % | 54.8 % |
+| All | 54.4 % | 48.3 % |
+
+Castling is the weak spot. The network only knows castling as the king's
+move to the g- or c-file. `MaiaMoveIndexer.indexOf(Board, Move)` therefore
+scores a Chess960 castle (the king onto its own rook) by that slot, or by the
+rook's move when the king already stands on its castling square. With it,
+the network's top move is the castle in 19.9 % of the positions where the
+player castled (top 3: 34.8 %); scored by the king-onto-rook slot it was
+2.8 %.
+
+Known limitation: when the king's castling square is next to it (e.g. king
+b1, rook a1, castling square c1), the castle and the plain king step to that
+square share one slot, so the network cannot tell them apart. Only training
+on Chess960 games would fix this and the weaker opening play. That is not
+done: the `maia3` repository has inference code only, no training code, so
+data preparation and training would have to be written from scratch, though
+the data exists (about 29.8 million rated Chess960 games in the Lichess
+database). A fine-tuned network would be a derivative under AGPL-3.0 and
+need its own provenance record.
+
 ## Not covered
 
 - The model plays the reference presets' way: the highest-scoring legal move,

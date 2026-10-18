@@ -50,8 +50,8 @@ nächste Mal.
 - Mit **Chess960** unter Neues Spiel beginnt jede Partie aus einer
   zufälligen der 960 Startstellungen: Die Figuren der Grundreihe stehen
   gemischt, für beide Seiten gleich, die Bauern wie gewohnt. Das geht
-  gegen Stockfish und gegen eine zweite Person; die App zeigt die Nummer
-  der Stellung an.
+  gegen Stockfish, Maia oder eine zweite Person; die App zeigt die
+  Nummer der Stellung an.
 - Zum Rochieren ziehst du den König auf seinen eigenen Turm. Danach
   stehen König und Turm wie im normalen Schach: auf g1 und f1 oder auf c1
   und d1. Führt kein gewöhnlicher Königszug auf g1 oder c1, kannst du den

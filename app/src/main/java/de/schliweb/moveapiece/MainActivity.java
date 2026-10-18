@@ -1542,7 +1542,9 @@ public class MainActivity extends AppCompatActivity
             info.setText(
                     withChess960(getString(R.string.status_engine_strength_format, engineElo)));
         } else if (mode == GameMode.MAIA) {
-            info.setText(getString(R.string.status_maia_strength_format, currentMaiaRating));
+            info.setText(
+                    withChess960(
+                            getString(R.string.status_maia_strength_format, currentMaiaRating)));
         } else {
             info.setText(withChess960(""));
         }

@@ -12,9 +12,9 @@ candidates (`-rc`) and test tags are not listed.
 
 ### Added
 
-- Chess960: a checkbox in New Game starts every game against Stockfish or a
-  second person from one of the 960 starting positions, picked at random,
-  and shows its number. Castling works by moving the king onto its own rook,
+- Chess960: a checkbox in New Game starts every game against Stockfish, Maia
+  or a second person from one of the 960 starting positions, picked at
+  random, and shows its number. Castling works by moving the king onto its own rook,
   on the screen and on the electronic boards; PGN export and import carry
   the variant.
 
