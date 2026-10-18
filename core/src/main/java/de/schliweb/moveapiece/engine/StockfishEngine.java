@@ -111,13 +111,6 @@ public class StockfishEngine {
     }
 
     /**
-     * Number of principal variations to search and report per {@link #go}, via "info ... multipv N
-     * ... pv ...:" lines ({@link UciInfoParser#parseMultiPv}/{@link
-     * UciInfoParser#parsePvFirstMove}). 1 (the default) reports only the best line - callers that
-     * raise this for a one-off "show top moves" search should restore it to 1 afterwards, since
-     * every extra line is extra search work.
-     */
-    /**
      * Switches Chess960 castling rules on or off, sending {@code UCI_Chess960} only when that
      * changes. With it on, Stockfish reads and writes castling as the king moving onto its own rook
      * ("b1a1"), as {@code ChessGame} does in Chess960. Call before {@link #setPosition(String,
@@ -131,6 +124,13 @@ public class StockfishEngine {
         writeLineAsync("setoption name UCI_Chess960 value " + on);
     }
 
+    /**
+     * Number of principal variations to search and report per {@link #go}, via "info ... multipv N
+     * ... pv ...:" lines ({@link UciInfoParser#parseMultiPv}/{@link
+     * UciInfoParser#parsePvFirstMove}). 1 (the default) reports only the best line - callers that
+     * raise this for a one-off "show top moves" search should restore it to 1 afterwards, since
+     * every extra line is extra search work.
+     */
     public void setMultiPv(int lines) {
         writeLineAsync("setoption name MultiPV value " + lines);
     }
