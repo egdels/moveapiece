@@ -34,6 +34,9 @@ public class BoardCanvas extends Canvas {
         List<Square> legalDestinationsFrom(Square from);
 
         boolean hasOwnPieceOn(Square square);
+
+        /** Whether moving from {@code from} to {@code to} captures, to mark it with a ring. */
+        boolean isCapture(Square from, Square to);
     }
 
     public interface OnMoveListener {
@@ -234,7 +237,7 @@ public class BoardCanvas extends Canvas {
                 if (legalDestinations.contains(square)) {
                     double cx = left + squareSize / 2;
                     double cy = top + squareSize / 2;
-                    boolean capture = boardState[square.ordinal()] != Piece.NONE;
+                    boolean capture = moveSource.isCapture(selected, square);
                     if (capture) {
                         double radius = squareSize * 0.46;
                         gc.setStroke(LEGAL_MOVE);

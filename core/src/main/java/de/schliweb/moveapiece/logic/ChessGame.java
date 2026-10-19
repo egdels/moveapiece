@@ -146,6 +146,20 @@ public class ChessGame {
     }
 
     /**
+     * Whether the move from {@code from} to {@code to} in the current position captures, for
+     * choosing its sound. A Chess960 castle, the king moving onto its own rook, captures nothing;
+     * an en passant capture does, although its destination is empty.
+     */
+    public boolean isCapture(Square from, Square to) {
+        Piece moving = board.getPiece(from);
+        Piece target = board.getPiece(to);
+        if (target != Piece.NONE) {
+            return target.getPieceSide() != moving.getPieceSide();
+        }
+        return moving.getPieceType() == PieceType.PAWN && from.getFile() != to.getFile();
+    }
+
+    /**
      * An engine move in the current position as the player would make it, for showing it: a
      * Chess960 castle, which the engine writes as the king moving onto its own rook ("b1a1"),
      * becomes the king's move to its castling square ("b1c1"). It stays as it is when the king

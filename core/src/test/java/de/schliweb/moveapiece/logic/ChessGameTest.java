@@ -681,6 +681,26 @@ public class ChessGameTest {
     }
 
     @Test
+    public void isCapture_aChess960CastleOntoTheOwnRookCapturesNothing() {
+        ChessGame game = chess960(KING_B1);
+        assertFalse(game.isCapture(Square.B1, Square.A1)); // O-O-O
+        assertFalse(game.isCapture(Square.B1, Square.G1)); // O-O
+        assertFalse(game.isCapture(Square.B1, Square.C1)); // Kc1
+    }
+
+    @Test
+    public void isCapture_seesOrdinaryAndEnPassantCaptures() {
+        ChessGame game = new ChessGame();
+        game.loadFen("4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 1");
+        assertTrue(game.isCapture(Square.E5, Square.D6)); // en passant, d6 is empty
+        assertFalse(game.isCapture(Square.E5, Square.E6));
+
+        game.loadFen("4k3/8/8/3p4/4P3/8/8/4K3 w - - 0 1");
+        assertTrue(game.isCapture(Square.E4, Square.D5));
+        assertFalse(game.isCapture(Square.E4, Square.E5));
+    }
+
+    @Test
     public void playerUci_showsAChess960CastleWithTheKingsCastlingSquare() {
         ChessGame game = chess960("r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R w HAha - 0 1");
         assertEquals("e1g1", game.playerUci("e1h1"));

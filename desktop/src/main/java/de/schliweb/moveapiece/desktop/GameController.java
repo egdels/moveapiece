@@ -646,6 +646,11 @@ final class GameController
         return game.hasSideToMovePieceOn(square);
     }
 
+    @Override
+    public boolean isCapture(Square from, Square to) {
+        return game.isCapture(from, to);
+    }
+
     // ---- move handling ----------------------------------------------------------
 
     private void onMoveChosen(Square from, Square to) {
@@ -661,7 +666,7 @@ final class GameController
                 return;
             }
         }
-        boolean wasCapture = game.pieceAt(to) != Piece.NONE;
+        boolean wasCapture = game.isCapture(from, to);
         searchFlow.recordMoveQualityBaseline();
         if (!game.applyMove(from, to, promotion)) {
             refresh();
@@ -994,7 +999,7 @@ final class GameController
             return;
         }
         Square to = UciMoves.to(uci);
-        boolean wasCapture = game.pieceAt(to) != Piece.NONE;
+        boolean wasCapture = game.isCapture(UciMoves.from(uci), to);
         applyUciToGame(uci, false); // sound follows on physical confirmation
         pegasusBridge.guideEngineMove(uci);
         if (pegasusBridge.isGuideActive()) {
@@ -2257,7 +2262,7 @@ final class GameController
     private boolean applyUciToGame(String uci, boolean withSound) {
         Square from = UciMoves.from(uci);
         Square to = UciMoves.to(uci);
-        boolean wasCapture = game.pieceAt(to) != Piece.NONE;
+        boolean wasCapture = game.isCapture(from, to);
         searchFlow.recordMoveQualityBaseline();
         if (!game.applyUciMove(uci)) {
             return false;

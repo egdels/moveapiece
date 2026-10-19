@@ -715,7 +715,7 @@ public class MainActivity extends AppCompatActivity
     private void applyConfirmedMove(String uci, boolean isEngineMove) {
         boolean guided = isEngineMove && board.getConnectionState() == ConnectionState.CONNECTED;
         Square to = UciMoves.to(uci);
-        boolean wasCapture = game.pieceAt(to) != Piece.NONE;
+        boolean wasCapture = game.isCapture(UciMoves.from(uci), to);
         // A guided engine move sounds on physical confirmation, not when applied.
         if (applyUciToGame(uci, !guided)) {
             if (guided) {
@@ -746,7 +746,7 @@ public class MainActivity extends AppCompatActivity
     private boolean applyUciToGame(String uci, boolean withSound) {
         Square from = UciMoves.from(uci);
         Square to = UciMoves.to(uci);
-        boolean wasCapture = game.pieceAt(to) != Piece.NONE;
+        boolean wasCapture = game.isCapture(from, to);
         searchFlow.recordMoveQualityBaseline();
         if (!game.applyUciMove(uci)) {
             return false;
@@ -2339,6 +2339,11 @@ public class MainActivity extends AppCompatActivity
         return game.hasSideToMovePieceOn(square);
     }
 
+    @Override
+    public boolean isCapture(Square from, Square to) {
+        return game.isCapture(from, to);
+    }
+
     // ---- BoardView.OnMoveListener ----------------------------------------------
 
     @Override
@@ -2462,7 +2467,7 @@ public class MainActivity extends AppCompatActivity
     }
 
     private void applyHumanMove(Square from, Square to, Piece promotion) {
-        boolean wasCapture = game.pieceAt(to) != Piece.NONE;
+        boolean wasCapture = game.isCapture(from, to);
         searchFlow.recordMoveQualityBaseline();
         if (!game.applyMove(from, to, promotion)) {
             refreshBoard();
