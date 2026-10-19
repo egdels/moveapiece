@@ -91,6 +91,11 @@ public class BoardViewTest {
         public boolean hasOwnPieceOn(Square square) {
             return square == ownPieceSquare;
         }
+
+        @Override
+        public boolean isCapture(Square from, Square to) {
+            return false;
+        }
     }
 
     private static class RecordingMoveListener implements BoardView.OnMoveListener {
