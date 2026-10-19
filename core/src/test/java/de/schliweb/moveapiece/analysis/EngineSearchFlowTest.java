@@ -597,6 +597,25 @@ public class EngineSearchFlowTest {
     }
 
     @Test
+    public void postGameAnalysis_replaysAChess960GameUnderChess960Rules() {
+        game.loadFen("r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R w HAha - 0 1", true);
+        game.applyUciMove("e1h1"); // O-O
+        game.applyUciMove("e8a8"); // O-O-O
+
+        flow.startPostGameAnalysis();
+        for (int i = 0; i < 3; i++) {
+            flow.onInfo("info depth 8 score cp 10 pv a2a3");
+            flow.onBestMove("a2a3");
+        }
+
+        assertEquals(Arrays.asList("e1h1", "e8a8"), host.reportMoves);
+        int chess960 = engine.commands.indexOf("chess960 true");
+        assertTrue(chess960 >= 0);
+        assertTrue(chess960 < engine.commands.indexOf("position "));
+        assertTrue(engine.commands.contains("position e1h1 e8a8"));
+    }
+
+    @Test
     public void postGameAnalysis_scoresAFinalCheckmateWithoutSearchingIt() {
         for (String uci : new String[] {"f2f3", "e7e5", "g2g4", "d8h4"}) {
             game.applyUciMove(uci);
