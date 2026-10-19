@@ -29,6 +29,7 @@ public class EngineSearchFlowTest {
     /** Records the commands instead of talking to a process. */
     private static final class FakeEngine extends StockfishEngine {
         final List<String> commands = new ArrayList<>();
+        private boolean chess960;
 
         FakeEngine() {
             super("unused", Runnable::run);
@@ -37,6 +38,15 @@ public class EngineSearchFlowTest {
         @Override
         public void stop() {
             commands.add("stop");
+        }
+
+        /** Recorded only when it changes, as the real engine only sends it then. */
+        @Override
+        public void setChess960(boolean on) {
+            if (on != chess960) {
+                chess960 = on;
+                commands.add("chess960 " + on);
+            }
         }
 
         @Override
@@ -181,6 +191,28 @@ public class EngineSearchFlowTest {
         assertEquals(Arrays.asList("stop", "position e2e4", "go 1200"), engine.commands);
         // Its own move is the one search that runs at the opponent's strength.
         assertEquals(Arrays.asList("restoreStrength", "engineMove:e7e5"), host.events);
+    }
+
+    @Test
+    public void engineMoveSearch_switchesChess960RulesWithTheGame() {
+        host.evaluationEnabled = false;
+        game.resetChess960(0);
+        flow.startEngineMoveSearch(1200);
+        flow.onBestMove("g1h1");
+        game.reset();
+        flow.startEngineMoveSearch(1200);
+
+        assertEquals(
+                Arrays.asList(
+                        "stop",
+                        "chess960 true",
+                        "position ",
+                        "go 1200",
+                        "stop",
+                        "chess960 false",
+                        "position ",
+                        "go 1200"),
+                engine.commands);
     }
 
     @Test
@@ -562,6 +594,25 @@ public class EngineSearchFlowTest {
                 engine.commands.containsAll(
                         Arrays.asList("position ", "position e2e4", "position e2e4 e7e5")));
         assertEquals(3, engine.count("go 400"));
+    }
+
+    @Test
+    public void postGameAnalysis_replaysAChess960GameUnderChess960Rules() {
+        game.loadFen("r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R w HAha - 0 1", true);
+        game.applyUciMove("e1h1"); // O-O
+        game.applyUciMove("e8a8"); // O-O-O
+
+        flow.startPostGameAnalysis();
+        for (int i = 0; i < 3; i++) {
+            flow.onInfo("info depth 8 score cp 10 pv a2a3");
+            flow.onBestMove("a2a3");
+        }
+
+        assertEquals(Arrays.asList("e1h1", "e8a8"), host.reportMoves);
+        int chess960 = engine.commands.indexOf("chess960 true");
+        assertTrue(chess960 >= 0);
+        assertTrue(chess960 < engine.commands.indexOf("position "));
+        assertTrue(engine.commands.contains("position e1h1 e8a8"));
     }
 
     @Test

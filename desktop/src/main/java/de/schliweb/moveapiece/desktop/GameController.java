@@ -31,6 +31,7 @@ import de.schliweb.moveapiece.engine.NnueAssets;
 import de.schliweb.moveapiece.engine.StockfishEngine;
 import de.schliweb.moveapiece.logic.BoardType;
 import de.schliweb.moveapiece.logic.BoardTypeDetection;
+import de.schliweb.moveapiece.logic.Chess960;
 import de.schliweb.moveapiece.logic.ChessGame;
 import de.schliweb.moveapiece.logic.GameSetup;
 import de.schliweb.moveapiece.logic.Opponent;
@@ -58,6 +59,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javafx.animation.PauseTransition;
@@ -644,6 +646,11 @@ final class GameController
         return game.hasSideToMovePieceOn(square);
     }
 
+    @Override
+    public boolean isCapture(Square from, Square to) {
+        return game.isCapture(from, to);
+    }
+
     // ---- move handling ----------------------------------------------------------
 
     private void onMoveChosen(Square from, Square to) {
@@ -659,7 +666,7 @@ final class GameController
                 return;
             }
         }
-        boolean wasCapture = game.pieceAt(to) != Piece.NONE;
+        boolean wasCapture = game.isCapture(from, to);
         searchFlow.recordMoveQualityBaseline();
         if (!game.applyMove(from, to, promotion)) {
             refresh();
@@ -992,7 +999,7 @@ final class GameController
             return;
         }
         Square to = UciMoves.to(uci);
-        boolean wasCapture = game.pieceAt(to) != Piece.NONE;
+        boolean wasCapture = game.isCapture(UciMoves.from(uci), to);
         applyUciToGame(uci, false); // sound follows on physical confirmation
         pegasusBridge.guideEngineMove(uci);
         if (pegasusBridge.isGuideActive()) {
@@ -1338,7 +1345,9 @@ final class GameController
         pause.play();
     }
 
-    private void showHint(String uci) {
+    private void showHint(String bestMoveUci) {
+        // A Chess960 castle shows the king's castling square, not the rook it is written onto.
+        String uci = game.playerUci(bestMoveUci);
         Square from = UciMoves.from(uci);
         Square to = UciMoves.to(uci);
         boardCanvas.setTrainingHint(from, to);
@@ -1362,7 +1371,8 @@ final class GameController
             alternatives.add(
                     Messages.get(
                             "hint_alternative_format",
-                            searchFlow.hintCandidates().squares(rank),
+                            UciMoves.squares(
+                                    game.playerUci(searchFlow.hintCandidates().move(rank))),
                             cpLossText));
         }
         hintAlternativesNote =
@@ -1506,10 +1516,17 @@ final class GameController
 
     private void newGame() {
         searchFlow.abandonPendingSearches();
-        game.reset();
+        // lastSetup is what is being started (applyGameSetup remembers it first); a Chess960 setup
+        // gets a new starting position for every game, also for a rematch from the board's NEW
+        // GAME button.
+        if (lastSetup.chess960()) {
+            game.resetChess960(Chess960.random(ThreadLocalRandom.current()));
+        } else {
+            game.reset();
+        }
         boardCanvas.setLastMove(null, null);
         if (pegasusBridge != null) {
-            pegasusBridge.resetForNewGame();
+            pegasusBridge.resetForNewGame(game.startFen());
         }
         refresh();
     }
@@ -2097,6 +2114,14 @@ final class GameController
                             OpeningNames.displayName(trainingSession.line()),
                             shownPly,
                             trainingSession.totalPlies()));
+        } else if (game.isChess960()) {
+            // Which of the 960 starting positions this is, so the players can tell what to set up;
+            // its number is unknown for e.g. an imported game in progress.
+            int number = game.chess960Number();
+            infoLabel.setText(
+                    number >= 0
+                            ? Messages.get("status_chess960_format", number)
+                            : Messages.get("status_chess960"));
         } else {
             infoLabel.setText("");
         }
@@ -2237,7 +2262,7 @@ final class GameController
     private boolean applyUciToGame(String uci, boolean withSound) {
         Square from = UciMoves.from(uci);
         Square to = UciMoves.to(uci);
-        boolean wasCapture = game.pieceAt(to) != Piece.NONE;
+        boolean wasCapture = game.isCapture(from, to);
         searchFlow.recordMoveQualityBaseline();
         if (!game.applyUciMove(uci)) {
             return false;

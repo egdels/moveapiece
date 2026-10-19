@@ -24,6 +24,12 @@ public class UciMovesTest {
     }
 
     @Test
+    public void squares_writesTheMoveFromTo() {
+        assertEquals("d2-d4", UciMoves.squares("d2d4"));
+        assertEquals("e7-e8", UciMoves.squares("e7e8q"));
+    }
+
+    @Test
     public void wrongProfileErrors_areTheMissingServiceAndCharacteristic() {
         assertTrue(BoardTypeDetection.isWrongProfileError(TransportError.SERVICE_NOT_FOUND));
         assertTrue(BoardTypeDetection.isWrongProfileError(TransportError.CHARACTERISTIC_NOT_FOUND));

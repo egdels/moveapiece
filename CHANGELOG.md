@@ -10,8 +10,30 @@ candidates (`-rc`) and test tags are not listed.
 
 ## [Unreleased]
 
+## [1.8.0]
+
 ### Added
 
+- Chess960: a checkbox in New Game starts every game against Stockfish, Maia
+  or a second person from one of the 960 starting positions, picked at
+  random; the app shows its number. Each new game, also one started with
+  the Chessnut's NEW GAME button, gets a new starting position.
+  - Castling: move the king onto its own rook. King and rook then stand
+    as in standard chess, on g1/f1 or c1/d1. If no ordinary king move goes
+    to g1 or c1, the king can also be moved there directly.
+  - Electronic boards: set the pieces up as on the screen; the squares
+    that differ light up until they match. Castle as the FIDE rules
+    recommend: lift the king, move the rook, put the king down. The
+    Pegasus cannot see a castle in which king and rook only swap squares;
+    make that one on the screen.
+  - Hints, the blunder warning, the evaluation and the game analysis work
+    in Chess960 as in standard chess; a hint to castle shows the king's
+    destination square.
+  - PGN export writes the variant and the starting position; PGN import
+    reads Chess960 games, also as Fischer Random.
+  - Maia learnt from standard games only. In Chess960 it predicts human
+    moves somewhat less well, mostly in the first moves, but stays a
+    human-like opponent. The opening trainer stays standard chess.
 - Help and Privacy Policy in the menu, on Android and the desktop. The help
   is in all six UI languages and explains playing, the training and
   analysis features, PGN and the electronic boards; both texts are shown
@@ -21,6 +43,8 @@ candidates (`-rc`) and test tags are not listed.
 
 ### Fixed
 
+- En passant: the capture played the sound of an ordinary move, and its
+  destination was marked with a dot instead of the capture ring.
 - Android: the status bar icons were white on the light background, and in
   landscape the toolbars of the opening library and preview stopped short
   of the camera cutout, leaving a strip. The toolbars now reach under the
@@ -399,6 +423,7 @@ Linux .deb).
 - Windows: move sounds were silent because of a malformed ID3 tag in the
   mp3 files.
 
+[1.8.0]: https://github.com/egdels/moveapiece/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/egdels/moveapiece/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/egdels/moveapiece/compare/v1.5.2...v1.6.0
 [1.5.2]: https://github.com/egdels/moveapiece/compare/v1.5.1...v1.5.2

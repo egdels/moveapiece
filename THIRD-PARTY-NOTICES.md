@@ -8,7 +8,7 @@ This project (MoveAPiece) is licensed under the GNU General Public License v3.0
 | Component | License | Source |
 |---|---|---|
 | Stockfish (`app/src/main/cpp/stockfish`, git submodule, pinned to tag `sf_19`, commit `edb0d9db6731067ec50ce619ff372b463bc4dd5d`) | GPLv3 | https://github.com/official-stockfish/Stockfish |
-| chesslib 1.3.7 | Apache 2.0 | https://github.com/bhlangonijr/chesslib |
+| chesslib, upstream master after 1.3.7 with the Chess960 castling fix and the commons-lang3 fix (upstream pull requests #143 and #144), bundled as source in `third_party/chesslib` until upstream releases them; changes in `third_party/chesslib/moveapiece-changes.diff` | Apache 2.0 | https://github.com/bhlangonijr/chesslib |
 | Apache Commons Lang3 3.18.0 (transitive dependency of chesslib above, both `app` and `desktop`) | Apache 2.0 | https://github.com/apache/commons-lang |
 | AndroidX (appcompat, constraintlayout) | Apache 2.0 | https://developer.android.com/jetpack/androidx |
 | Material Components for Android | Apache 2.0 | https://github.com/material-components/material-components-android |

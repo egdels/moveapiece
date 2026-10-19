@@ -68,7 +68,7 @@ choose.
 | Language | Java (no Kotlin) |
 | Android UI | Material 3 Components, View Binding, ConstraintLayout |
 | Desktop UI | JavaFX, styled with a custom stylesheet using the Android app's own Material 3 colors (`desktop/.../app.css`) |
-| Chess rules | [chesslib](https://github.com/bhlangonijr/chesslib) (MIT) |
+| Chess rules | [chesslib](https://github.com/bhlangonijr/chesslib) (Apache 2.0), bundled as source with two fixes offered upstream until a release contains them, see [third_party/chesslib](third_party/chesslib/README.md) |
 | Engine | [Stockfish](https://github.com/official-stockfish/Stockfish) (GPLv3), built from source, driven over UCI through `ProcessBuilder` — via the NDK on Android, via the host's native toolchain (Makefile `COMP=gcc`/`clang`/`mingw`) on desktop |
 | Human-like opponent | [Maia-3](https://github.com/CSSLab/maia3) (AGPL-3.0, the 5M model converted to ONNX, see [MAIA_PROVENANCE.md](MAIA_PROVENANCE.md)), one bundled network that takes the rating as an input (offered: 800–2400), run in-process via [ONNX Runtime](https://github.com/microsoft/onnxruntime) (MIT) — a single forward pass per move, no subprocess/UCI involved unlike Stockfish |
 | Physical boards | DGT Pegasus: vendored from a companion project's `core`/BLE-transport modules (GPLv3, own code — see [Third-Party Notices](THIRD-PARTY-NOTICES.md)). Chessnut (Air family): `chessnut-core`, own implementation of the board's BLE protocol, verified byte by byte against a real Chessnut Air with the capture tool in `tools/chessnut-sniffer/` (protocol notes there), plus piece-identity-based move detection on top of `pegasus-core`'s chess model. Transport implementations (shared by both boards through a per-board GATT profile): Android (`android.bluetooth.*`), desktop/macOS (CoreBluetooth via a small in-house Objective-C/JNI bridge, `desktop/src/main/native/macos/`), desktop/Windows (Windows Runtime `Windows.Devices.Bluetooth` via a small in-house C++/WinRT/JNI bridge, `desktop/src/main/native/windows/`, MSVC-built), desktop/Linux ([bluez-dbus](https://github.com/hypfvieh/bluez-dbus)/[dbus-java](https://github.com/hypfvieh/dbus-java), both MIT — pure Java, no native code, since BlueZ's GATT client API is fully reachable over D-Bus). No third-party dependency for macOS/Windows: the one mature cross-platform BLE library (SimpleBLE) is BUSL-1.1-licensed, not GPL/FOSS |
@@ -277,6 +277,10 @@ chessnut-core/           Chessnut protocol, Air family (frames, board reports wi
 help/                    The in-app help, HELP.md plus one HELP.<lang>.md per UI
                          language; copied into both apps by their builds together
                          with PRIVACY.md and rendered by core's docs.MarkdownDocument
+
+third_party/chesslib/    chesslib's source with the Chess960 castling fix, built as
+                         :chesslib until an upstream release contains it (README.md
+                         there)
 
 tools/chessnut-sniffer/  Python/bleak capture tool used to verify the
                          Chessnut protocol on hardware, with the protocol

@@ -44,6 +44,23 @@ successiva.
 - La **Libreria delle aperture** nel menu mostra ogni apertura mossa per
   mossa, senza partita.
 
+## Chess960
+
+- Con **Chess960** in Nuova partita, ogni partita inizia da una delle
+  960 posizioni iniziali, scelta a caso: i pezzi della prima traversa
+  sono mescolati, uguali per entrambi i colori, e i pedoni stanno come
+  al solito. Funziona contro Stockfish, Maia o un'altra persona; l'app
+  mostra il numero della posizione.
+- Per arroccare, muovi il re sulla propria torre. Re e torre si trovano
+  poi come negli scacchi normali: su g1 e f1 oppure su c1 e d1. Se nessuna
+  mossa normale del re porta su g1 o c1, puoi anche muovere il re
+  direttamente lì.
+- Su una scacchiera elettronica, disponi i pezzi come sullo schermo;
+  finché non corrispondono, le case diverse si illuminano. Arrocca come
+  raccomandano le regole FIDE: solleva il re, muovi la torre, posa il
+  re. Se re e torre si scambiano soltanto le case, la Pegasus non nota la
+  differenza; esegui quell'arrocco sullo schermo.
+
 ## Salvare e caricare partite
 
 - **Esporta PGN** nel menu passa la partita in corso in formato PGN,

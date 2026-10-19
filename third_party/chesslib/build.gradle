@@ -1,0 +1,24 @@
+// chesslib (https://github.com/bhlangonijr/chesslib, Apache 2.0), built from the source copy in
+// this directory - see README.md for where it comes from and why. chesslib itself builds with
+// Maven; this is the Gradle equivalent of its pom.xml for what MoveAPiece needs.
+plugins {
+    id 'java-library'
+}
+
+dependencies {
+    // As in chesslib's pom.xml.
+    api 'org.apache.commons:commons-lang3:3.18.0'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    // chesslib targets Java 11.
+    options.release = 11
+    options.encoding = 'UTF-8'
+}
+
+// Byte-identical jars from identical sources, for reproducible builds: no file timestamps, a fixed
+// entry order.
+tasks.withType(AbstractArchiveTask).configureEach {
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+}

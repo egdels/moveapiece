@@ -11,7 +11,9 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import de.schliweb.pegasus.core.protocol.BoardState;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import org.junit.Test;
 
 /**
@@ -186,5 +188,128 @@ public class ChessPositionTest {
         assertEquals("e7e8q", Move.fromUci("e7e8q").uci());
         assertEquals(PieceType.KNIGHT, Move.fromUci("a7a8n").promotion());
         assertEquals("e1g1", Move.fromUci("e1g1").uci());
+    }
+
+    // --- Chess960 -------------------------------------------------------------------------------
+    // Perft values computed with python-chess (chess960=True); the whole rules layer was also
+    // compared move by move with python-chess on about 526,000 positions from random Chess960
+    // games.
+
+    @Test
+    public void chess960_perft() {
+        ChessPosition position =
+                ChessPosition.fromFen(
+                        "bqnb1rkr/pp3ppp/3ppn2/2p5/5P2/P2P4/NPP1P1PP/BQ1BNRKR w HFhf - 2 9");
+        assertTrue(position.isChess960());
+        assertEquals(21, perft(position, 1));
+        assertEquals(528, perft(position, 2));
+        assertEquals(12189, perft(position, 3));
+
+        ChessPosition kingNextToRook =
+                ChessPosition.fromFen("rk4r1/pppppppp/8/8/8/8/PPPPPPPP/RK4R1 w GAga - 0 1");
+        assertEquals(24, perft(kingNextToRook, 1));
+        assertEquals(576, perft(kingNextToRook, 2));
+        assertEquals(13494, perft(kingNextToRook, 3));
+    }
+
+    @Test
+    public void chess960_castleIsTheKingOntoItsRook() {
+        ChessPosition position =
+                ChessPosition.fromFen("rk4r1/pppppppp/8/8/8/8/PPPPPPPP/RK4R1 w GAga - 0 1");
+        List<Move> legal = position.legalMoves();
+        assertTrue(legal.contains(Move.fromUci("b1a1"))); // O-O-O
+        assertTrue(legal.contains(Move.fromUci("b1g1"))); // O-O
+        assertTrue(legal.contains(Move.fromUci("b1c1"))); // plain king step
+
+        ChessPosition long960 = position.apply(Move.fromUci("b1a1"));
+        assertEquals("rk4r1/pppppppp/8/8/8/8/PPPPPPPP/2KR2R1 b ga - 1 1", long960.toFen());
+        ChessPosition step = position.apply(Move.fromUci("b1c1"));
+        assertEquals("rk4r1/pppppppp/8/8/8/8/PPPPPPPP/R1K3R1 b ga - 1 1", step.toFen());
+    }
+
+    @Test
+    public void destinationsFrom_listsTheKingsCastlingSquaresNotTheRooks() {
+        ChessPosition position =
+                ChessPosition.fromFen("rk4r1/pppppppp/8/8/8/8/PPPPPPPP/RK4R1 w GAga - 0 1");
+        // c1 is a plain king step and the O-O-O square at once; g1 (O-O) holds the rook.
+        assertEquals(Set.of("c1", "g1"), squareNames(position.destinationsFrom(sq("b1"))));
+    }
+
+    @Test
+    public void destinationsFrom_skipsACastleThatLeavesTheKingWhereItStands() {
+        ChessPosition position = ChessPosition.fromFen("1r4kr/8/8/8/8/8/8/1R4KR w HBhb - 0 1");
+        // O-O (g1h1) only moves the rook; O-O-O (g1b1) puts the king on c1.
+        assertEquals(
+                Set.of("c1", "f1", "f2", "g2"), // h2 is covered by the rook on h8
+                squareNames(position.destinationsFrom(sq("g1"))));
+    }
+
+    @Test
+    public void destinationsFrom_keepsStandardCastling() {
+        ChessPosition position = ChessPosition.fromFen(KIWIPETE);
+        assertEquals(
+                Set.of("c1", "d1", "f1", "g1"), squareNames(position.destinationsFrom(sq("e1"))));
+    }
+
+    private static int sq(String name) {
+        return BoardState.squareIndex(name);
+    }
+
+    private static Set<String> squareNames(List<Integer> squares) {
+        assertEquals("no square twice", squares.size(), new HashSet<>(squares).size());
+        Set<String> names = new HashSet<>();
+        for (int square : squares) {
+            names.add(BoardState.squareName(square));
+        }
+        return names;
+    }
+
+    @Test
+    public void chess960_kingAlreadyOnItsCastlingSquare() {
+        ChessPosition position = ChessPosition.fromFen("1r4kr/8/8/8/8/8/8/1R4KR w HBhb - 0 1");
+        assertEquals(
+                "1r4kr/8/8/8/8/8/8/1R3RK1 b hb - 1 1",
+                position.apply(Move.fromUci("g1h1")).toFen());
+        assertEquals(24, perft(position, 1));
+        assertEquals(479, perft(position, 2));
+        assertEquals(10954, perft(position, 3));
+    }
+
+    @Test
+    public void chess960_castlingRookMayNotShieldTheKingsDestination() {
+        // The rook on b8 shields c8 from the queen on a8; after O-O-O the king would be in check.
+        ChessPosition position =
+                ChessPosition.fromFen(
+                        "Qr1k4/nb1p1rq1/4pb1p/2NP1pp1/p3BP1P/PNp1K1P1/1P2P1R1/1RB5 b b - 6 22");
+        assertFalse(position.legalMoves().contains(Move.fromUci("d8b8")));
+    }
+
+    @Test
+    public void chess960_xFenAndForcedChess960() {
+        // X-FEN "KQkq" with rooks on b and f: a Chess960 position, written back in Shredder form.
+        ChessPosition xFen =
+                ChessPosition.fromFen("nrbqkrnb/pppppppp/8/8/8/8/PPPPPPPP/NRBQKRNB w KQkq - 0 1");
+        assertTrue(xFen.isChess960());
+        assertEquals("nrbqkrnb/pppppppp/8/8/8/8/PPPPPPPP/NRBQKRNB w FBfb - 0 1", xFen.toFen());
+
+        ChessPosition standard = ChessPosition.starting();
+        assertFalse(standard.isChess960());
+        ChessPosition array518 = ChessPosition.fromFen(ChessPosition.STARTING_FEN, true);
+        assertTrue(array518.isChess960());
+        assertEquals("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w HAha - 0 1", array518.toFen());
+        assertEquals(
+                ChessPosition.STARTING_FEN,
+                ChessPosition.fromFen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w HAha - 0 1")
+                        .toFen()
+                        .replace("HAha", "KQkq"));
+    }
+
+    @Test
+    public void chess960_movingARookEndsOnlyItsRight() {
+        ChessPosition position =
+                ChessPosition.fromFen("rk4r1/pppppppp/8/8/8/8/PPPPPPPP/RK4R1 w GAga - 0 1");
+        assertEquals(
+                "rk4r1/pppppppp/8/8/8/8/PPPPPPPP/RK3R2 b Aga - 1 1",
+                position.apply(Move.fromUci("g1f1")).toFen());
     }
 }

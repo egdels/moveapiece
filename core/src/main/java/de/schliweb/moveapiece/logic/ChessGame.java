@@ -7,9 +7,11 @@ package de.schliweb.moveapiece.logic;
 
 import com.github.bhlangonijr.chesslib.Board;
 import com.github.bhlangonijr.chesslib.Piece;
+import com.github.bhlangonijr.chesslib.PieceType;
 import com.github.bhlangonijr.chesslib.Side;
 import com.github.bhlangonijr.chesslib.Square;
 import com.github.bhlangonijr.chesslib.game.Game;
+import com.github.bhlangonijr.chesslib.game.VariationType;
 import com.github.bhlangonijr.chesslib.move.Move;
 import com.github.bhlangonijr.chesslib.move.MoveConversionException;
 import com.github.bhlangonijr.chesslib.move.MoveList;
@@ -23,6 +25,9 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Wraps a chesslib {@link Board} with the subset of operations the UI and the engine bridge need:
@@ -52,11 +57,25 @@ public class ChessGame {
         return board.getSideToMove();
     }
 
+    /**
+     * Squares the piece on {@code from} can move to. In Chess960 a castle move is the king moving
+     * onto its own rook; its final square (g- or c-file) is listed as well, since that is where
+     * players expect to put the king - see {@link #applyMove}.
+     */
     public List<Square> legalDestinationsFrom(Square from) {
         List<Square> result = new ArrayList<>();
         for (Move m : board.legalMoves()) {
             if (m.getFrom() == from && !result.contains(m.getTo())) {
                 result.add(m.getTo());
+            }
+            Square castleTarget = chess960KingTarget(m);
+            // Not when the king already stands there: clicking the king again deselects it, and
+            // that castle is still the king put onto its rook.
+            if (m.getFrom() == from
+                    && castleTarget != null
+                    && castleTarget != from
+                    && !result.contains(castleTarget)) {
+                result.add(castleTarget);
             }
         }
         return result;
@@ -79,20 +98,96 @@ public class ChessGame {
      */
     public boolean applyMove(Square from, Square to, Piece promotion) {
         Piece wantedPromotion = promotion == null ? Piece.NONE : promotion;
-        for (Move m : board.legalMoves()) {
+        List<Move> legalMoves = board.legalMoves();
+        for (Move m : legalMoves) {
             if (m.getFrom() == from && m.getTo() == to && m.getPromotion() == wantedPromotion) {
-                if (board.doMove(m)) {
-                    moveHistory.add(m);
-                    redoHistory.clear();
-                    return true;
-                }
-                return false;
+                return play(m);
+            }
+        }
+        // Chess960: the king put on its castling square castles, unless a plain king move goes
+        // there - that one keeps the square, castling is then the king put onto its rook.
+        for (Move m : legalMoves) {
+            if (m.getFrom() == from && to != from && chess960KingTarget(m) == to) {
+                return play(m);
             }
         }
         return false;
     }
 
-    /** Applies a move given in UCI notation (e.g. "e2e4", "e7e8q"), as returned by the engine. */
+    private boolean play(Move move) {
+        if (!board.doMove(move)) {
+            return false;
+        }
+        moveHistory.add(move);
+        redoHistory.clear();
+        return true;
+    }
+
+    /**
+     * For a Chess960 castle move (the king moving onto its own rook), the square the king ends up
+     * on; null for any other move.
+     */
+    private Square chess960KingTarget(Move move) {
+        if (!isChess960() || !board.getContext().isCastleMove(move)) {
+            return null;
+        }
+        Piece target = board.getPiece(move.getTo());
+        Piece king = board.getPiece(move.getFrom());
+        if (king.getPieceType() != PieceType.KING
+                || target.getPieceType() != PieceType.ROOK
+                || target.getPieceSide() != king.getPieceSide()) {
+            return null;
+        }
+        boolean kingSide = board.getContext().isKingSideCastle(move);
+        if (king.getPieceSide() == Side.WHITE) {
+            return kingSide ? Square.G1 : Square.C1;
+        }
+        return kingSide ? Square.G8 : Square.C8;
+    }
+
+    /**
+     * Whether the move from {@code from} to {@code to} in the current position captures, for
+     * choosing its sound. A Chess960 castle, the king moving onto its own rook, captures nothing;
+     * an en passant capture does, although its destination is empty.
+     */
+    public boolean isCapture(Square from, Square to) {
+        Piece moving = board.getPiece(from);
+        Piece target = board.getPiece(to);
+        if (target != Piece.NONE) {
+            return target.getPieceSide() != moving.getPieceSide();
+        }
+        return moving.getPieceType() == PieceType.PAWN && from.getFile() != to.getFile();
+    }
+
+    /**
+     * An engine move in the current position as the player would make it, for showing it: a
+     * Chess960 castle, which the engine writes as the king moving onto its own rook ("b1a1"),
+     * becomes the king's move to its castling square ("b1c1"). It stays as it is when the king
+     * already stands there, or when a plain king move goes there, which {@link #applyMove} would
+     * play instead. Any other move is returned unchanged.
+     */
+    public String playerUci(String uciMove) {
+        if (!isChess960() || uciMove == null || uciMove.length() < 4) {
+            return uciMove;
+        }
+        Move move = new Move(uciMove, board.getSideToMove());
+        Square target = chess960KingTarget(move);
+        if (target == null || target == move.getFrom()) {
+            return uciMove;
+        }
+        for (Move m : board.legalMoves()) {
+            if (m.getFrom() == move.getFrom() && m.getTo() == target) {
+                return uciMove;
+            }
+        }
+        return uciMove.substring(0, 2) + target.value().toLowerCase(Locale.ROOT);
+    }
+
+    /**
+     * Applies a move given in UCI notation (e.g. "e2e4", "e7e8q"), as returned by the engine. In
+     * Chess960, castling is the king moving onto its own rook ("b1a1"), as with Stockfish's
+     * UCI_Chess960.
+     */
     public boolean applyUciMove(String uciMove) {
         if (uciMove == null || uciMove.length() < 4) {
             return false;
@@ -287,6 +382,38 @@ public class ChessGame {
         loadFen(START_FEN);
     }
 
+    /** Starts a Chess960 game from starting position {@code number} (see {@link Chess960}). */
+    public void resetChess960(int number) {
+        loadFen(Chess960.startFen(number), true);
+    }
+
+    /**
+     * Whether this game is played under Chess960 castling rules: the king castles onto its own
+     * rook, wherever king and rooks started.
+     */
+    public boolean isChess960() {
+        return board.getContext().getVariationType() == VariationType.CHESS960;
+    }
+
+    /**
+     * The Chess960 starting position number of {@link #startFen()}, or -1 if this is no Chess960
+     * game or did not start from one of the 960 starting positions (e.g. an imported game in
+     * progress).
+     */
+    public int chess960Number() {
+        if (!isChess960()) {
+            return -1;
+        }
+        String[] ranks = startFen.trim().split("\\s+")[0].split("/");
+        if (ranks.length != 8
+                || !"pppppppp".equals(ranks[1])
+                || !"PPPPPPPP".equals(ranks[6])
+                || !ranks[0].equals(ranks[7].toLowerCase(Locale.ROOT))) {
+            return -1;
+        }
+        return Chess960.numberOf(ranks[7]);
+    }
+
     /**
      * FEN the current move history starts from; {@link #START_FEN} unless {@link #loadFen} was
      * used.
@@ -316,8 +443,18 @@ public class ChessGame {
 
     /** Sets up an arbitrary position, clearing move history. */
     public void loadFen(String fen) {
-        board.loadFromFen(fen);
-        startFen = fen;
+        loadFen(fen, false);
+    }
+
+    /**
+     * Like {@link #loadFen(String)}; {@code chess960} forces Chess960 castling rules, which
+     * chesslib otherwise only infers from the FEN (Shredder castling rights or a king off the
+     * e-file). The start FEN is then kept in chesslib's Shredder form, so that it names the
+     * castling rooks unambiguously and is read back as Chess960 wherever it is used.
+     */
+    public void loadFen(String fen, boolean chess960) {
+        board.loadFromFen(fen, chess960);
+        startFen = chess960 ? board.getFen() : fen;
         moveHistory.clear();
         redoHistory.clear();
     }
@@ -426,6 +563,9 @@ public class ChessGame {
         sb.append("[White \"").append(whiteName).append("\"]\n");
         sb.append("[Black \"").append(blackName).append("\"]\n");
         sb.append("[Result \"").append(result).append("\"]\n");
+        if (isChess960()) {
+            sb.append("[Variant \"Chess960\"]\n");
+        }
         if (!START_FEN.equals(startFen)) {
             sb.append("[SetUp \"1\"]\n");
             sb.append("[FEN \"").append(startFen).append("\"]\n");
@@ -470,7 +610,10 @@ public class ChessGame {
             // from here, not from hasNext()/next() below - must be inside
             // this try too, or it escapes uncaught as a PgnException.
             Iterator<Game> games =
-                    new PgnIterator(Arrays.asList(pgnText.split("\n")).iterator()).iterator();
+                    new PgnIterator(
+                                    Arrays.asList(normalizeChess960Fen(pgnText).split("\n"))
+                                            .iterator())
+                            .iterator();
             if (!games.hasNext()) {
                 reset();
                 return false;
@@ -493,9 +636,10 @@ public class ChessGame {
         }
         reset();
         String fen = pgnGame.getFen();
+        boolean chess960 = isChess960Variant(pgnGame);
         if (fen != null && !fen.isBlank()) {
             try {
-                loadFen(fen);
+                loadFen(fen, chess960);
             } catch (RuntimeException e) {
                 reset();
                 return false;
@@ -508,5 +652,77 @@ public class ChessGame {
             }
         }
         return true;
+    }
+
+    private static final Pattern TAG = Pattern.compile("^\\s*\\[(\\w+)\\s+\"(.*)\"\\s*]\\s*$");
+
+    /**
+     * For a first game tagged {@code [Variant "Chess960"]}: rewrites its FEN tag into chesslib's
+     * Shredder form, or adds the standard array as one if it has none. chesslib parses the movetext
+     * from that tag while reading the PGN, regardless of the Variant tag, so an X-FEN start
+     * ("KQkq") with the king on the e-file would read as standard chess - O-O as e1g1 - and fail.
+     * Any other text is returned unchanged.
+     */
+    static String normalizeChess960Fen(String pgnText) {
+        String[] lines = pgnText.split("\n", -1);
+        boolean chess960 = false;
+        int fenLine = -1;
+        int lastTagLine = -1;
+        for (int i = 0; i < lines.length; i++) {
+            Matcher tag = TAG.matcher(lines[i]);
+            if (tag.matches()) {
+                lastTagLine = i;
+                if ("variant".equalsIgnoreCase(tag.group(1))) {
+                    chess960 = isChess960Name(tag.group(2));
+                } else if ("fen".equalsIgnoreCase(tag.group(1))) {
+                    fenLine = i;
+                }
+            } else if (lastTagLine >= 0 && !lines[i].isBlank()) {
+                break; // the first game's movetext
+            }
+        }
+        if (!chess960) {
+            return pgnText;
+        }
+        if (fenLine < 0) {
+            lines[lastTagLine] +=
+                    "\n[SetUp \"1\"]\n[FEN \"" + Chess960.startFen(Chess960.STANDARD) + "\"]";
+            return String.join("\n", lines);
+        }
+        Matcher tag = TAG.matcher(lines[fenLine]);
+        tag.matches();
+        try {
+            Board board = new Board();
+            board.loadFromFen(tag.group(2), true);
+            lines[fenLine] = "[FEN \"" + board.getFen() + "\"]";
+        } catch (RuntimeException e) {
+            return pgnText; // an unusable FEN is left to loadPgn's own error handling
+        }
+        return String.join("\n", lines);
+    }
+
+    /**
+     * Whether the game's PGN {@code Variant} tag names Chess960 (also known as Fischer Random).
+     * chesslib keeps that tag among the unrecognised ones; its own "variation" is the opening
+     * variation.
+     */
+    private static boolean isChess960Variant(Game pgnGame) {
+        if (pgnGame.getProperty() == null) {
+            return false;
+        }
+        for (Map.Entry<String, String> tag : pgnGame.getProperty().entrySet()) {
+            if ("variant".equalsIgnoreCase(tag.getKey().trim())) {
+                return isChess960Name(tag.getValue());
+            }
+        }
+        return false;
+    }
+
+    private static boolean isChess960Name(String variant) {
+        if (variant == null) {
+            return false;
+        }
+        String v = variant.trim().toLowerCase(Locale.ROOT).replace(" ", "");
+        return v.equals("chess960") || v.equals("fischerandom") || v.equals("fischerrandom");
     }
 }

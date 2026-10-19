@@ -37,6 +37,9 @@ public class BoardView extends View {
         List<Square> legalDestinationsFrom(Square from);
 
         boolean hasOwnPieceOn(Square square);
+
+        /** Whether moving from {@code from} to {@code to} captures, to mark it with a ring. */
+        boolean isCapture(Square from, Square to);
     }
 
     public interface OnMoveListener {
@@ -279,7 +282,7 @@ public class BoardView extends View {
                 if (legalDestinations.contains(square)) {
                     float cx = left + squareSize / 2f;
                     float cy = top + squareSize / 2f;
-                    boolean capture = boardState[square.ordinal()] != Piece.NONE;
+                    boolean capture = moveSource.isCapture(selected, square);
                     float radius = capture ? squareSize * 0.46f : squareSize * 0.16f;
                     if (capture) {
                         legalCaptureRingPaint.setStrokeWidth(squareSize * 0.08f);

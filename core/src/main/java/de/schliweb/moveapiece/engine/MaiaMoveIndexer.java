@@ -5,9 +5,14 @@
 
 package de.schliweb.moveapiece.engine;
 
+import com.github.bhlangonijr.chesslib.Board;
+import com.github.bhlangonijr.chesslib.File;
 import com.github.bhlangonijr.chesslib.Piece;
 import com.github.bhlangonijr.chesslib.PieceType;
+import com.github.bhlangonijr.chesslib.Rank;
+import com.github.bhlangonijr.chesslib.Side;
 import com.github.bhlangonijr.chesslib.Square;
+import com.github.bhlangonijr.chesslib.game.VariationType;
 import com.github.bhlangonijr.chesslib.move.Move;
 
 /**
@@ -17,7 +22,8 @@ import com.github.bhlangonijr.chesslib.move.Move;
  *
  * <p>Like the input (see {@link MaiaPositionEncoder}) the output is from the side to move's point
  * of view, so a move of Black is flipped top to bottom first. Castling is the plain king move
- * ({@code e1g1}), a promotion always uses its promotion slot.
+ * ({@code e1g1}), a promotion always uses its promotion slot. A Chess960 castle takes the slot of
+ * the king's move to its castling square, see {@link #indexOf(Board, Move)}.
  */
 final class MaiaMoveIndexer {
 
@@ -40,6 +46,34 @@ final class MaiaMoveIndexer {
                     + promotionIndex(promotion.getPieceType());
         }
         return (fromRank * 8 + fromFile) * SQUARES + toRank * 8 + toFile;
+    }
+
+    /**
+     * {@link #indexOf(Move, boolean)} for a legal move in {@code board}. Maia learnt castling from
+     * standard games only, as the king's move to the g- or c-file; a Chess960 castle (the king onto
+     * its own rook, a pair of squares Maia never saw as castling) takes that slot too, or - when
+     * the king already stands on its castling square - the slot of the rook's move. Measured on
+     * human Chess960 games, this lets Maia predict castling about as often as one in five times the
+     * player castled, against hardly ever with the king-onto-rook slot.
+     */
+    static int indexOf(Board board, Move move) {
+        boolean blackToMove = board.getSideToMove() == Side.BLACK;
+        Piece king = board.getPiece(move.getFrom());
+        Piece target = board.getPiece(move.getTo());
+        if (board.getContext().getVariationType() == VariationType.CHESS960
+                && king.getPieceType() == PieceType.KING
+                && target.getPieceType() == PieceType.ROOK
+                && target.getPieceSide() == king.getPieceSide()) {
+            boolean kingSide = file(move.getTo()) > file(move.getFrom());
+            Rank rank = move.getFrom().getRank();
+            Square kingTo = Square.encode(rank, kingSide ? File.FILE_G : File.FILE_C);
+            if (kingTo != move.getFrom()) {
+                return indexOf(new Move(move.getFrom(), kingTo), blackToMove);
+            }
+            Square rookTo = Square.encode(rank, kingSide ? File.FILE_F : File.FILE_D);
+            return indexOf(new Move(move.getTo(), rookTo), blackToMove);
+        }
+        return indexOf(move, blackToMove);
     }
 
     private static int file(Square square) {

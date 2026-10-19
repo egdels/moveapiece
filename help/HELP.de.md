@@ -45,6 +45,23 @@ nächste Mal.
 - Die **Eröffnungsbibliothek** im Menü zeigt jede Eröffnung Zug für Zug,
   ohne Partie.
 
+## Chess960
+
+- Mit **Chess960** unter Neues Spiel beginnt jede Partie aus einer
+  zufälligen der 960 Startstellungen: Die Figuren der Grundreihe stehen
+  gemischt, für beide Seiten gleich, die Bauern wie gewohnt. Das geht
+  gegen Stockfish, Maia oder eine zweite Person; die App zeigt die
+  Nummer der Stellung an.
+- Zum Rochieren ziehst du den König auf seinen eigenen Turm. Danach
+  stehen König und Turm wie im normalen Schach: auf g1 und f1 oder auf c1
+  und d1. Führt kein gewöhnlicher Königszug auf g1 oder c1, kannst du den
+  König auch direkt dorthin ziehen.
+- Am elektronischen Brett stellst du die Figuren nach dem Bildschirm auf;
+  bis sie stimmen, leuchten die abweichenden Felder. Rochiere so, wie es
+  die FIDE-Regeln empfehlen: König abheben, Turm ziehen, König absetzen.
+  Tauschen König und Turm dabei nur ihre Felder, bemerkt das Pegasus
+  keinen Unterschied; diese Rochade führst du auf dem Bildschirm aus.
+
 ## Partien speichern und laden
 
 - **PGN exportieren** im Menü gibt die aktuelle Partie im PGN-Format

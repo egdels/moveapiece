@@ -82,6 +82,12 @@ public interface PhysicalBoardBridge {
 
     void resetForNewGame();
 
+    /**
+     * Like {@link #resetForNewGame()}, for a game starting from {@code startFen} instead of the
+     * standard starting position, e.g. a Chess960 one.
+     */
+    void resetForNewGame(String startFen);
+
     void syncBoardToPosition(String fen);
 
     /**

@@ -229,6 +229,21 @@ public class StockfishEngineTest {
     }
 
     @Test
+    public void setChess960_isSentOnlyWhenItChanges() throws Exception {
+        startEngine();
+
+        engine.setChess960(false);
+        engine.setChess960(true);
+        engine.setChess960(true);
+        engine.setChess960(false);
+        engine.setPosition("");
+
+        assertEquals("setoption name UCI_Chess960 value true", nextCommand());
+        assertEquals("setoption name UCI_Chess960 value false", nextCommand());
+        assertEquals("position startpos", nextCommand());
+    }
+
+    @Test
     public void goAndStop_areSentAndTheBestMoveIsParsed() throws Exception {
         startEngine();
 

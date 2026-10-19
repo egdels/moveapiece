@@ -11,7 +11,7 @@ dependencies {
     // The board package (PhysicalBoardBridge and its adapters) is shared by :app and :desktop and
     // speaks in the physical-board types of :chessnut-core and, through it, :pegasus-core.
     api project(':chessnut-core')
-    implementation 'com.github.bhlangonijr:chesslib:1.3.7'
+    implementation project(':chesslib')
     // MaiaEngine only needs the ai.onnxruntime.* API surface to compile here - compileOnly, not
     // implementation, because desktop and Android need genuinely different artifacts at runtime
     // (desktop JVM natives vs. Android AAR natives for arm64-v8a/armeabi-v7a/x86_64), both MIT and

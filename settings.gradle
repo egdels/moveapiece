@@ -11,7 +11,6 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        maven { url 'https://jitpack.io' }
     }
 }
 
@@ -21,3 +20,8 @@ include ':pegasus-core'
 include ':chessnut-core'
 include ':core'
 include ':desktop'
+
+// chesslib built from its bundled source, see third_party/chesslib/README.md.
+include ':chesslib'
+project(':chesslib').projectDir = file('third_party/chesslib')
+

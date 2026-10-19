@@ -14,6 +14,14 @@ import java.util.List;
  * passant target square, halfmove clock and fullmove number. Supports FEN import/export, legal move
  * generation (including castling, en passant, promotion/underpromotion) and {@link #apply(Move)}.
  *
+ * <p>Castling follows the Chess960 rules, of which standard chess is the special case with the king
+ * on e1/e8 and the rooks in the corners: a castling right names its rook's square, and the king
+ * ends on the g- or c-file with the rook next to it on the inside. In a Chess960 position ({@link
+ * #isChess960()}) a castle move is written as the king moving onto its own rook ("b1a1", the UCI
+ * Chess960 convention also used by chesslib and Stockfish) and FEN castling rights name the rook
+ * files (Shredder-FEN, "HAha"); otherwise castling is the king's two-square move ("e1g1") and the
+ * rights are "KQkq".
+ *
  * <p>Square numbering matches the DGT scheme shared with {@link BoardState}: index 0 = a8 … 63 = h1
  * (row = index / 8, 0 = rank 8; column = index % 8, 0 = file a).
  *
@@ -27,15 +35,13 @@ public final class ChessPosition {
 
     private static final int NO_SQUARE = -1;
 
-    // Castling right bits.
-    private static final int WHITE_KINGSIDE = 1;
-    private static final int WHITE_QUEENSIDE = 2;
-    private static final int BLACK_KINGSIDE = 4;
-    private static final int BLACK_QUEENSIDE = 8;
+    // Indices into castlingRooks.
+    private static final int WHITE_KINGSIDE = 0;
+    private static final int WHITE_QUEENSIDE = 1;
+    private static final int BLACK_KINGSIDE = 2;
+    private static final int BLACK_QUEENSIDE = 3;
 
-    // Well-known square indices (0 = a8 … 63 = h1).
-    private static final int A8 = 0, E8 = 4, H8 = 7;
-    private static final int A1 = 56, E1 = 60, H1 = 63;
+    private static final int E_FILE = 4;
 
     private static final int[][] KNIGHT_OFFSETS = {
         {-2, -1}, {-2, 1}, {-1, -2}, {-1, 2},
@@ -50,7 +56,10 @@ public final class ChessPosition {
 
     private final Piece[] board;
     private final PieceColor sideToMove;
-    private final int castlingRights;
+    // Square of the rook each castling right belongs to, or NO_SQUARE without that right; indexed
+    // by WHITE_KINGSIDE ... BLACK_QUEENSIDE.
+    private final int[] castlingRooks;
+    private final boolean chess960;
     private final int enPassantSquare;
     private final int halfmoveClock;
     private final int fullmoveNumber;
@@ -58,13 +67,15 @@ public final class ChessPosition {
     private ChessPosition(
             Piece[] board,
             PieceColor sideToMove,
-            int castlingRights,
+            int[] castlingRooks,
+            boolean chess960,
             int enPassantSquare,
             int halfmoveClock,
             int fullmoveNumber) {
         this.board = board;
         this.sideToMove = sideToMove;
-        this.castlingRights = castlingRights;
+        this.castlingRooks = castlingRooks;
+        this.chess960 = chess960;
         this.enPassantSquare = enPassantSquare;
         this.halfmoveClock = halfmoveClock;
         this.fullmoveNumber = fullmoveNumber;
@@ -75,8 +86,20 @@ public final class ChessPosition {
         return fromFen(STARTING_FEN);
     }
 
-    /** Parses a FEN string into a position. */
+    /**
+     * Parses a FEN string into a position. It is a Chess960 position ({@link #isChess960()}) if the
+     * castling rights say so: rook files (Shredder-FEN), a king off the e-file, or an X-FEN "K"/"Q"
+     * whose rook is not in the corner.
+     */
     public static ChessPosition fromFen(String fen) {
+        return fromFen(fen, false);
+    }
+
+    /**
+     * Like {@link #fromFen(String)}; {@code chess960} makes it a Chess960 position whatever the
+     * castling rights look like (e.g. Chess960 starting position 518, the standard array).
+     */
+    public static ChessPosition fromFen(String fen, boolean chess960) {
         if (fen == null) {
             throw new IllegalArgumentException("FEN must not be null");
         }
@@ -114,31 +137,84 @@ public final class ChessPosition {
         } else {
             throw new IllegalArgumentException("Invalid side to move: " + fen);
         }
-        int rights = 0;
+        int[] rooks = {NO_SQUARE, NO_SQUARE, NO_SQUARE, NO_SQUARE};
+        boolean nonStandard = chess960;
         if (!"-".equals(parts[2])) {
             for (char c : parts[2].toCharArray()) {
-                switch (c) {
-                    case 'K':
-                        rights |= WHITE_KINGSIDE;
-                        break;
-                    case 'Q':
-                        rights |= WHITE_QUEENSIDE;
-                        break;
-                    case 'k':
-                        rights |= BLACK_KINGSIDE;
-                        break;
-                    case 'q':
-                        rights |= BLACK_QUEENSIDE;
-                        break;
-                    default:
-                        throw new IllegalArgumentException("Invalid castling field: " + fen);
+                PieceColor color = Character.isUpperCase(c) ? PieceColor.WHITE : PieceColor.BLACK;
+                int row = color == PieceColor.WHITE ? 7 : 0;
+                int kingFile = backRankKingFile(board, color);
+                char letter = Character.toUpperCase(c);
+                int rookFile;
+                if (letter == 'K') {
+                    rookFile = outermostRookFile(board, color, kingFile, true);
+                } else if (letter == 'Q') {
+                    rookFile = outermostRookFile(board, color, kingFile, false);
+                } else if (letter >= 'A' && letter <= 'H') {
+                    rookFile = letter - 'A';
+                    nonStandard = true;
+                } else {
+                    throw new IllegalArgumentException("Invalid castling field: " + fen);
+                }
+                if (kingFile < 0
+                        || rookFile < 0
+                        || rookFile == kingFile
+                        || board[row * 8 + rookFile] != Piece.of(color, PieceType.ROOK)) {
+                    continue; // a right without its king and rook in place cannot be used
+                }
+                boolean kingside = rookFile > kingFile;
+                rooks[rightIndex(color, kingside)] = row * 8 + rookFile;
+                if (kingFile != E_FILE || rookFile != (kingside ? 7 : 0)) {
+                    nonStandard = true;
                 }
             }
         }
         int ep = "-".equals(parts[3]) ? NO_SQUARE : BoardState.squareIndex(parts[3]);
         int halfmove = parts.length > 4 ? Integer.parseInt(parts[4]) : 0;
         int fullmove = parts.length > 5 ? Integer.parseInt(parts[5]) : 1;
-        return new ChessPosition(board, side, rights, ep, halfmove, fullmove);
+        return new ChessPosition(board, side, rooks, nonStandard, ep, halfmove, fullmove);
+    }
+
+    private static int rightIndex(PieceColor color, boolean kingside) {
+        if (color == PieceColor.WHITE) {
+            return kingside ? WHITE_KINGSIDE : WHITE_QUEENSIDE;
+        }
+        return kingside ? BLACK_KINGSIDE : BLACK_QUEENSIDE;
+    }
+
+    /** File of {@code color}'s king if it stands on its back rank, else -1. */
+    private static int backRankKingFile(Piece[] board, PieceColor color) {
+        int row = color == PieceColor.WHITE ? 7 : 0;
+        for (int file = 0; file < 8; file++) {
+            if (board[row * 8 + file] == Piece.of(color, PieceType.KING)) {
+                return file;
+            }
+        }
+        return -1;
+    }
+
+    /** X-FEN "K"/"Q": the outermost rook on that side of the king, or -1. */
+    private static int outermostRookFile(
+            Piece[] board, PieceColor color, int kingFile, boolean kingside) {
+        if (kingFile < 0) {
+            return -1;
+        }
+        int row = color == PieceColor.WHITE ? 7 : 0;
+        Piece rook = Piece.of(color, PieceType.ROOK);
+        if (kingside) {
+            for (int file = 7; file > kingFile; file--) {
+                if (board[row * 8 + file] == rook) {
+                    return file;
+                }
+            }
+        } else {
+            for (int file = 0; file < kingFile; file++) {
+                if (board[row * 8 + file] == rook) {
+                    return file;
+                }
+            }
+        }
+        return -1;
     }
 
     /** Exports this position as a FEN string. */
@@ -166,13 +242,17 @@ public final class ChessPosition {
             }
         }
         sb.append(sideToMove == PieceColor.WHITE ? " w " : " b ");
-        if (castlingRights == 0) {
+        int rightsStart = sb.length();
+        String standardLetters = "KQkq";
+        for (int i = 0; i < castlingRooks.length; i++) {
+            if (castlingRooks[i] != NO_SQUARE) {
+                char file = (char) ('A' + castlingRooks[i] % 8);
+                char letter = chess960 ? file : standardLetters.charAt(i);
+                sb.append(i < BLACK_KINGSIDE ? letter : Character.toLowerCase(letter));
+            }
+        }
+        if (sb.length() == rightsStart) {
             sb.append('-');
-        } else {
-            if ((castlingRights & WHITE_KINGSIDE) != 0) sb.append('K');
-            if ((castlingRights & WHITE_QUEENSIDE) != 0) sb.append('Q');
-            if ((castlingRights & BLACK_KINGSIDE) != 0) sb.append('k');
-            if ((castlingRights & BLACK_QUEENSIDE) != 0) sb.append('q');
         }
         sb.append(' ');
         sb.append(enPassantSquare == NO_SQUARE ? "-" : BoardState.squareName(enPassantSquare));
@@ -187,6 +267,14 @@ public final class ChessPosition {
 
     public PieceColor sideToMove() {
         return sideToMove;
+    }
+
+    /**
+     * Whether castling is written the Chess960 way: the king moving onto its own rook, and rook
+     * files as FEN castling rights. See the class comment.
+     */
+    public boolean isChess960() {
+        return chess960;
     }
 
     /** En passant target square index or -1 if none. */
@@ -221,6 +309,27 @@ public final class ChessPosition {
     }
 
     /**
+     * The squares a player may put the piece on {@code from} down on, from {@link #legalMoves()}. A
+     * castle counts with the square the king ends up on (g- or c-file), not with the rook's square
+     * a Chess960 castle is written with; a castle that leaves the king where it stands adds no
+     * square, since only the rook moves.
+     */
+    public List<Integer> destinationsFrom(int from) {
+        List<Integer> destinations = new ArrayList<>();
+        for (Move move : legalMoves()) {
+            if (move.from() != from) {
+                continue;
+            }
+            int right = castlingRightOf(move);
+            int to = right >= 0 ? kingDestination(right, from / 8) : move.to();
+            if (to != from && !destinations.contains(to)) {
+                destinations.add(to);
+            }
+        }
+        return destinations;
+    }
+
+    /**
      * Applies a legal move and returns the resulting position. Throws {@link
      * IllegalArgumentException} if the move is not legal here.
      */
@@ -231,19 +340,22 @@ public final class ChessPosition {
         }
         Piece moving = board[move.from()];
         boolean isPawnMove = moving.type() == PieceType.PAWN;
+        // A Chess960 castle moves the king onto its own rook, which captures nothing.
         boolean isCapture =
-                board[move.to()] != null || (isPawnMove && move.to() == enPassantSquare);
+                (board[move.to()] != null && castlingRightOf(move) < 0)
+                        || (isPawnMove && move.to() == enPassantSquare);
         Piece[] next = makeMoveOnBoard(move);
 
-        int rights = castlingRights;
-        if (moving.type() == PieceType.KING) {
-            rights &=
-                    moving.color() == PieceColor.WHITE
-                            ? ~(WHITE_KINGSIDE | WHITE_QUEENSIDE)
-                            : ~(BLACK_KINGSIDE | BLACK_QUEENSIDE);
+        int[] rooks = castlingRooks.clone();
+        for (int i = 0; i < rooks.length; i++) {
+            boolean ownKing =
+                    moving.type() == PieceType.KING
+                            && (i < BLACK_KINGSIDE) == (moving.color() == PieceColor.WHITE);
+            // A moved king, or a rook leaving or captured on its square, ends that right.
+            if (ownKing || rooks[i] == move.from() || rooks[i] == move.to()) {
+                rooks[i] = NO_SQUARE;
+            }
         }
-        rights = clearRookRights(rights, move.from());
-        rights = clearRookRights(rights, move.to());
 
         int ep = NO_SQUARE;
         if (isPawnMove && Math.abs(move.from() - move.to()) == 16) {
@@ -251,30 +363,60 @@ public final class ChessPosition {
         }
         int halfmove = (isPawnMove || isCapture) ? 0 : halfmoveClock + 1;
         int fullmove = sideToMove == PieceColor.BLACK ? fullmoveNumber + 1 : fullmoveNumber;
-        return new ChessPosition(next, sideToMove.opposite(), rights, ep, halfmove, fullmove);
+        return new ChessPosition(
+                next, sideToMove.opposite(), rooks, chess960, ep, halfmove, fullmove);
     }
 
     // ---------------------------------------------------------------- rules
 
-    private static int clearRookRights(int rights, int square) {
-        switch (square) {
-            case H1:
-                return rights & ~WHITE_KINGSIDE;
-            case A1:
-                return rights & ~WHITE_QUEENSIDE;
-            case H8:
-                return rights & ~BLACK_KINGSIDE;
-            case A8:
-                return rights & ~BLACK_QUEENSIDE;
-            default:
-                return rights;
+    /**
+     * The castling right {@code move} uses, or -1 if it is no castle move: in Chess960 the king
+     * moving onto its own castling rook, otherwise the king's two-square move along its rank.
+     */
+    private int castlingRightOf(Move move) {
+        Piece moving = board[move.from()];
+        if (moving == null || moving.type() != PieceType.KING) {
+            return -1;
         }
+        boolean kingside = move.to() > move.from();
+        int right = rightIndex(moving.color(), kingside);
+        if (chess960) {
+            return castlingRooks[right] == move.to() ? right : -1;
+        }
+        boolean twoSquares =
+                move.from() / 8 == move.to() / 8 && Math.abs(move.from() - move.to()) == 2;
+        return twoSquares && castlingRooks[right] != NO_SQUARE ? right : -1;
+    }
+
+    private static boolean isKingside(int right) {
+        return right == WHITE_KINGSIDE || right == BLACK_KINGSIDE;
+    }
+
+    /** Where the king ends up when castling with {@code right}: the g- or c-file. */
+    private static int kingDestination(int right, int row) {
+        return row * 8 + (isKingside(right) ? 6 : 2);
+    }
+
+    /** Where the rook ends up when castling with {@code right}: the f- or d-file. */
+    private static int rookDestination(int right, int row) {
+        return row * 8 + (isKingside(right) ? 5 : 3);
     }
 
     /** Executes the move on a board copy (castling rook + ep capture included). */
     private Piece[] makeMoveOnBoard(Move move) {
         Piece[] next = board.clone();
         Piece moving = next[move.from()];
+        int castlingRight = castlingRightOf(move);
+        if (castlingRight >= 0) {
+            int row = move.from() / 8;
+            int rookFrom = castlingRooks[castlingRight];
+            Piece rook = next[rookFrom];
+            next[move.from()] = null;
+            next[rookFrom] = null;
+            next[kingDestination(castlingRight, row)] = moving;
+            next[rookDestination(castlingRight, row)] = rook;
+            return next;
+        }
         next[move.from()] = null;
         if (moving.type() == PieceType.PAWN
                 && move.to() == enPassantSquare
@@ -285,16 +427,6 @@ public final class ChessPosition {
         }
         next[move.to()] =
                 move.promotion() == null ? moving : Piece.of(moving.color(), move.promotion());
-        if (moving.type() == PieceType.KING && Math.abs(move.from() - move.to()) == 2) {
-            // Castling: also move the rook.
-            if (move.to() == move.from() + 2) { // kingside
-                next[move.from() + 1] = next[move.from() + 3];
-                next[move.from() + 3] = null;
-            } else { // queenside
-                next[move.from() - 1] = next[move.from() - 4];
-                next[move.from() - 4] = null;
-            }
-        }
         return next;
     }
 
@@ -413,34 +545,65 @@ public final class ChessPosition {
         }
     }
 
+    /**
+     * Castling, by the Chess960 rules: the king is not in check; every square between king and its
+     * destination and between rook and its destination is empty apart from king and rook
+     * themselves; and no square the king crosses or lands on is attacked once king and rook have
+     * left their squares (the castling rook may otherwise shield the king's destination from a rook
+     * or queen behind it).
+     */
     private void addCastlingMoves(List<Move> moves, PieceColor color) {
         PieceColor enemy = color.opposite();
-        int king = color == PieceColor.WHITE ? E1 : E8;
-        if (board[king] == null
-                || board[king].type() != PieceType.KING
-                || isAttacked(king, enemy, board)) {
+        int row = color == PieceColor.WHITE ? 7 : 0;
+        int kingFile = backRankKingFile(board, color);
+        if (kingFile < 0) {
             return;
         }
-        int kingside = color == PieceColor.WHITE ? WHITE_KINGSIDE : BLACK_KINGSIDE;
-        int queenside = color == PieceColor.WHITE ? WHITE_QUEENSIDE : BLACK_QUEENSIDE;
+        int king = row * 8 + kingFile;
+        if (isAttacked(king, enemy, board)) {
+            return;
+        }
         Piece rook = Piece.of(color, PieceType.ROOK);
-        if ((castlingRights & kingside) != 0
-                && rook == board[king + 3]
-                && board[king + 1] == null
-                && board[king + 2] == null
-                && !isAttacked(king + 1, enemy, board)
-                && !isAttacked(king + 2, enemy, board)) {
-            moves.add(new Move(king, king + 2));
+        for (boolean kingside : new boolean[] {true, false}) {
+            int right = rightIndex(color, kingside);
+            int rookFrom = castlingRooks[right];
+            if (rookFrom == NO_SQUARE || board[rookFrom] != rook) {
+                continue;
+            }
+            int kingTo = kingDestination(right, row);
+            int rookTo = rookDestination(right, row);
+            if (!emptyBetween(row, king, kingTo, king, rookFrom)
+                    || !emptyBetween(row, rookFrom, rookTo, king, rookFrom)) {
+                continue;
+            }
+            Piece[] without = board.clone();
+            without[king] = null;
+            without[rookFrom] = null;
+            without[rookTo] = rook;
+            // Every square from the one next to the king up to its destination; none if the king
+            // already stands there (its own square was checked above).
+            boolean safe = true;
+            for (int square = king; safe && square != kingTo; ) {
+                square += Integer.signum(kingTo - square);
+                safe = !isAttacked(square, enemy, without);
+            }
+            if (safe) {
+                moves.add(new Move(king, chess960 ? rookFrom : kingTo));
+            }
         }
-        if ((castlingRights & queenside) != 0
-                && rook == board[king - 4]
-                && board[king - 1] == null
-                && board[king - 2] == null
-                && board[king - 3] == null
-                && !isAttacked(king - 1, enemy, board)
-                && !isAttacked(king - 2, enemy, board)) {
-            moves.add(new Move(king, king - 2));
+    }
+
+    /** Whether all squares from {@code a} to {@code b} (inclusive) are empty or king or rook. */
+    private boolean emptyBetween(int row, int a, int b, int king, int rookFrom) {
+        for (int square = Math.min(a, b); square <= Math.max(a, b); square++) {
+            if (square / 8 == row
+                    && square != king
+                    && square != rookFrom
+                    && board[square] != null) {
+                return false;
+            }
         }
+        return true;
     }
 
     private static int kingSquare(Piece[] board, PieceColor color) {

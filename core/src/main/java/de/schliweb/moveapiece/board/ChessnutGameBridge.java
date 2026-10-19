@@ -380,6 +380,10 @@ public class ChessnutGameBridge {
         flow.resetForNewGame();
     }
 
+    public void resetForNewGame(String startFen) {
+        flow.resetForNewGame(startFen);
+    }
+
     public void syncBoardToPosition(String fen) {
         flow.syncBoardToPosition(fen);
     }

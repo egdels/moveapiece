@@ -360,9 +360,23 @@ public final class ChessnutGameFlow {
 
     /** Tracks the starting position; a board that does not show it lights up right away. */
     public void resetForNewGame() {
+        resetForNewGame(ChessPosition.STARTING_FEN);
+    }
+
+    /**
+     * Like {@link #resetForNewGame()}, for a game starting from {@code startFen}, e.g. a Chess960
+     * starting position. Malformed FEN is ignored.
+     */
+    public void resetForNewGame(String startFen) {
+        ChessPosition start;
+        try {
+            start = ChessPosition.fromFen(startFen);
+        } catch (IllegalArgumentException e) {
+            return;
+        }
         abortGuide();
         leds.off();
-        dispatch(detector.reset(ChessPosition.starting(), physicalBoard));
+        dispatch(detector.reset(start, physicalBoard));
     }
 
     /**

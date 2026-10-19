@@ -11,7 +11,6 @@ import ai.onnxruntime.OrtEnvironment;
 import ai.onnxruntime.OrtException;
 import ai.onnxruntime.OrtSession;
 import com.github.bhlangonijr.chesslib.Board;
-import com.github.bhlangonijr.chesslib.Side;
 import com.github.bhlangonijr.chesslib.move.Move;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -269,11 +268,10 @@ public class MaiaEngine {
     }
 
     private Move chooseMove(List<Move> legalMoves, float[] policy, double temperature) {
-        boolean blackToMove = board.getSideToMove() == Side.BLACK;
         List<Move> candidates = legalMoves;
         List<Float> logits = new ArrayList<>(legalMoves.size());
         for (Move move : legalMoves) {
-            logits.add(policy[MaiaMoveIndexer.indexOf(move, blackToMove)]);
+            logits.add(policy[MaiaMoveIndexer.indexOf(board, move)]);
         }
         if (temperature <= 0.0) {
             int bestAt = 0;

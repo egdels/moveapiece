@@ -41,6 +41,22 @@ the New Game dialog, and the app remembers it for next time.
 - The **Opening Library** in the menu shows each opening move by move,
   without a game.
 
+## Chess960
+
+- With **Chess960** in New Game, every game starts from one of the 960
+  starting positions, picked at random: the back-rank pieces are
+  shuffled, the same for both sides, and the pawns stand as usual. It
+  works against Stockfish, Maia or a second person; the app shows the
+  number of the position.
+- To castle, move the king onto its own rook. King and rook then stand as
+  in standard chess: on g1 and f1 or on c1 and d1. If no ordinary king
+  move goes to g1 or c1, you can also move the king straight there.
+- On an electronic board, set up the pieces as shown on the screen; until
+  they match, the squares that differ light up. Castle the way the FIDE
+  rules recommend: lift the king, move the rook, put the king down. If
+  king and rook merely swap squares, the Pegasus cannot tell the
+  difference; make that castling move on the screen.
+
 ## Saving and loading games
 
 - **Export PGN** in the menu passes the current game on in PGN, the

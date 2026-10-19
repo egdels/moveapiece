@@ -26,6 +26,7 @@ final class Settings {
     private static final String KEY_LAST_SIDE = "lastSide";
     private static final String KEY_LAST_OPENING = "lastOpening";
     private static final String KEY_LAST_TRAINING_HINTS = "lastTrainingHints";
+    private static final String KEY_LAST_CHESS960 = "lastChess960";
     private static final int DEFAULT_MAIA_RATING = 1500;
 
     private final SharedPreferences prefs;
@@ -83,7 +84,8 @@ final class Settings {
                 prefs.getString(KEY_LAST_OPPONENT, null),
                 prefs.getString(KEY_LAST_SIDE, null),
                 prefs.getString(KEY_LAST_OPENING, null),
-                prefs.getBoolean(KEY_LAST_TRAINING_HINTS, true));
+                prefs.getBoolean(KEY_LAST_TRAINING_HINTS, true),
+                prefs.getBoolean(KEY_LAST_CHESS960, false));
     }
 
     void setLastGameSetup(GameSetup setup) {
@@ -92,6 +94,7 @@ final class Settings {
                 .putString(KEY_LAST_SIDE, setup.side().name())
                 .putString(KEY_LAST_OPENING, setup.openingId())
                 .putBoolean(KEY_LAST_TRAINING_HINTS, setup.hintsEnabled())
+                .putBoolean(KEY_LAST_CHESS960, setup.chess960())
                 .apply();
     }
 }

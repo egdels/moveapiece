@@ -316,6 +316,7 @@ public final class EngineSearchFlow {
         PendingSearch search = newSearch(purpose);
         pendingSearches.add(search);
         setStrengthFor(purpose);
+        engine.setChess960(game.isChess960());
         engine.setPosition(game.startFen(), game.toUciMoveList());
         engine.go(movetimeMs);
         return search;
@@ -356,6 +357,7 @@ public final class EngineSearchFlow {
         hintCandidates.clear();
         setStrengthFor(SearchPurpose.HINT);
         engine.setMultiPv(HINT_MULTI_PV_LINES);
+        engine.setChess960(game.isChess960());
         engine.setPosition(game.startFen(), game.toUciMoveList());
         engine.go(HINT_MOVETIME_MS);
     }
@@ -475,6 +477,7 @@ public final class EngineSearchFlow {
             return;
         }
         pendingSearches.add(newSearch(SearchPurpose.POST_GAME));
+        engine.setChess960(game.isChess960());
         engine.setPosition(
                 game.startFen(), String.join(" ", postGameUciMoves.subList(0, positionIndex)));
         engine.go(POST_GAME_MOVETIME_MS);

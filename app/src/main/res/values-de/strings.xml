@@ -24,9 +24,11 @@
     <string name="color_black">Schwarz</string>
     <string name="dialog_opening_title">Eröffnung</string>
     <string name="dialog_training_hint_checkbox">Zugvorschlag anzeigen</string>
+    <string name="dialog_chess960_checkbox">Chess960 (zufällige Startaufstellung)</string>
 
     <string name="dialog_strength_format">Stockfish-Spielstärke (Elo): %1$d</string>
     <string name="status_engine_strength_format">Stockfish (Elo %1$d)</string>
+    <string name="status_chess960_format">Chess960 Nr. %1$d</string>
     <string name="dialog_maia_rating_format">Maia-Wertungszahl: %1$d</string>
     <string name="status_maia_strength_format">Maia (Wertungszahl %1$d)</string>
 

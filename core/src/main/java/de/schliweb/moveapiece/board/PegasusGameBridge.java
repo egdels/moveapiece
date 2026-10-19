@@ -944,16 +944,11 @@ public class PegasusGameBridge {
     /** Legal destinations of the lifted piece ({@link #liftedPieceSquare()}), empty if none. */
     public List<Integer> liftedPieceDestinations() {
         int square = liftedPieceSquare();
-        List<Integer> destinations = new ArrayList<>();
         if (square < 0) {
-            return destinations;
+            return new ArrayList<>();
         }
-        for (Move move : moveDetector.position().legalMoves()) {
-            if (move.from() == square && !destinations.contains(move.to())) {
-                destinations.add(move.to());
-            }
-        }
-        return destinations;
+        // A Chess960 castle shows the king's castling square, where the player puts it down.
+        return moveDetector.position().destinationsFrom(square);
     }
 
     /** Whether the lifted piece belongs to the side not to move. */
@@ -1377,12 +1372,27 @@ public class PegasusGameBridge {
      * went dark and stayed dark: nothing lights it again until the next physical event.
      */
     public void resetForNewGame() {
+        resetForNewGame(ChessPosition.STARTING_FEN);
+    }
+
+    /**
+     * Like {@link #resetForNewGame()}, for a game starting from {@code startFen}, e.g. a Chess960
+     * starting position. Malformed FEN is logged and ignored.
+     */
+    public void resetForNewGame(String startFen) {
+        ChessPosition start;
+        try {
+            start = ChessPosition.fromFen(startFen);
+        } catch (IllegalArgumentException e) {
+            LOG.log(Level.WARNING, "resetForNewGame: malformed FEN " + startFen, e);
+            return;
+        }
         clearBoardHint();
         cancel(checkIndicatorTask);
         abortGuide();
         ledController.off();
         squaresSeenEmpty.clear();
-        MoveDetectionResult result = moveDetector.reset(ChessPosition.starting(), physicalBoard);
+        MoveDetectionResult result = moveDetector.reset(start, physicalBoard);
         if (result.kind() == MoveDetectionResult.Kind.BOARD_MISMATCH) {
             updateMismatchLeds(result);
         }

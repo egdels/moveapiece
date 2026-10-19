@@ -5,11 +5,9 @@
 
 package de.schliweb.moveapiece.training;
 
-import com.github.bhlangonijr.chesslib.Piece;
 import com.github.bhlangonijr.chesslib.Side;
-import com.github.bhlangonijr.chesslib.Square;
 import de.schliweb.moveapiece.logic.ChessGame;
-import java.util.Locale;
+import de.schliweb.moveapiece.logic.UciMoves;
 
 /**
  * The opening trainer's move flow, shared by the desktop and Android controllers: which side is to
@@ -373,8 +371,7 @@ public final class TrainingFlow {
     }
 
     private boolean isCapture(String uci) {
-        Square to = Square.fromValue(uci.substring(2, 4).toUpperCase(Locale.ROOT));
-        return game.pieceAt(to) != Piece.NONE;
+        return game.isCapture(UciMoves.from(uci), UciMoves.to(uci));
     }
 
     private void syncBoard() {

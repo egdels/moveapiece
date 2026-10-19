@@ -1,0 +1,7 @@
+Chess960 and help in the app.
+
+* Chess960: a random starting position against Stockfish, Maia or a friend, also on the Pegasus and Chessnut.
+* Castle by moving the king onto its own rook.
+* Help and privacy policy in the menu, offline.
+* En passant sounds and is marked as a capture.
+* Android: status bar and toolbars fixed.

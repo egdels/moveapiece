@@ -278,6 +278,35 @@ public class ChessnutGameFlowTest {
     }
 
     @Test
+    public void newChess960GameTracksItsStartAndDetectsItsCastling() {
+        String start = "rk4r1/pppppppp/8/8/8/8/PPPPPPPP/RK4R1 w GAga - 0 1";
+        flow.onPhysicalBoard(Boards.start());
+        flow.resetForNewGame(start);
+
+        assertEquals(start, flow.trackedFen());
+        assertEquals("mismatch:true", events.get(events.size() - 1));
+
+        flow.onPhysicalBoard(Boards.of(start));
+        assertTrue(flow.isBoardInSync());
+
+        // Castling the way the FIDE rules recommend: king off, rook over, king down.
+        BoardState kingOff = lift(Boards.of(start), "b1");
+        flow.onPhysicalBoard(kingOff);
+        BoardState rookOver = move(kingOff, "a1", "d1");
+        flow.onPhysicalBoard(rookOver);
+        flow.onPhysicalBoard(put(rookOver, "c1", Boards.of(start).pieceCodeAt(sq("b1"))));
+
+        assertEquals("rk4r1/pppppppp/8/8/8/8/PPPPPPPP/2KR2R1 b ga - 1 1", flow.trackedFen());
+    }
+
+    @Test
+    public void resetForNewGameIgnoresMalformedFen() {
+        flow.onPhysicalBoard(Boards.start());
+        flow.resetForNewGame("not a fen");
+        assertEquals(ChessPosition.STARTING_FEN, flow.trackedFen());
+    }
+
+    @Test
     public void syncToPositionIgnoresMalformedFenAndAbortsGuide() {
         flow.onPhysicalBoard(Boards.start());
         flow.guideEngineMove("e2e4");

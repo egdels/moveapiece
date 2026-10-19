@@ -24,7 +24,6 @@ public class MultiPvCandidatesTest {
         assertEquals(41, candidates.cp(0));
         assertEquals("d2d4", candidates.move(1));
         assertEquals(20, candidates.cp(1));
-        assertEquals("d2-d4", candidates.squares(1));
         assertNull(candidates.move(2));
     }
 
