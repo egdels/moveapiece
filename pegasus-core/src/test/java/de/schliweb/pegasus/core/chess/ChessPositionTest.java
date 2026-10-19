@@ -11,7 +11,9 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import de.schliweb.pegasus.core.protocol.BoardState;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import org.junit.Test;
 
 /**
@@ -223,6 +225,43 @@ public class ChessPositionTest {
         assertEquals("rk4r1/pppppppp/8/8/8/8/PPPPPPPP/2KR2R1 b ga - 1 1", long960.toFen());
         ChessPosition step = position.apply(Move.fromUci("b1c1"));
         assertEquals("rk4r1/pppppppp/8/8/8/8/PPPPPPPP/R1K3R1 b ga - 1 1", step.toFen());
+    }
+
+    @Test
+    public void destinationsFrom_listsTheKingsCastlingSquaresNotTheRooks() {
+        ChessPosition position =
+                ChessPosition.fromFen("rk4r1/pppppppp/8/8/8/8/PPPPPPPP/RK4R1 w GAga - 0 1");
+        // c1 is a plain king step and the O-O-O square at once; g1 (O-O) holds the rook.
+        assertEquals(Set.of("c1", "g1"), squareNames(position.destinationsFrom(sq("b1"))));
+    }
+
+    @Test
+    public void destinationsFrom_skipsACastleThatLeavesTheKingWhereItStands() {
+        ChessPosition position = ChessPosition.fromFen("1r4kr/8/8/8/8/8/8/1R4KR w HBhb - 0 1");
+        // O-O (g1h1) only moves the rook; O-O-O (g1b1) puts the king on c1.
+        assertEquals(
+                Set.of("c1", "f1", "f2", "g2"), // h2 is covered by the rook on h8
+                squareNames(position.destinationsFrom(sq("g1"))));
+    }
+
+    @Test
+    public void destinationsFrom_keepsStandardCastling() {
+        ChessPosition position = ChessPosition.fromFen(KIWIPETE);
+        assertEquals(
+                Set.of("c1", "d1", "f1", "g1"), squareNames(position.destinationsFrom(sq("e1"))));
+    }
+
+    private static int sq(String name) {
+        return BoardState.squareIndex(name);
+    }
+
+    private static Set<String> squareNames(List<Integer> squares) {
+        assertEquals("no square twice", squares.size(), new HashSet<>(squares).size());
+        Set<String> names = new HashSet<>();
+        for (int square : squares) {
+            names.add(BoardState.squareName(square));
+        }
+        return names;
     }
 
     @Test

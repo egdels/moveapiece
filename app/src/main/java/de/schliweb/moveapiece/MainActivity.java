@@ -2032,7 +2032,9 @@ public class MainActivity extends AppCompatActivity
         searchFlow.startEngineMoveSearch(ENGINE_MOVETIME_MS);
     }
 
-    private void showHint(String uci) {
+    private void showHint(String bestMoveUci) {
+        // A Chess960 castle shows the king's castling square, not the rook it is written onto.
+        String uci = game.playerUci(bestMoveUci);
         Square from = UciMoves.from(uci);
         Square to = UciMoves.to(uci);
         binding.boardView.setTrainingHint(from, to);
@@ -2053,7 +2055,8 @@ public class MainActivity extends AppCompatActivity
             alternatives.add(
                     getString(
                             R.string.hint_alternative_format,
-                            searchFlow.hintCandidates().squares(rank),
+                            UciMoves.squares(
+                                    game.playerUci(searchFlow.hintCandidates().move(rank))),
                             searchFlow.hintCandidates().cp(rank) / 100.0));
         }
         hintAlternativesNote =

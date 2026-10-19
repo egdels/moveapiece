@@ -1340,7 +1340,9 @@ final class GameController
         pause.play();
     }
 
-    private void showHint(String uci) {
+    private void showHint(String bestMoveUci) {
+        // A Chess960 castle shows the king's castling square, not the rook it is written onto.
+        String uci = game.playerUci(bestMoveUci);
         Square from = UciMoves.from(uci);
         Square to = UciMoves.to(uci);
         boardCanvas.setTrainingHint(from, to);
@@ -1364,7 +1366,8 @@ final class GameController
             alternatives.add(
                     Messages.get(
                             "hint_alternative_format",
-                            searchFlow.hintCandidates().squares(rank),
+                            UciMoves.squares(
+                                    game.playerUci(searchFlow.hintCandidates().move(rank))),
                             cpLossText));
         }
         hintAlternativesNote =

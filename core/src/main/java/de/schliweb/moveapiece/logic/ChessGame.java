@@ -146,6 +146,30 @@ public class ChessGame {
     }
 
     /**
+     * An engine move in the current position as the player would make it, for showing it: a
+     * Chess960 castle, which the engine writes as the king moving onto its own rook ("b1a1"),
+     * becomes the king's move to its castling square ("b1c1"). It stays as it is when the king
+     * already stands there, or when a plain king move goes there, which {@link #applyMove} would
+     * play instead. Any other move is returned unchanged.
+     */
+    public String playerUci(String uciMove) {
+        if (!isChess960() || uciMove == null || uciMove.length() < 4) {
+            return uciMove;
+        }
+        Move move = new Move(uciMove, board.getSideToMove());
+        Square target = chess960KingTarget(move);
+        if (target == null || target == move.getFrom()) {
+            return uciMove;
+        }
+        for (Move m : board.legalMoves()) {
+            if (m.getFrom() == move.getFrom() && m.getTo() == target) {
+                return uciMove;
+            }
+        }
+        return uciMove.substring(0, 2) + target.value().toLowerCase(Locale.ROOT);
+    }
+
+    /**
      * Applies a move given in UCI notation (e.g. "e2e4", "e7e8q"), as returned by the engine. In
      * Chess960, castling is the king moving onto its own rook ("b1a1"), as with Stockfish's
      * UCI_Chess960.

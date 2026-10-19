@@ -7,7 +7,6 @@ package de.schliweb.moveapiece.analysis;
 
 import de.schliweb.moveapiece.engine.UciInfoParser;
 import java.util.Arrays;
-import java.util.Locale;
 import java.util.Optional;
 import java.util.OptionalInt;
 
@@ -67,13 +66,5 @@ public final class MultiPvCandidates {
     /** Score of that line in centipawns, from the mover's perspective. */
     public int cp(int rank) {
         return cpByRank[rank];
-    }
-
-    /** That line's move as plain "from-to" squares, e.g. "e2-e4". */
-    public String squares(int rank) {
-        String uci = moveByRank[rank];
-        return uci.substring(0, 2).toLowerCase(Locale.ROOT)
-                + "-"
-                + uci.substring(2, 4).toLowerCase(Locale.ROOT);
     }
 }

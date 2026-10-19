@@ -681,6 +681,38 @@ public class ChessGameTest {
     }
 
     @Test
+    public void playerUci_showsAChess960CastleWithTheKingsCastlingSquare() {
+        ChessGame game = chess960("r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R w HAha - 0 1");
+        assertEquals("e1g1", game.playerUci("e1h1"));
+        assertEquals("e1c1", game.playerUci("e1a1"));
+        assertEquals("e2e4", game.playerUci("e2e4"));
+        // The shown move is one the player can make.
+        assertTrue(game.applyMove(Square.E1, Square.G1, null));
+        assertEquals("e1h1", game.lastMoveUci());
+    }
+
+    @Test
+    public void playerUci_keepsTheRooksSquareWhereAPlainKingMoveGoesToTheCastlingSquare() {
+        ChessGame game = chess960(KING_B1);
+        assertEquals("b1a1", game.playerUci("b1a1")); // Kc1 is a move of its own
+        assertEquals("b1g1", game.playerUci("b1g1")); // the king ends on the rook's square
+    }
+
+    @Test
+    public void playerUci_keepsACastleThatLeavesTheKingWhereItStands() {
+        ChessGame game = chess960("1r4kr/pppppppp/8/8/8/8/PPPPPPPP/1R4KR w HBhb - 0 1");
+        assertEquals("g1h1", game.playerUci("g1h1"));
+    }
+
+    @Test
+    public void playerUci_leavesStandardChessAlone() {
+        ChessGame game = new ChessGame();
+        game.loadFen("r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R w KQkq - 0 1");
+        assertEquals("e1g1", game.playerUci("e1g1"));
+        assertEquals("e1h1", game.playerUci("e1h1"));
+    }
+
+    @Test
     public void chess960_plainKingStepToTheCastlingSquareStaysAKingMove() {
         ChessGame game = chess960(KING_B1);
         assertTrue(game.applyMove(Square.B1, Square.C1, null));

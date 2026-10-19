@@ -944,16 +944,11 @@ public class PegasusGameBridge {
     /** Legal destinations of the lifted piece ({@link #liftedPieceSquare()}), empty if none. */
     public List<Integer> liftedPieceDestinations() {
         int square = liftedPieceSquare();
-        List<Integer> destinations = new ArrayList<>();
         if (square < 0) {
-            return destinations;
+            return new ArrayList<>();
         }
-        for (Move move : moveDetector.position().legalMoves()) {
-            if (move.from() == square && !destinations.contains(move.to())) {
-                destinations.add(move.to());
-            }
-        }
-        return destinations;
+        // A Chess960 castle shows the king's castling square, where the player puts it down.
+        return moveDetector.position().destinationsFrom(square);
     }
 
     /** Whether the lifted piece belongs to the side not to move. */

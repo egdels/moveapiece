@@ -22,4 +22,11 @@ public final class UciMoves {
     public static Square to(String uci) {
         return Square.valueOf(uci.substring(2, 4).toUpperCase(Locale.ROOT));
     }
+
+    /** The move as plain "from-to" squares, e.g. "e2-e4". */
+    public static String squares(String uci) {
+        return uci.substring(0, 2).toLowerCase(Locale.ROOT)
+                + "-"
+                + uci.substring(2, 4).toLowerCase(Locale.ROOT);
+    }
 }

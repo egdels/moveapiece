@@ -309,6 +309,27 @@ public final class ChessPosition {
     }
 
     /**
+     * The squares a player may put the piece on {@code from} down on, from {@link #legalMoves()}. A
+     * castle counts with the square the king ends up on (g- or c-file), not with the rook's square
+     * a Chess960 castle is written with; a castle that leaves the king where it stands adds no
+     * square, since only the rook moves.
+     */
+    public List<Integer> destinationsFrom(int from) {
+        List<Integer> destinations = new ArrayList<>();
+        for (Move move : legalMoves()) {
+            if (move.from() != from) {
+                continue;
+            }
+            int right = castlingRightOf(move);
+            int to = right >= 0 ? kingDestination(right, from / 8) : move.to();
+            if (to != from && !destinations.contains(to)) {
+                destinations.add(to);
+            }
+        }
+        return destinations;
+    }
+
+    /**
      * Applies a legal move and returns the resulting position. Throws {@link
      * IllegalArgumentException} if the move is not legal here.
      */
