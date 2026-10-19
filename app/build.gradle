@@ -230,7 +230,7 @@ dependencies {
     implementation 'androidx.appcompat:appcompat:1.8.0'
     implementation 'com.google.android.material:material:1.14.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.2.2'
-    implementation rootProject.ext.chesslib
+    implementation project(':chesslib')
     // Physical DGT Pegasus board support (BLE); see :pegasus-core and
     // THIRD-PARTY-NOTICES.md for provenance.
     implementation project(':pegasus-core')

@@ -1,2 +1,0 @@
-// Gradle wrapper around a local chesslib checkout - see build.gradle.
-rootProject.name = 'chesslib'
