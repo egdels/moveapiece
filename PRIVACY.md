@@ -1,7 +1,7 @@
 # Privacy Policy
 
 *MoveAPiece for Android and desktop (Windows, macOS, Linux). Effective
-2026-10-11. Both apps show this text in their menu.*
+2026-10-20. Both apps show this text in their menu.*
 
 ## Who is responsible
 
