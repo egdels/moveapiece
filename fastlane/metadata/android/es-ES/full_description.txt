@@ -4,6 +4,7 @@ JUGAR AL AJEDREZ CONTRA EL ORDENADOR
 • Stockfish, el conocido motor de ajedrez de código abierto, con fuerza de juego ajustable de 1320 a 3190 Elo, desde principiante hasta nivel de maestro
 • Maia, una IA de ajedrez de estilo humano: juega las jugadas que un jugador del rating elegido (800 a 2400) haría normalmente, con pausas de reflexión naturales. Un rival que se siente como un jugador de club, no como una calculadora
 • Dos jugadores en el mismo teléfono o tableta
+• Chess960 (ajedrez aleatorio de Fischer): cada partida empieza desde una de las 960 posiciones iniciales, elegida al azar, contra Stockfish, Maia o un amigo, en la pantalla o en un tablero electrónico
 
 APRENDER APERTURAS DE AJEDREZ
 • Entrenamiento de aperturas con 20 líneas conocidas, entre ellas la Apertura española, la Siciliana Najdorf, la Partida italiana, el Gambito de dama, la Caro-Kann y la India de rey. La app juega el lado del libro y solo acepta la respuesta correcta

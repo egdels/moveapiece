@@ -459,6 +459,50 @@ public class ChessGame {
         redoHistory.clear();
     }
 
+    /**
+     * Everything needed to rebuild a game exactly, undo/redo cursor included: the start position,
+     * every move of the known line in UCI notation ({@link #toFullUciMoveList()}, so moves taken
+     * back stay redoable) and how many of them are played. Plain values, so an app can keep it
+     * across a restart of its screen, see {@link #restore}.
+     */
+    public record Snapshot(String startFen, boolean chess960, String uciMoves, int ply) {}
+
+    public Snapshot snapshot() {
+        return new Snapshot(startFen, isChess960(), toFullUciMoveList(), moveCount());
+    }
+
+    /**
+     * Rebuilds the game {@link #snapshot()} described. If the snapshot does not fit together (an
+     * illegal move, a ply outside the line), the game is left at the standard starting position and
+     * false is returned.
+     */
+    public boolean restore(Snapshot snapshot) {
+        boolean restored;
+        try {
+            restored = replay(snapshot);
+        } catch (RuntimeException e) {
+            // chesslib throws rather than returning false for text that is no move at all.
+            restored = false;
+        }
+        if (!restored) {
+            reset();
+        }
+        return restored;
+    }
+
+    private boolean replay(Snapshot snapshot) {
+        loadFen(snapshot.startFen(), snapshot.chess960());
+        String moves = snapshot.uciMoves().trim();
+        if (!moves.isEmpty()) {
+            for (String uci : moves.split("\\s+")) {
+                if (!applyUciMove(uci)) {
+                    return false;
+                }
+            }
+        }
+        return snapshot.ply() >= 0 && jumpToPly(snapshot.ply()) == snapshot.ply();
+    }
+
     public int moveCount() {
         return moveHistory.size();
     }

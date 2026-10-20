@@ -4,6 +4,7 @@ SCHACH GEGEN DEN COMPUTER
 • Stockfish, die bekannte Open-Source-Schachengine, mit einstellbarer Spielstärke von Elo 1320 bis 3190, vom Anfänger bis zum Meisterniveau
 • Maia, eine menschenähnliche Schach-KI: Sie spielt die Züge, die ein Spieler der gewählten Wertung (800 bis 2400) typischerweise spielen würde, mit natürlichen Bedenkpausen. Ein Gegner, der sich wie ein Vereinsspieler anfühlt, nicht wie ein Rechner
 • Zwei Spieler an einem Handy oder Tablet
+• Chess960 (Fischer-Random-Schach): Jede Partie beginnt aus einer zufällig gewählten der 960 Startstellungen, gegen Stockfish, Maia oder einen Freund, auf dem Bildschirm oder am elektronischen Brett
 
 SCHACHERÖFFNUNGEN LERNEN
 • Eröffnungstrainer mit 20 bekannten Varianten, darunter Spanisch, Sizilianisch (Najdorf), Italienisch, Damengambit, Caro-Kann und Königsindisch. Die App spielt die Buchseite und akzeptiert nur die richtige Antwort

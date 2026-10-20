@@ -10,6 +10,26 @@ candidates (`-rc`) and test tags are not listed.
 
 ## [Unreleased]
 
+### Added
+
+- Licenses in the menu of both apps: every open-source component the app
+  contains, with its copyright and license, and the full license texts.
+- The help explains the green dot on the rook when the king is selected in
+  Chess960: it stands for castling.
+- Desktop: the game in progress, opening training included, is kept when
+  the app is closed and picks up where it was at the next start. A finished
+  game or a finished opening line is not kept.
+
+### Fixed
+
+- Android, dark mode: the links in the help, privacy policy and licenses and
+  the moves in the move history were dark green on the dark background and
+  hard to read; they now use lighter greens there.
+- Android: the game in progress, opening training included, is no longer lost
+  when the system rebuilds the screen, for example when switching to dark
+  mode, changing the font size or language, or after Android ended the app
+  in the background. A connected board has to be reconnected afterwards.
+
 ## [1.8.0]
 
 ### Added

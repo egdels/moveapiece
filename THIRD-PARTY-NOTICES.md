@@ -3,6 +3,11 @@
 This project (MoveAPiece) is licensed under the GNU General Public License v3.0
 (see `LICENSE`), as required by its use of Stockfish.
 
+The apps show the components they contain, with copyright holders and full
+license texts, under Licenses in their menu: that page is
+`OPEN-SOURCE-LICENSES.md`. Update it together with this file whenever a
+dependency is added, removed or changes its license.
+
 ## Source code dependencies
 
 | Component | License | Source |

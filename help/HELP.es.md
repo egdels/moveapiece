@@ -56,6 +56,8 @@ la próxima vez.
   quedan como en el ajedrez normal: en g1 y f1 o en c1 y d1. Si ninguna
   jugada normal del rey lleva a g1 o c1, también puedes mover el rey
   directamente allí.
+  Al seleccionar el rey, la torre también muestra un punto
+  verde: significa enroque, no capturar tu propia pieza.
 - En un tablero electrónico, coloca las piezas como se ven en la
   pantalla; hasta que coincidan, se iluminan las casillas distintas.
   Enroca como recomiendan las reglas de la FIDE: levanta el rey, mueve la

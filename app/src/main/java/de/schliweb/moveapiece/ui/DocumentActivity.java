@@ -34,24 +34,28 @@ import java.util.regex.Pattern;
 
 /**
  * Shows one Markdown file from the assets: the help in the device's language (the asset name is the
- * {@code help_asset} string, so Android's own resource lookup picks the language) or the privacy
- * policy. app/build.gradle copies both from the repository root, so the text is maintained in one
- * place for GitHub, this app and the desktop app. Google Play wants the privacy policy reachable
- * from inside the app; as text it keeps the app offline.
+ * {@code help_asset} string, so Android's own resource lookup picks the language), the privacy
+ * policy or the open-source licenses. app/build.gradle copies them from the repository, so the text
+ * is maintained in one place for GitHub, this app and the desktop app. Google Play wants the
+ * privacy policy reachable from inside the app; as text it keeps the app offline. The licenses page
+ * gives everyone who gets the app the license texts its components require to come along.
  */
 public class DocumentActivity extends AppCompatActivity {
 
     public static final String PRIVACY_POLICY = "PRIVACY.md";
+    public static final String LICENSES = "OPEN-SOURCE-LICENSES.md";
 
     private static final String EXTRA_ASSET = "asset";
 
     /**
      * A web address with a path, such as github.com/egdels/moveapiece, without punctuation that
      * ends the sentence. Not Patterns.WEB_URL: that takes file names like CHANGELOG.md for a domain
-     * (.md is Moldova's) and keeps a full stop after the address.
+     * (.md is Moldova's) and keeps a full stop after the address. Nor the closing ">" of an address
+     * in angle brackets, as the license texts write them; the path may be just "/", as in
+     * https://fsf.org/.
      */
     private static final Pattern WEB_ADDRESS =
-            Pattern.compile("(https://)?[\\w-]+(\\.[\\w-]+)+/[^\\s]*[^\\s.,;:)]");
+            Pattern.compile("(https://)?[\\w-]+(\\.[\\w-]+)+/([^\\s>]*[^\\s.,;:)>])?");
 
     public static void start(Context context, String asset) {
         context.startActivity(

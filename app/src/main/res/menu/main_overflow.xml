@@ -22,4 +22,7 @@
     <item
         android:id="@+id/menuPrivacyPolicy"
         android:title="@string/menu_privacy_policy" />
+    <item
+        android:id="@+id/menuLicenses"
+        android:title="@string/menu_licenses" />
 </menu>

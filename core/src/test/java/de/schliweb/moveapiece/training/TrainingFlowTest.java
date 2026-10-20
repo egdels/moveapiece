@@ -411,4 +411,33 @@ public class TrainingFlowTest {
         assertEquals(1, host.cancelled);
         assertFalse(flow.onGuidanceComplete());
     }
+
+    @Test
+    public void resume_replaysTheLineSilentlyUpToThePly() {
+        assertTrue(flow.resume(RUY_LOPEZ, Side.BLACK, false, 4));
+
+        assertEquals(4, flow.session().plyIndex());
+        assertEquals(Side.BLACK, flow.session().humanSide());
+        assertFalse(flow.session().hintsEnabled());
+        assertEquals("e2e4 e7e5 g1f3 b8c6", game.toUciMoveList());
+        assertTrue(host.applied.isEmpty());
+        assertEquals(0, host.rewrites);
+    }
+
+    @Test
+    public void resume_atTheEndOfTheLineIsComplete() {
+        assertTrue(flow.resume(SHORT, Side.WHITE, true, 2));
+        assertTrue(flow.session().isComplete());
+        assertEquals("e2e4 e7e5", game.toUciMoveList());
+    }
+
+    @Test
+    public void resume_outsideTheLineStopsAndResets() {
+        assertFalse(flow.resume(SHORT, Side.WHITE, true, 3));
+        assertNull(flow.session());
+        assertEquals(START_FEN, game.toFen());
+
+        assertFalse(flow.resume(SHORT, Side.WHITE, true, -1));
+        assertNull(flow.session());
+    }
 }

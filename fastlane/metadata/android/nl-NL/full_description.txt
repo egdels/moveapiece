@@ -4,6 +4,7 @@ SCHAKEN TEGEN DE COMPUTER
 • Stockfish, de bekende opensource-schaakengine, met instelbare speelsterkte van 1320 tot 3190 Elo, van beginner tot meesterniveau
 • Maia, een menselijk spelende schaak-AI: ze speelt de zetten die een speler met de gekozen rating (800 tot 2400) doorgaans zou spelen, met natuurlijke bedenktijd. Een tegenstander die aanvoelt als een clubspeler, niet als een rekenmachine
 • Twee spelers op één telefoon of tablet
+• Chess960 (Fischer Random): elke partij begint vanuit een van de 960 beginopstellingen, willekeurig gekozen, tegen Stockfish, Maia of een vriend, op het scherm of op een elektronisch bord
 
 SCHAAKOPENINGEN LEREN
 • Openingstraining met 20 bekende varianten, waaronder Spaans, Siciliaans Najdorf, Italiaanse partij, Damegambiet, Caro-Kann en Koningsindisch. De app speelt de boekkant en accepteert alleen het juiste antwoord

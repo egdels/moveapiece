@@ -114,6 +114,31 @@ public final class TrainingFlow {
         game.reset();
     }
 
+    /**
+     * Like {@link #start}, but picks the line up at {@code plyIndex}, e.g. after the app's screen
+     * was rebuilt: the line's first {@code plyIndex} moves are played onto the game silently, with
+     * no host callbacks. A book move that was applied but not yet confirmed by the board does not
+     * count; {@link #advance()} plays it again. The host then does its screen reset and calls
+     * {@link #advance()}, as after {@link #start}. Returns false, with training stopped and the
+     * game reset, if {@code plyIndex} lies outside the line.
+     */
+    public boolean resume(OpeningLine line, Side humanSide, boolean hintsEnabled, int plyIndex) {
+        start(line, humanSide, hintsEnabled);
+        if (plyIndex < 0 || plyIndex > session.totalPlies()) {
+            stop();
+            return false;
+        }
+        while (session.plyIndex() < plyIndex) {
+            if (!game.applyUciMove(session.currentExpectedUci())) {
+                stop();
+                game.reset();
+                return false;
+            }
+            session.advance();
+        }
+        return true;
+    }
+
     /** Leaves training (new game, free play, PGN import): drops the session and any timer. */
     public void stop() {
         cancelScheduledBookMove();

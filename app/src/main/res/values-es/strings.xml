@@ -9,6 +9,7 @@
     <string name="menu_more">Más</string>
     <string name="menu_help">Ayuda</string>
     <string name="menu_privacy_policy">Política de privacidad</string>
+    <string name="menu_licenses">Licencias</string>
     <string name="help_asset">HELP.es.md</string>
     <string name="menu_opponent">Rival</string>
     <string name="menu_board_connect">Conectar tablero…</string>

@@ -21,6 +21,9 @@ JDK's own `jpackage`.
 - Play against Stockfish (adjustable Elo 1320–3190), against Maia (a
   human-like opponent that plays like a player of a chosen rating,
   800–2400, see the Tech stack table), or against another person
+- Play Chess960 (Fischer Random): every game starts from one of the 960
+  starting positions, picked at random, against Stockfish, Maia or
+  another person, on the screen or on a physical board
 - Drill an opening: pick one of 20 well-known lines, the app plays the
   book side and accepts only the correct reply
 - Look an opening up in a step-through library

@@ -53,6 +53,8 @@ in het venster Nieuw spel, en de app onthoudt het voor de volgende keer.
   staan daarna zoals bij gewoon schaken: op g1 en f1 of op c1 en d1. Leidt
   geen gewone koningszet naar g1 of c1, dan kun je de koning ook direct
   daarheen zetten.
+  Selecteer je de koning, dan krijgt ook de toren een groene
+  stip: die staat voor rokeren, niet voor het slaan van je eigen stuk.
 - Op een elektronisch bord zet je de stukken op zoals op het scherm;
   tot ze kloppen, lichten de afwijkende velden op. Rokeer zoals de
   FIDE-regels aanraden: koning optillen, toren verplaatsen, koning

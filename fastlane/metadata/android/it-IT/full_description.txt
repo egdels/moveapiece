@@ -4,6 +4,7 @@ GIOCARE A SCACCHI CONTRO IL COMPUTER
 • Stockfish, il noto motore scacchistico open source, con forza di gioco regolabile da 1320 a 3190 Elo, dal principiante al livello di maestro
 • Maia, un'IA scacchistica dallo stile umano: gioca le mosse che un giocatore del punteggio scelto (da 800 a 2400) giocherebbe di solito, con pause di riflessione naturali. Un avversario che sembra un giocatore di circolo, non una calcolatrice
 • Due giocatori sullo stesso telefono o tablet
+• Chess960 (scacchi casuali di Fischer): ogni partita inizia da una delle 960 posizioni iniziali, scelta a caso, contro Stockfish, Maia o un amico, sullo schermo o su una scacchiera elettronica
 
 IMPARARE LE APERTURE DI SCACCHI
 • Allenamento aperture con 20 linee note, tra cui Apertura spagnola, Siciliana Najdorf, Partita italiana, Gambetto di donna, Caro-Kann ed Est-Indiana. L'app gioca il lato del libro e accetta solo la risposta corretta

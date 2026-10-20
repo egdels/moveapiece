@@ -4,6 +4,7 @@ JOUER AUX ÉCHECS CONTRE L'ORDINATEUR
 • Stockfish, le célèbre moteur d'échecs open source, avec une force de jeu réglable de 1320 à 3190 Elo, du débutant au niveau maître
 • Maia, une IA d'échecs au jeu humain : elle joue les coups qu'un joueur du classement choisi (800 à 2400) jouerait typiquement, avec des temps de réflexion naturels. Un adversaire qui ressemble à un joueur de club, pas à une calculatrice
 • Deux joueurs sur un même téléphone ou une même tablette
+• Chess960 (échecs aléatoires de Fischer) : chaque partie commence à partir de l'une des 960 positions de départ, tirée au hasard, contre Stockfish, Maia ou un ami, à l'écran ou sur un échiquier électronique
 
 APPRENDRE LES OUVERTURES D'ÉCHECS
 • Entraînement d'ouvertures avec 20 lignes connues, dont la Partie espagnole, la Sicilienne Najdorf, la Partie italienne, le Gambit dame, la Caro-Kann et l'Est-indienne. L'application joue le côté du livre et n'accepte que la bonne réponse

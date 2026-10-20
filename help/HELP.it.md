@@ -55,6 +55,8 @@ successiva.
   poi come negli scacchi normali: su g1 e f1 oppure su c1 e d1. Se nessuna
   mossa normale del re porta su g1 o c1, puoi anche muovere il re
   direttamente lì.
+  Quando selezioni il re, anche la torre mostra un punto
+  verde: indica l'arrocco, non la cattura di un tuo pezzo.
 - Su una scacchiera elettronica, disponi i pezzi come sullo schermo;
   finché non corrispondono, le case diverse si illuminano. Arrocca come
   raccomandano le regole FIDE: solleva il re, muovi la torre, posa il

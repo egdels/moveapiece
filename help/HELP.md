@@ -51,6 +51,8 @@ the New Game dialog, and the app remembers it for next time.
 - To castle, move the king onto its own rook. King and rook then stand as
   in standard chess: on g1 and f1 or on c1 and d1. If no ordinary king
   move goes to g1 or c1, you can also move the king straight there.
+  When you select the king, the rook also gets a green dot:
+  it stands for castling, not for capturing your own piece.
 - On an electronic board, set up the pieces as shown on the screen; until
   they match, the squares that differ light up. Castle the way the FIDE
   rules recommend: lift the king, move the rook, put the king down. If

@@ -4,6 +4,7 @@ PLAY CHESS AGAINST THE COMPUTER
 • Stockfish, the well-known open-source chess engine, at an adjustable playing strength from Elo 1320 to 3190, from beginner to master level
 • Maia, a human-like chess AI: it plays the moves a player of a chosen rating (800 to 2400) would typically play, with natural thinking pauses. An opponent that feels like a club player, not a calculator
 • Two players on one phone or tablet
+• Chess960 (Fischer Random): every game starts from one of the 960 starting positions, picked at random, against Stockfish, Maia or a friend, on the screen or on an electronic board
 
 LEARN CHESS OPENINGS
 • Opening trainer with 20 well-known lines, among them Ruy Lopez, Sicilian Najdorf, Italian Game, Queen's Gambit, Caro-Kann and King's Indian. The app plays the book side and accepts only the correct reply

@@ -65,11 +65,15 @@ dependencies {
     testImplementation 'junit:junit:4.13.2'
 }
 
-// The privacy policy and the help are maintained once, as PRIVACY.md in the repository root and
-// help/HELP*.md (one file per UI language), for GitHub and both apps alike; DocumentWindow shows
-// them from here. The Android app copies the same files into its assets (see app/build.gradle).
+// The privacy policy, the open-source licenses and the help are maintained once, as PRIVACY.md
+// and OPEN-SOURCE-LICENSES.md in the repository root and help/HELP*.md (one file per UI
+// language), for GitHub and both apps alike; DocumentWindow shows them from here. The Android
+// app copies the same files into its assets (see app/build.gradle).
 tasks.named('processResources') {
     from(rootProject.file('PRIVACY.md')) {
+        into 'de/schliweb/moveapiece/desktop/docs'
+    }
+    from(rootProject.file('OPEN-SOURCE-LICENSES.md')) {
         into 'de/schliweb/moveapiece/desktop/docs'
     }
     from(rootProject.file('help')) {

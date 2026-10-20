@@ -123,6 +123,22 @@ public class MainActivity extends AppCompatActivity
      */
     private static final String TAG = "MainActivity";
 
+    // Keys of the saved instance state, see onSaveInstanceState.
+    private static final String STATE_MODE = "mode";
+    private static final String STATE_ENGINE_SIDE = "engineSide";
+    private static final String STATE_BOARD_FLIPPED = "boardFlipped";
+    private static final String STATE_MAIA_RATING = "maiaRating";
+    private static final String STATE_LAST_MOVE_FROM = "lastMoveFrom";
+    private static final String STATE_LAST_MOVE_TO = "lastMoveTo";
+    private static final String STATE_START_FEN = "startFen";
+    private static final String STATE_CHESS960 = "chess960";
+    private static final String STATE_UCI_MOVES = "uciMoves";
+    private static final String STATE_PLY = "ply";
+    private static final String STATE_TRAINING_LINE = "trainingLine";
+    private static final String STATE_TRAINING_SIDE = "trainingSide";
+    private static final String STATE_TRAINING_HINTS = "trainingHints";
+    private static final String STATE_TRAINING_PLY = "trainingPly";
+
     private enum GameMode {
         HUMAN,
         ENGINE,
@@ -320,8 +336,132 @@ public class MainActivity extends AppCompatActivity
         pgnImportLauncher =
                 registerForActivityResult(
                         new ActivityResultContracts.GetContent(), this::onPgnFileSelected);
+        boolean restored = savedInstanceState != null && restoreGameState(savedInstanceState);
         bindViews();
         startEngine();
+        if (restored) {
+            resumeRestoredGame();
+        }
+    }
+
+    // ---- Keeping the game across a rebuilt Activity -------------------------------------------
+
+    /**
+     * The manifest's configChanges only covers rotation (see {@link #bindViews}); anything else -
+     * switching to dark mode, a new font size or language, or Android ending the app in the
+     * background - destroys this Activity and creates a new one. What is needed to carry on with
+     * the same game goes into the saved state here and comes back in {@link #restoreGameState}.
+     * Engines and the board connection are not kept: the engines start afresh and pick the game up
+     * by themselves, the board is reconnected by the player and synced on connect.
+     */
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putString(STATE_MODE, mode.name());
+        outState.putString(STATE_ENGINE_SIDE, engineSide.name());
+        outState.putBoolean(STATE_BOARD_FLIPPED, boardFlipped);
+        outState.putInt(STATE_MAIA_RATING, currentMaiaRating);
+        if (lastMoveFrom != null && lastMoveTo != null) {
+            outState.putString(STATE_LAST_MOVE_FROM, lastMoveFrom.name());
+            outState.putString(STATE_LAST_MOVE_TO, lastMoveTo.name());
+        }
+        TrainingSession session = trainingFlow.session();
+        if (mode == GameMode.TRAINING && session != null) {
+            // The game is exactly the line's moves so far; a book move applied but not yet
+            // confirmed by the board is left out and played again on resume.
+            outState.putString(STATE_TRAINING_LINE, session.line().id());
+            outState.putString(STATE_TRAINING_SIDE, session.humanSide().name());
+            outState.putBoolean(STATE_TRAINING_HINTS, session.hintsEnabled());
+            outState.putInt(STATE_TRAINING_PLY, session.plyIndex());
+        } else {
+            ChessGame.Snapshot snapshot = game.snapshot();
+            outState.putString(STATE_START_FEN, snapshot.startFen());
+            outState.putBoolean(STATE_CHESS960, snapshot.chess960());
+            outState.putString(STATE_UCI_MOVES, snapshot.uciMoves());
+            outState.putInt(STATE_PLY, snapshot.ply());
+        }
+    }
+
+    /**
+     * Puts back what {@link #onSaveInstanceState} saved, before the views are bound. Returns false,
+     * leaving the fresh-start state alone, if the saved state is missing or unusable.
+     */
+    private boolean restoreGameState(Bundle state) {
+        GameMode savedMode;
+        Side savedEngineSide;
+        try {
+            savedMode = GameMode.valueOf(state.getString(STATE_MODE, ""));
+            savedEngineSide = Side.valueOf(state.getString(STATE_ENGINE_SIDE, ""));
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+        if (savedMode == GameMode.TRAINING) {
+            OpeningLine line = OpeningRepository.byId(state.getString(STATE_TRAINING_LINE, ""));
+            Side humanSide;
+            try {
+                humanSide = Side.valueOf(state.getString(STATE_TRAINING_SIDE, ""));
+            } catch (IllegalArgumentException e) {
+                return false;
+            }
+            if (line == null
+                    || !trainingFlow.resume(
+                            line,
+                            humanSide,
+                            state.getBoolean(STATE_TRAINING_HINTS, true),
+                            state.getInt(STATE_TRAINING_PLY, 0))) {
+                return false;
+            }
+            trainingSession = trainingFlow.session();
+        } else {
+            String startFen = state.getString(STATE_START_FEN);
+            String uciMoves = state.getString(STATE_UCI_MOVES);
+            if (startFen == null
+                    || uciMoves == null
+                    || !game.restore(
+                            new ChessGame.Snapshot(
+                                    startFen,
+                                    state.getBoolean(STATE_CHESS960, false),
+                                    uciMoves,
+                                    state.getInt(STATE_PLY, 0)))) {
+                return false;
+            }
+        }
+        mode = savedMode;
+        engineSide = savedEngineSide;
+        boardFlipped = state.getBoolean(STATE_BOARD_FLIPPED, false);
+        currentMaiaRating = state.getInt(STATE_MAIA_RATING, currentMaiaRating);
+        String from = state.getString(STATE_LAST_MOVE_FROM);
+        String to = state.getString(STATE_LAST_MOVE_TO);
+        if (from != null && to != null) {
+            try {
+                lastMoveFrom = Square.valueOf(from);
+                lastMoveTo = Square.valueOf(to);
+            } catch (IllegalArgumentException e) {
+                lastMoveFrom = null;
+                lastMoveTo = null;
+            }
+        }
+        scrollMoveHistoryToEnd = true;
+        return true;
+    }
+
+    /**
+     * Second half of a restore, once the views are bound: the board bridge learns the start
+     * position (as {@link #startNewGame} tells it), and the opponent takes up its turn. Stockfish
+     * does that by itself once it is ready ({@link #onReadyOk}); Maia is loaded here, the trainer
+     * moves on from where it was.
+     */
+    private void resumeRestoredGame() {
+        if (game.isChess960()) {
+            board.resetForNewGame(game.startFen());
+        } else {
+            board.resetForNewGame();
+        }
+        if (mode == GameMode.MAIA) {
+            loadMaiaEngine(currentMaiaRating);
+        } else if (mode == GameMode.TRAINING) {
+            maybeAdvanceTraining();
+        }
     }
 
     /**
@@ -624,6 +764,8 @@ public class MainActivity extends AppCompatActivity
                         DocumentActivity.start(this, getString(R.string.help_asset));
                     } else if (id == R.id.menuPrivacyPolicy) {
                         DocumentActivity.start(this, DocumentActivity.PRIVACY_POLICY);
+                    } else if (id == R.id.menuLicenses) {
+                        DocumentActivity.start(this, DocumentActivity.LICENSES);
                     } else {
                         return false;
                     }
@@ -1655,8 +1797,9 @@ public class MainActivity extends AppCompatActivity
      * version where every move (not the move-number tokens) is a {@link ClickableSpan} that jumps
      * the game to the position right after it via {@link #jumpToPly}. The move(s) that make up the
      * position currently on the board - however reached (a played move, {@link #undo()}/{@link
-     * #redo()}, or a previous history click) - are additionally bolded and drawn in a darker shade,
-     * so the list always shows where you currently are.
+     * #redo()}, or a previous history click) - are additionally bolded and drawn in a stronger
+     * shade (darker in light mode, lighter in dark mode), so the list always shows where you
+     * currently are.
      *
      * <p>In a paired-engine mode ({@link #isPairedEngineMode}, Stockfish or Maia) that's always the
      * human's move plus the opponent's paired reply (see {@link #jumpToPly}'s own pairing -
@@ -1697,8 +1840,8 @@ public class MainActivity extends AppCompatActivity
                                 ds.setColor(
                                         getColor(
                                                 isCurrent
-                                                        ? R.color.brand_primary_dark
-                                                        : R.color.brand_primary));
+                                                        ? R.color.text_brand_strong
+                                                        : R.color.text_brand));
                                 ds.setUnderlineText(false);
                                 ds.setFakeBoldText(isCurrent);
                             }

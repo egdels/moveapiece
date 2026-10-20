@@ -835,4 +835,72 @@ public class ChessGameTest {
         assertTrue(game.applyMove(Square.E2, Square.E4, null));
         assertFalse(game.toPgn("Weiß", "Schwarz").contains("[Variant"));
     }
+
+    // --- Snapshot / restore ---------------------------------------------------------------------
+
+    @Test
+    public void restore_keepsTheMovesTakenBackRedoable() {
+        ChessGame game = new ChessGame();
+        assertTrue(game.applyUciMove("e2e4"));
+        assertTrue(game.applyUciMove("e7e5"));
+        assertTrue(game.applyUciMove("g1f3"));
+        assertTrue(game.undoLastMove());
+        ChessGame.Snapshot snapshot = game.snapshot();
+
+        ChessGame restored = new ChessGame();
+        assertTrue(restored.restore(snapshot));
+
+        assertEquals(2, restored.moveCount());
+        assertEquals(game.toFen(), restored.toFen());
+        assertTrue(restored.canRedo());
+        assertTrue(restored.redoMove());
+        assertEquals("g1f3", restored.lastMoveUci());
+    }
+
+    @Test
+    public void restore_chess960AfterCastling() {
+        ChessGame game = new ChessGame();
+        // King on e1, rooks on b1 and g1 with f1 empty: e1g1, the king onto its rook, castles.
+        game.loadFen("1r2k1r1/pppppppp/8/8/8/8/PPPPPPPP/1R2K1R1 w GBgb - 0 1", true);
+        assertTrue(game.applyUciMove("e1g1"));
+        assertEquals(Piece.WHITE_KING, game.pieceAt(Square.G1));
+        assertEquals(Piece.WHITE_ROOK, game.pieceAt(Square.F1));
+
+        ChessGame restored = new ChessGame();
+        assertTrue(restored.restore(game.snapshot()));
+
+        assertTrue(restored.isChess960());
+        assertEquals(game.startFen(), restored.startFen());
+        assertEquals(game.toFen(), restored.toFen());
+        assertEquals(Piece.WHITE_KING, restored.pieceAt(Square.G1));
+        assertEquals(Piece.WHITE_ROOK, restored.pieceAt(Square.F1));
+    }
+
+    @Test
+    public void restore_numberedChess960KeepsItsNumber() {
+        ChessGame game = new ChessGame();
+        game.resetChess960(53);
+        ChessGame restored = new ChessGame();
+        assertTrue(restored.restore(game.snapshot()));
+        assertEquals(53, restored.chess960Number());
+    }
+
+    @Test
+    public void restore_brokenSnapshotFallsBackToTheStartingPosition() {
+        String start = new ChessGame().toFen();
+        for (ChessGame.Snapshot broken :
+                List.of(
+                        new ChessGame.Snapshot(start, false, "e2e4 e2e4", 2), // illegal move
+                        new ChessGame.Snapshot(start, false, "e2e4", 2), // ply past the line
+                        new ChessGame.Snapshot(start, false, "e2e4", -1),
+                        new ChessGame.Snapshot(start, false, "zz", 1), // no move at all
+                        new ChessGame.Snapshot("not a fen", false, "", 0))) {
+            ChessGame game = new ChessGame();
+            assertTrue(game.applyUciMove("d2d4"));
+            assertFalse(broken.toString(), game.restore(broken));
+            assertEquals(broken.toString(), start, game.toFen());
+            assertEquals(0, game.moveCount());
+            assertFalse(game.canRedo());
+        }
+    }
 }

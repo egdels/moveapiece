@@ -11,18 +11,23 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * The help and the privacy policy (HELP*.md in help/, PRIVACY.md in the repository root), parsed
- * into blocks of styled spans that each app renders with its own widgets. Only the subset of
- * Markdown those files use: a "#" title, "##" headings, paragraphs, "-" bullets with indented
- * continuation lines, and inline {@code `code`}, {@code **bold**} and {@code *italic*}. The files
- * deliberately use no tables or link syntax so that this stays small; a URL is plain text.
+ * The help, the privacy policy and the open-source licenses (HELP*.md in help/, PRIVACY.md and
+ * OPEN-SOURCE-LICENSES.md in the repository root), parsed into blocks of styled spans that each app
+ * renders with its own widgets. Only the subset of Markdown those files use: a "#" title, "##"
+ * headings, paragraphs, "-" bullets with indented continuation lines, inline {@code `code`}, {@code
+ * **bold**} and {@code *italic*}, and fenced blocks between two {@code ```} lines. A fenced block
+ * holds text that must stay as written, such as a license: each of its paragraphs becomes a {@link
+ * BlockType#VERBATIM} block, reflowed but without any inline markup. The files deliberately use no
+ * tables or link syntax so that this stays small; a URL is plain text.
  */
 public record MarkdownDocument(String title, List<Block> blocks) {
 
     public enum BlockType {
         HEADING,
         PARAGRAPH,
-        BULLET
+        BULLET,
+        /** A paragraph from a fenced block: plain text, shown like a paragraph. */
+        VERBATIM
     }
 
     public record Block(BlockType type, List<Span> spans) {}
@@ -39,6 +44,19 @@ public record MarkdownDocument(String title, List<Block> blocks) {
         String title = fallbackTitle;
         for (String raw : markdown.split("\\r?\\n", -1)) {
             String line = raw.stripTrailing();
+            if (line.strip().startsWith("```")) {
+                parser.flush();
+                parser.fenced = !parser.fenced;
+                continue;
+            }
+            if (parser.fenced) {
+                if (line.isBlank()) {
+                    parser.flush();
+                } else {
+                    parser.verbatim.add(line.strip());
+                }
+                continue;
+            }
             if (line.isBlank()) {
                 parser.flush();
             } else if (line.startsWith("# ")) {
@@ -70,6 +88,8 @@ public record MarkdownDocument(String title, List<Block> blocks) {
         final List<Block> blocks = new ArrayList<>();
         final StringBuilder paragraph = new StringBuilder();
         StringBuilder bullet;
+        final List<String> verbatim = new ArrayList<>();
+        boolean fenced;
 
         void flush() {
             if (bullet != null) {
@@ -79,6 +99,14 @@ public record MarkdownDocument(String title, List<Block> blocks) {
             if (paragraph.length() > 0) {
                 blocks.add(new Block(BlockType.PARAGRAPH, inline(paragraph.toString())));
                 paragraph.setLength(0);
+            }
+            if (!verbatim.isEmpty()) {
+                // Reflowed like any paragraph; runs of spaces only lined text up in the file.
+                String text = String.join(" ", verbatim).replaceAll("\\s+", " ");
+                blocks.add(
+                        new Block(
+                                BlockType.VERBATIM, List.of(new Span(text, false, false, false))));
+                verbatim.clear();
             }
         }
     }

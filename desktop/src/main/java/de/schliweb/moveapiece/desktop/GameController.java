@@ -38,6 +38,7 @@ import de.schliweb.moveapiece.logic.Opponent;
 import de.schliweb.moveapiece.logic.PgnGames;
 import de.schliweb.moveapiece.logic.UciMoves;
 import de.schliweb.moveapiece.training.OpeningLine;
+import de.schliweb.moveapiece.training.OpeningRepository;
 import de.schliweb.moveapiece.training.TrainingFlow;
 import de.schliweb.moveapiece.training.TrainingSession;
 import de.schliweb.pegasus.core.protocol.BoardState;
@@ -199,6 +200,7 @@ final class GameController
     private final MenuItem analyzeGameItem = new MenuItem(Messages.get("action_analyze_game"));
     private final MenuItem helpItem = new MenuItem(Messages.get("menu_help"));
     private final MenuItem privacyPolicyItem = new MenuItem(Messages.get("menu_privacy_policy"));
+    private final MenuItem licensesItem = new MenuItem(Messages.get("menu_licenses"));
     // A plain icon button that pops a ContextMenu rather than a MenuButton: a MenuButton's
     // arrow region keeps its space even when hidden and pushes the glyph off-centre.
     private final Button moreButton = iconButton(MORE_ICON_PATH, Messages.get("menu_more"));
@@ -451,8 +453,135 @@ final class GameController
 
         boardCanvas.setMoveSource(this);
         boardCanvas.setOnMoveListener(this::onMoveChosen);
+        boolean restored = restoreSavedGame();
         refresh();
+        if (restored) {
+            resumeRestoredGame();
+        }
         return root;
+    }
+
+    // ---- Keeping the game across a restart ----------------------------------------------------
+
+    /** What {@link #saveGame} last wrote, so an unchanged game is not written again. */
+    private Settings.SavedGame lastSavedGame;
+
+    /**
+     * Keeps the game in progress for the next launch ({@link Settings#setSavedGame}); called from
+     * every {@link #refresh} and on {@link #shutdown}, so it also survives an app that is killed
+     * rather than closed. A finished game is not kept, nor is a training line played to its end:
+     * there is nothing left to play, and restoring it would open the game-over or training-complete
+     * dialog before the window is even shown. Engines and the board connection are not part of it:
+     * Stockfish and Maia pick the game up by themselves, the board is reconnected by the player and
+     * synced on connect.
+     */
+    private void saveGame() {
+        TrainingSession session = trainingFlow.session();
+        boolean trainingComplete = mode == Mode.TRAINING && session != null && session.isComplete();
+        if (game.isGameOver() || trainingComplete) {
+            if (lastSavedGame != null || Settings.getSavedGame() != null) {
+                Settings.clearSavedGame();
+                lastSavedGame = null;
+            }
+            return;
+        }
+        Settings.SavedGame saved =
+                mode == Mode.TRAINING && session != null
+                        // The game is exactly the line's moves so far; a book move applied but not
+                        // yet confirmed by the board is left out and played again on resume.
+                        ? new Settings.SavedGame(
+                                mode.name(),
+                                session.humanSide().name(),
+                                boardFlipped,
+                                currentMaiaRating,
+                                null,
+                                session.line().id(),
+                                session.hintsEnabled(),
+                                session.plyIndex())
+                        : new Settings.SavedGame(
+                                mode.name(),
+                                humanSide.name(),
+                                boardFlipped,
+                                currentMaiaRating,
+                                game.snapshot(),
+                                null,
+                                true,
+                                0);
+        if (!saved.equals(lastSavedGame)) {
+            Settings.setSavedGame(saved);
+            lastSavedGame = saved;
+        }
+    }
+
+    /**
+     * Puts back the game {@link #saveGame} kept at the last launch, before the first {@link
+     * #refresh}. Returns false, leaving the fresh start alone, if nothing usable was kept.
+     */
+    private boolean restoreSavedGame() {
+        Settings.SavedGame saved = Settings.getSavedGame();
+        if (saved == null || saved.humanSide() == null) {
+            return false;
+        }
+        Mode savedMode;
+        Side savedSide;
+        try {
+            savedMode = Mode.valueOf(saved.mode());
+            savedSide = Side.valueOf(saved.humanSide());
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+        if (savedMode == Mode.TRAINING) {
+            OpeningLine line =
+                    saved.trainingLine() == null
+                            ? null
+                            : OpeningRepository.byId(saved.trainingLine());
+            if (line == null
+                    || !trainingFlow.resume(
+                            line, savedSide, saved.trainingHints(), saved.trainingPly())) {
+                return false;
+            }
+            trainingSession = trainingFlow.session();
+        } else if (saved.snapshot() == null || !game.restore(saved.snapshot())) {
+            return false;
+        }
+        if (game.isGameOver()) {
+            trainingFlow.stop();
+            trainingSession = null;
+            game.reset();
+            return false;
+        }
+        mode = savedMode;
+        humanSide = savedSide;
+        boardFlipped = saved.flipped();
+        boardCanvas.setFlipped(boardFlipped);
+        if (mode == Mode.HUMAN_VS_MAIA) {
+            currentMaiaRating = saved.maiaRating();
+        }
+        strengthSlider.setDisable(mode != Mode.HUMAN_VS_STOCKFISH);
+        updateStrengthControlsVisibility();
+        String lastMove = game.lastMoveUci();
+        if (lastMove != null) {
+            boardCanvas.setLastMove(UciMoves.from(lastMove), UciMoves.to(lastMove));
+        }
+        scrollMoveHistoryToEnd = true;
+        return true;
+    }
+
+    /**
+     * Second half of a restore, after the first {@link #refresh}: the board bridge learns the start
+     * position (as {@link #newGame} tells it), and the opponent takes up its turn. Stockfish does
+     * that by itself once it is ready ({@link #onReadyOk}); Maia is loaded here, the trainer moves
+     * on from where it was.
+     */
+    private void resumeRestoredGame() {
+        if (pegasusBridge != null) {
+            pegasusBridge.resetForNewGame(game.startFen());
+        }
+        if (mode == Mode.HUMAN_VS_MAIA) {
+            loadMaiaEngine(currentMaiaRating);
+        } else if (mode == Mode.TRAINING) {
+            trainingFlow.advance();
+        }
     }
 
     private void resizeBoard(StackPane holder) {
@@ -567,6 +696,7 @@ final class GameController
         helpItem.setOnAction(e -> DocumentWindow.show(stage, Messages.get("help_file")));
         privacyPolicyItem.setOnAction(
                 e -> DocumentWindow.show(stage, DocumentWindow.PRIVACY_POLICY));
+        licensesItem.setOnAction(e -> DocumentWindow.show(stage, DocumentWindow.LICENSES));
         moreMenu.getItems()
                 .addAll(
                         openingLibraryItem,
@@ -574,7 +704,8 @@ final class GameController
                         exportItem,
                         analyzeGameItem,
                         helpItem,
-                        privacyPolicyItem);
+                        privacyPolicyItem,
+                        licensesItem);
         moreMenu.setOnShowing(e -> updateOverflowMenuState());
         moreButton.setOnAction(
                 e -> {
@@ -1839,6 +1970,7 @@ final class GameController
         maybeTriggerAnalysis();
         updateHintButtonState();
         updateNoteLabel();
+        saveGame();
 
         if (game.isGameOver()) {
             showGameOverAlert();
@@ -2437,6 +2569,7 @@ final class GameController
     }
 
     void shutdown() {
+        saveGame();
         if (engine != null) {
             engine.shutdown();
         }

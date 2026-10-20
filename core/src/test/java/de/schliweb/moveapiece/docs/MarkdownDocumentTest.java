@@ -66,25 +66,49 @@ public class MarkdownDocumentTest {
                 spans);
     }
 
+    @Test
+    public void fencedBlockStaysPlainAndReflows() {
+        MarkdownDocument doc =
+                MarkdownDocument.parse(
+                        "## License\n\n```\n  # not a heading\n- not a bullet, `show w'\n\n"
+                                + "THE  SOFTWARE *IS*   PROVIDED\n```\n\nafter **bold**\n",
+                        "x");
+        List<Block> blocks = doc.blocks();
+        assertEquals(4, blocks.size());
+        assertBlock(blocks.get(0), BlockType.HEADING, "License");
+        assertBlock(blocks.get(1), BlockType.VERBATIM, "# not a heading - not a bullet, `show w'");
+        assertBlock(blocks.get(2), BlockType.VERBATIM, "THE SOFTWARE *IS* PROVIDED");
+        assertEquals(
+                List.of(new Span("THE SOFTWARE *IS* PROVIDED", false, false, false)),
+                blocks.get(2).spans());
+        assertEquals(BlockType.PARAGRAPH, blocks.get(3).type());
+        assertTrue(blocks.get(3).spans().get(1).bold());
+    }
+
     /**
      * Every shipped document parses into a title and content, and no Markdown the parser does not
      * know (links, tables, deeper headings, stray emphasis markers) slips into the visible text.
+     * License texts in fenced blocks are exempt: they are shown exactly as written.
      */
     @Test
     public void shippedDocumentsUseOnlyTheSupportedSubset() throws IOException {
         Path root = Path.of("..").toAbsolutePath().normalize();
         List<Path> files = new java.util.ArrayList<>();
         files.add(root.resolve("PRIVACY.md"));
+        files.add(root.resolve("OPEN-SOURCE-LICENSES.md"));
         try (DirectoryStream<Path> help = Files.newDirectoryStream(root.resolve("help"), "*.md")) {
             help.forEach(files::add);
         }
-        assertEquals(7, files.size());
+        assertEquals(8, files.size());
         for (Path file : files) {
             String text = Files.readString(file, StandardCharsets.UTF_8);
             MarkdownDocument doc = MarkdownDocument.parse(text, "");
             assertTrue(file + ": title", !doc.title().isEmpty());
             assertTrue(file + ": content", doc.blocks().size() > 3);
             for (Block block : doc.blocks()) {
+                if (block.type() == BlockType.VERBATIM) {
+                    continue;
+                }
                 for (Span span : block.spans()) {
                     if (span.code()) {
                         continue; // permission names such as BLUETOOTH_SCAN

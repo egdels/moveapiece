@@ -57,6 +57,9 @@ souvient pour la prochaine fois.
   retrouvent alors comme aux échecs classiques : en g1 et f1 ou en c1 et
   d1. Si aucun coup ordinaire du roi ne mène en g1 ou c1, vous pouvez
   aussi y placer le roi directement.
+  Quand vous sélectionnez le roi, la tour porte elle
+  aussi un point vert : il indique le roque, pas la prise de votre
+  propre pièce.
 - Sur un échiquier électronique, installez les pièces comme à l'écran ;
   tant qu'elles ne correspondent pas, les cases différentes s'allument.
   Roquez comme le recommandent les règles de la FIDE : soulevez le roi,

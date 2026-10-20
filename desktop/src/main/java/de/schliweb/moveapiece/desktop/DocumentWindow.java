@@ -26,13 +26,15 @@ import javafx.stage.Stage;
 
 /**
  * Shows one Markdown file from the resources: the help in the host's language (the file name is the
- * {@code help_file} message, so the resource bundle picks the language) or the privacy policy.
- * desktop/build.gradle copies both from the repository root, so the text is maintained in one place
- * for GitHub, this app and the Android app (its {@code ui.DocumentActivity}).
+ * {@code help_file} message, so the resource bundle picks the language), the privacy policy or the
+ * open-source licenses. desktop/build.gradle copies them from the repository, so the text is
+ * maintained in one place for GitHub, this app and the Android app (its {@code
+ * ui.DocumentActivity}).
  */
 final class DocumentWindow {
 
     static final String PRIVACY_POLICY = "PRIVACY.md";
+    static final String LICENSES = "OPEN-SOURCE-LICENSES.md";
 
     /** One window per file: opening it again brings the open one to the front. */
     private static final Map<String, Stage> OPEN = new HashMap<>();

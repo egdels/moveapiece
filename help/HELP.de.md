@@ -56,6 +56,9 @@ nächste Mal.
   stehen König und Turm wie im normalen Schach: auf g1 und f1 oder auf c1
   und d1. Führt kein gewöhnlicher Königszug auf g1 oder c1, kannst du den
   König auch direkt dorthin ziehen.
+  Wählst du den König aus, trägt auch der Turm einen grünen
+  Punkt: Er steht für die Rochade, nicht für das Schlagen der eigenen
+  Figur.
 - Am elektronischen Brett stellst du die Figuren nach dem Bildschirm auf;
   bis sie stimmen, leuchten die abweichenden Felder. Rochiere so, wie es
   die FIDE-Regeln empfehlen: König abheben, Turm ziehen, König absetzen.

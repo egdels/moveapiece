@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Lighter shades of the brand green for text on the dark background (see values/colors.xml).
+         Both reach well over the 4.5:1 contrast WCAG asks for normal text on Material 3's dark
+         surface (#141218); the current move in the history is the lighter one, as the strong
+         shade is the darker one in light mode. -->
+    <color name="text_brand">#81C784</color>
+    <color name="text_brand_strong">#C8E6C9</color>
+</resources>

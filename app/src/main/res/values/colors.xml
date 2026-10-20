@@ -12,4 +12,11 @@
     <color name="brand_primary">#2E7D32</color>
     <color name="brand_primary_dark">#1B5E20</color>
     <color name="brand_secondary">#8D6E63</color>
+
+    <!-- Brand green used as text on the screen background: links in the help, privacy policy and
+         licenses, and the moves in the move history (the current one in the strong shade). The
+         dark theme has lighter shades in values-night, since the brand greens above are too dark
+         to read on its background. -->
+    <color name="text_brand">@color/brand_primary</color>
+    <color name="text_brand_strong">@color/brand_primary_dark</color>
 </resources>

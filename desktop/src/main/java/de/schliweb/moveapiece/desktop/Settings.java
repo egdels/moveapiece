@@ -7,12 +7,13 @@ package de.schliweb.moveapiece.desktop;
 
 import de.schliweb.moveapiece.engine.MaiaRatings;
 import de.schliweb.moveapiece.logic.BoardType;
+import de.schliweb.moveapiece.logic.ChessGame;
 import de.schliweb.moveapiece.logic.GameSetup;
 import java.util.prefs.Preferences;
 
 /**
  * Persists user-adjustable settings (engine strength, Maia rating, evaluation display, physical
- * board type, last game setup) across app restarts.
+ * board type, last game setup) and the game in progress across app restarts.
  */
 final class Settings {
 
@@ -95,5 +96,105 @@ final class Settings {
         }
         PREFS.putBoolean(KEY_LAST_TRAINING_HINTS, setup.hintsEnabled());
         PREFS.putBoolean(KEY_LAST_CHESS960, setup.chess960());
+    }
+
+    // ---- The game in progress ---------------------------------------------------------------
+
+    /**
+     * The game in progress, kept across a restart of the app (see {@code GameController#saveGame}).
+     * In training only the training fields are set and {@code snapshot} is null; otherwise the game
+     * is the snapshot and the training fields are unused.
+     */
+    record SavedGame(
+            String mode,
+            String humanSide,
+            boolean flipped,
+            int maiaRating,
+            ChessGame.Snapshot snapshot,
+            String trainingLine,
+            boolean trainingHints,
+            int trainingPly) {}
+
+    private static final String NODE_SAVED_GAME = "savedGame";
+    private static final String KEY_GAME_MODE = "mode";
+    private static final String KEY_GAME_HUMAN_SIDE = "humanSide";
+    private static final String KEY_GAME_FLIPPED = "flipped";
+    private static final String KEY_GAME_MAIA_RATING = "maiaRating";
+    private static final String KEY_GAME_START_FEN = "startFen";
+    private static final String KEY_GAME_CHESS960 = "chess960";
+    private static final String KEY_GAME_UCI_MOVES = "uciMoves";
+    private static final String KEY_GAME_PLY = "ply";
+    private static final String KEY_GAME_TRAINING_LINE = "trainingLine";
+    private static final String KEY_GAME_TRAINING_HINTS = "trainingHints";
+    private static final String KEY_GAME_TRAINING_PLY = "trainingPly";
+
+    /** Null when no game was kept, see {@link #setSavedGame}. */
+    static SavedGame getSavedGame() {
+        Preferences node = PREFS.node(NODE_SAVED_GAME);
+        String mode = node.get(KEY_GAME_MODE, null);
+        if (mode == null) {
+            return null;
+        }
+        String startFen = node.get(KEY_GAME_START_FEN, null);
+        String uciMoves = node.get(KEY_GAME_UCI_MOVES, null);
+        ChessGame.Snapshot snapshot =
+                startFen == null || uciMoves == null
+                        ? null
+                        : new ChessGame.Snapshot(
+                                startFen,
+                                node.getBoolean(KEY_GAME_CHESS960, false),
+                                uciMoves,
+                                node.getInt(KEY_GAME_PLY, 0));
+        return new SavedGame(
+                mode,
+                node.get(KEY_GAME_HUMAN_SIDE, null),
+                node.getBoolean(KEY_GAME_FLIPPED, false),
+                node.getInt(KEY_GAME_MAIA_RATING, DEFAULT_MAIA_RATING),
+                snapshot,
+                node.get(KEY_GAME_TRAINING_LINE, null),
+                node.getBoolean(KEY_GAME_TRAINING_HINTS, true),
+                node.getInt(KEY_GAME_TRAINING_PLY, 0));
+    }
+
+    /**
+     * Keeps {@code game} for the next launch, replacing what was kept before. A game too long for a
+     * preference value (over about 1600 moves) is not kept.
+     */
+    static void setSavedGame(SavedGame game) {
+        Preferences node = PREFS.node(NODE_SAVED_GAME);
+        ChessGame.Snapshot snapshot = game.snapshot();
+        if (snapshot != null
+                && (snapshot.uciMoves().length() > Preferences.MAX_VALUE_LENGTH
+                        || snapshot.startFen().length() > Preferences.MAX_VALUE_LENGTH)) {
+            clearSavedGame();
+            return;
+        }
+        node.put(KEY_GAME_MODE, game.mode());
+        node.put(KEY_GAME_HUMAN_SIDE, game.humanSide());
+        node.putBoolean(KEY_GAME_FLIPPED, game.flipped());
+        node.putInt(KEY_GAME_MAIA_RATING, game.maiaRating());
+        if (snapshot == null) {
+            node.remove(KEY_GAME_START_FEN);
+            node.remove(KEY_GAME_CHESS960);
+            node.remove(KEY_GAME_UCI_MOVES);
+            node.remove(KEY_GAME_PLY);
+        } else {
+            node.put(KEY_GAME_START_FEN, snapshot.startFen());
+            node.putBoolean(KEY_GAME_CHESS960, snapshot.chess960());
+            node.put(KEY_GAME_UCI_MOVES, snapshot.uciMoves());
+            node.putInt(KEY_GAME_PLY, snapshot.ply());
+        }
+        if (game.trainingLine() == null) {
+            node.remove(KEY_GAME_TRAINING_LINE);
+        } else {
+            node.put(KEY_GAME_TRAINING_LINE, game.trainingLine());
+        }
+        node.putBoolean(KEY_GAME_TRAINING_HINTS, game.trainingHints());
+        node.putInt(KEY_GAME_TRAINING_PLY, game.trainingPly());
+    }
+
+    /** Forgets the kept game: {@link #getSavedGame} returns null until the next save. */
+    static void clearSavedGame() {
+        PREFS.node(NODE_SAVED_GAME).remove(KEY_GAME_MODE);
     }
 }
