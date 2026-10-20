@@ -8,28 +8,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versions follow [Semantic Versioning](https://semver.org/). Release
 candidates (`-rc`) and test tags are not listed.
 
-## [Unreleased]
-
-### Added
-
-- Licenses in the menu of both apps: every open-source component the app
-  contains, with its copyright and license, and the full license texts.
-- The help explains the green dot on the rook when the king is selected in
-  Chess960: it stands for castling.
-- The game in progress, opening training included, is kept when the app is
-  closed and picks up where it was at the next start, in both apps. A
-  finished game or a finished opening line is not kept. A connected board
-  has to be reconnected afterwards.
-
-### Fixed
-
-- Android, dark mode: the links in the help, privacy policy and licenses and
-  the moves in the move history were dark green on the dark background and
-  hard to read; they now use lighter greens there.
-- Android: the game in progress is no longer lost when the system rebuilds
-  the screen, for example when switching to dark mode or changing the font
-  size or language.
-
 ## [1.8.0]
 
 ### Added
@@ -40,7 +18,8 @@ candidates (`-rc`) and test tags are not listed.
   the Chessnut's NEW GAME button, gets a new starting position.
   - Castling: move the king onto its own rook. King and rook then stand
     as in standard chess, on g1/f1 or c1/d1. If no ordinary king move goes
-    to g1 or c1, the king can also be moved there directly.
+    to g1 or c1, the king can also be moved there directly. With the king
+    selected, the rook gets a green dot for castling; the help explains it.
   - Electronic boards: set the pieces up as on the screen; the squares
     that differ light up until they match. Castle as the FIDE rules
     recommend: lift the king, move the rook, put the king down. The
@@ -60,6 +39,14 @@ candidates (`-rc`) and test tags are not listed.
   inside the app, so it stays offline. The privacy policy now also names
   who is responsible, what the app reads and stores, and every Android
   permission, as Google Play asks.
+- Licenses in the menu of both apps: every open-source component the app
+  contains, with its copyright and license, and the full license texts.
+- The game in progress, opening training included, is kept when the app is
+  closed and picks up where it was at the next start, in both apps. On
+  Android it also survives the screen being rebuilt, for example when
+  switching to dark mode or changing the font size or language; until now
+  that started a new game. A finished game or a finished opening line is
+  not kept. A connected board has to be reconnected afterwards.
 
 ### Fixed
 
@@ -72,7 +59,9 @@ candidates (`-rc`) and test tags are not listed.
   the light or dark theme.
 - Android, dark mode: the Next button of the opening preview had dark
   purple text on green; text on the brand colours is now white in both
-  themes.
+  themes. The links in the help, privacy policy and licenses and the moves
+  in the move history were dark green on the dark background and hard to
+  read; they now use lighter greens there.
 
 ## [1.7.0] - 2026-10-10
 
