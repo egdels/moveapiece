@@ -25,6 +25,10 @@ app never opens a network connection either.
   whether the evaluation is shown and which type of board was connected
   last. On Android they are in the app's private storage, on the desktop
   in the operating system's user preferences.
+- **The game in progress**: its moves, opponent and colour, or the opening
+  line you are training and how far you got, so the game picks up where it
+  was when you open the app again. It is stored next to the settings and
+  deleted when the game or the opening line ends.
 - **The chess engine's network file**: on Android, Stockfish's evaluation
   network is unpacked from the app into its private storage on first
   start.
