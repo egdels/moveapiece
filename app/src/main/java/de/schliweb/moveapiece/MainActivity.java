@@ -123,22 +123,6 @@ public class MainActivity extends AppCompatActivity
      */
     private static final String TAG = "MainActivity";
 
-    // Keys of the saved instance state, see onSaveInstanceState.
-    private static final String STATE_MODE = "mode";
-    private static final String STATE_ENGINE_SIDE = "engineSide";
-    private static final String STATE_BOARD_FLIPPED = "boardFlipped";
-    private static final String STATE_MAIA_RATING = "maiaRating";
-    private static final String STATE_LAST_MOVE_FROM = "lastMoveFrom";
-    private static final String STATE_LAST_MOVE_TO = "lastMoveTo";
-    private static final String STATE_START_FEN = "startFen";
-    private static final String STATE_CHESS960 = "chess960";
-    private static final String STATE_UCI_MOVES = "uciMoves";
-    private static final String STATE_PLY = "ply";
-    private static final String STATE_TRAINING_LINE = "trainingLine";
-    private static final String STATE_TRAINING_SIDE = "trainingSide";
-    private static final String STATE_TRAINING_HINTS = "trainingHints";
-    private static final String STATE_TRAINING_PLY = "trainingPly";
-
     private enum GameMode {
         HUMAN,
         ENGINE,
@@ -336,7 +320,7 @@ public class MainActivity extends AppCompatActivity
         pgnImportLauncher =
                 registerForActivityResult(
                         new ActivityResultContracts.GetContent(), this::onPgnFileSelected);
-        boolean restored = savedInstanceState != null && restoreGameState(savedInstanceState);
+        boolean restored = restoreSavedGame();
         bindViews();
         startEngine();
         if (restored) {
@@ -344,102 +328,114 @@ public class MainActivity extends AppCompatActivity
         }
     }
 
-    // ---- Keeping the game across a rebuilt Activity -------------------------------------------
+    // ---- Keeping the game across a restart ----------------------------------------------------
+
+    /** What {@link #saveGame} last wrote, so an unchanged game is not written again. */
+    private Settings.SavedGame lastSavedGame;
 
     /**
-     * The manifest's configChanges only covers rotation (see {@link #bindViews}); anything else -
-     * switching to dark mode, a new font size or language, or Android ending the app in the
-     * background - destroys this Activity and creates a new one. What is needed to carry on with
-     * the same game goes into the saved state here and comes back in {@link #restoreGameState}.
-     * Engines and the board connection are not kept: the engines start afresh and pick the game up
-     * by themselves, the board is reconnected by the player and synced on connect.
+     * Keeps the game in progress for the next start of this Activity ({@link
+     * Settings#setSavedGame}): after the app was closed, swiped away or ended by Android in the
+     * background, and after a configuration change other than rotation (dark mode, font size,
+     * language) rebuilds the Activity. Called from every {@link #refreshBoard} and on {@link
+     * #onStop}. A finished game is not kept, nor is a training line played to its end: there is
+     * nothing left to play. Engines and the board connection are not part of it: Stockfish and Maia
+     * pick the game up by themselves, the board is reconnected by the player and synced on connect.
      */
-    @Override
-    protected void onSaveInstanceState(Bundle outState) {
-        super.onSaveInstanceState(outState);
-        outState.putString(STATE_MODE, mode.name());
-        outState.putString(STATE_ENGINE_SIDE, engineSide.name());
-        outState.putBoolean(STATE_BOARD_FLIPPED, boardFlipped);
-        outState.putInt(STATE_MAIA_RATING, currentMaiaRating);
-        if (lastMoveFrom != null && lastMoveTo != null) {
-            outState.putString(STATE_LAST_MOVE_FROM, lastMoveFrom.name());
-            outState.putString(STATE_LAST_MOVE_TO, lastMoveTo.name());
-        }
+    private void saveGame() {
         TrainingSession session = trainingFlow.session();
-        if (mode == GameMode.TRAINING && session != null) {
-            // The game is exactly the line's moves so far; a book move applied but not yet
-            // confirmed by the board is left out and played again on resume.
-            outState.putString(STATE_TRAINING_LINE, session.line().id());
-            outState.putString(STATE_TRAINING_SIDE, session.humanSide().name());
-            outState.putBoolean(STATE_TRAINING_HINTS, session.hintsEnabled());
-            outState.putInt(STATE_TRAINING_PLY, session.plyIndex());
-        } else {
-            ChessGame.Snapshot snapshot = game.snapshot();
-            outState.putString(STATE_START_FEN, snapshot.startFen());
-            outState.putBoolean(STATE_CHESS960, snapshot.chess960());
-            outState.putString(STATE_UCI_MOVES, snapshot.uciMoves());
-            outState.putInt(STATE_PLY, snapshot.ply());
+        boolean training = mode == GameMode.TRAINING && session != null;
+        if (game.isGameOver() || (training && session.isComplete())) {
+            if (lastSavedGame != null || settings.getSavedGame() != null) {
+                settings.clearSavedGame();
+                lastSavedGame = null;
+            }
+            return;
+        }
+        Settings.SavedGame saved =
+                training
+                        // The game is exactly the line's moves so far; a book move applied but not
+                        // yet confirmed by the board is left out and played again on resume.
+                        ? new Settings.SavedGame(
+                                mode.name(),
+                                session.humanSide().name(),
+                                boardFlipped,
+                                currentMaiaRating,
+                                null,
+                                session.line().id(),
+                                session.hintsEnabled(),
+                                session.plyIndex())
+                        : new Settings.SavedGame(
+                                mode.name(),
+                                engineSide.name(),
+                                boardFlipped,
+                                currentMaiaRating,
+                                game.snapshot(),
+                                null,
+                                true,
+                                0);
+        if (!saved.equals(lastSavedGame)) {
+            settings.setSavedGame(saved);
+            lastSavedGame = saved;
+        }
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        if (binding != null) {
+            saveGame();
         }
     }
 
     /**
-     * Puts back what {@link #onSaveInstanceState} saved, before the views are bound. Returns false,
-     * leaving the fresh-start state alone, if the saved state is missing or unusable.
+     * Puts back the game {@link #saveGame} kept, before the views are bound. Returns false, leaving
+     * the fresh start alone, if nothing usable was kept.
      */
-    private boolean restoreGameState(Bundle state) {
+    private boolean restoreSavedGame() {
+        Settings.SavedGame saved = settings.getSavedGame();
+        if (saved == null || saved.side() == null) {
+            return false;
+        }
         GameMode savedMode;
-        Side savedEngineSide;
+        Side savedSide;
         try {
-            savedMode = GameMode.valueOf(state.getString(STATE_MODE, ""));
-            savedEngineSide = Side.valueOf(state.getString(STATE_ENGINE_SIDE, ""));
+            savedMode = GameMode.valueOf(saved.mode());
+            savedSide = Side.valueOf(saved.side());
         } catch (IllegalArgumentException e) {
             return false;
         }
         if (savedMode == GameMode.TRAINING) {
-            OpeningLine line = OpeningRepository.byId(state.getString(STATE_TRAINING_LINE, ""));
-            Side humanSide;
-            try {
-                humanSide = Side.valueOf(state.getString(STATE_TRAINING_SIDE, ""));
-            } catch (IllegalArgumentException e) {
-                return false;
-            }
+            OpeningLine line =
+                    saved.trainingLine() == null
+                            ? null
+                            : OpeningRepository.byId(saved.trainingLine());
             if (line == null
                     || !trainingFlow.resume(
-                            line,
-                            humanSide,
-                            state.getBoolean(STATE_TRAINING_HINTS, true),
-                            state.getInt(STATE_TRAINING_PLY, 0))) {
+                            line, savedSide, saved.trainingHints(), saved.trainingPly())) {
                 return false;
             }
             trainingSession = trainingFlow.session();
+        } else if (saved.snapshot() == null || !game.restore(saved.snapshot())) {
+            return false;
         } else {
-            String startFen = state.getString(STATE_START_FEN);
-            String uciMoves = state.getString(STATE_UCI_MOVES);
-            if (startFen == null
-                    || uciMoves == null
-                    || !game.restore(
-                            new ChessGame.Snapshot(
-                                    startFen,
-                                    state.getBoolean(STATE_CHESS960, false),
-                                    uciMoves,
-                                    state.getInt(STATE_PLY, 0)))) {
-                return false;
-            }
+            engineSide = savedSide;
+        }
+        if (game.isGameOver()) {
+            trainingFlow.stop();
+            trainingSession = null;
+            game.reset();
+            return false;
         }
         mode = savedMode;
-        engineSide = savedEngineSide;
-        boardFlipped = state.getBoolean(STATE_BOARD_FLIPPED, false);
-        currentMaiaRating = state.getInt(STATE_MAIA_RATING, currentMaiaRating);
-        String from = state.getString(STATE_LAST_MOVE_FROM);
-        String to = state.getString(STATE_LAST_MOVE_TO);
-        if (from != null && to != null) {
-            try {
-                lastMoveFrom = Square.valueOf(from);
-                lastMoveTo = Square.valueOf(to);
-            } catch (IllegalArgumentException e) {
-                lastMoveFrom = null;
-                lastMoveTo = null;
-            }
+        boardFlipped = saved.flipped();
+        if (mode == GameMode.MAIA) {
+            currentMaiaRating = MaiaRatings.nearest(saved.maiaRating());
+        }
+        String lastMove = game.lastMoveUci();
+        if (lastMove != null) {
+            lastMoveFrom = UciMoves.from(lastMove);
+            lastMoveTo = UciMoves.to(lastMove);
         }
         scrollMoveHistoryToEnd = true;
         return true;
@@ -1630,6 +1626,7 @@ public class MainActivity extends AppCompatActivity
         maybeTriggerAnalysis();
         updateNoteText();
         updateHintButtonState();
+        saveGame();
     }
 
     private boolean isBoardInteractiveNow() {
