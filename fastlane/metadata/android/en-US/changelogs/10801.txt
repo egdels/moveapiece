@@ -1,0 +1,1 @@
+* Fixes a crash of the Google Play version when a game starts.

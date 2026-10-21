@@ -8,6 +8,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versions follow [Semantic Versioning](https://semver.org/). Release
 candidates (`-rc`) and test tags are not listed.
 
+## [1.8.1] - 2026-10-21
+
+### Fixed
+
+- Android: the version from Google Play crashed when a game started. Play's
+  automatic app protection changed the app in a way that broke it on
+  Android 14 and newer. The F-Droid and GitHub builds were not affected.
+
 ## [1.8.0] - 2026-10-20
 
 ### Added
@@ -432,6 +440,7 @@ Linux .deb).
 - Windows: move sounds were silent because of a malformed ID3 tag in the
   mp3 files.
 
+[1.8.1]: https://github.com/egdels/moveapiece/compare/v1.8.0...v1.8.1
 [1.8.0]: https://github.com/egdels/moveapiece/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/egdels/moveapiece/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/egdels/moveapiece/compare/v1.5.2...v1.6.0
