@@ -52,6 +52,10 @@ nächste Mal.
   gemischt, für beide Seiten gleich, die Bauern wie gewohnt. Das geht
   gegen Stockfish, Maia oder eine zweite Person; die App zeigt die
   Nummer der Stellung an.
+- Maia hat nur aus Partien im normalen Schach gelernt. In Chess960
+  spielt Maia deshalb spürbar schwächer als die gewählte Wertung und
+  rochiert selten; eine höhere Wertung spielt aber weiterhin stärker als
+  eine niedrigere.
 - Zum Rochieren ziehst du den König auf seinen eigenen Turm. Danach
   stehen König und Turm wie im normalen Schach: auf g1 und f1 oder auf c1
   und d1. Führt kein gewöhnlicher Königszug auf g1 oder c1, kannst du den

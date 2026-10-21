@@ -51,6 +51,9 @@ successiva.
   sono mescolati, uguali per entrambi i colori, e i pedoni stanno come
   al solito. Funziona contro Stockfish, Maia o un'altra persona; l'app
   mostra il numero della posizione.
+- Maia ha imparato solo da partite di scacchi normali. In Chess960 gioca
+  in modo sensibilmente più debole rispetto al punteggio scelto e arrocca
+  di rado; un punteggio più alto gioca comunque meglio di uno più basso.
 - Per arroccare, muovi il re sulla propria torre. Re e torre si trovano
   poi come negli scacchi normali: su g1 e f1 oppure su c1 e d1. Se nessuna
   mossa normale del re porta su g1 o c1, puoi anche muovere il re
