@@ -12,7 +12,9 @@ MAIA_PROVENANCE.md for the pinned revisions and checksums.
 
 Besides writing the model it checks the export against the PyTorch original
 and, with --golden, writes the reference moves the Java tests assert against.
-Those come from the PyTorch model, not from the exported file.
+Those come from the PyTorch model, not from the exported file. --model and
+--margin export another Maia-3 size or keep only clearer reference moves; the
+defaults give the bundled file.
 """
 
 import argparse
@@ -24,7 +26,7 @@ from collections import deque
 
 import numpy as np
 
-MODEL = "maia3-5m"
+MODEL = "maia3-5m"  # the bundled network; --model picks another
 OPSET = 17
 ELOS = (800, 1100, 1500, 1900, 2400)
 
@@ -53,7 +55,11 @@ MIN_MARGIN = 0.05
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--maia3-repo", required=True, help="checkout of CSSLab/maia3")
+    parser.add_argument("--model", default=MODEL, help="Maia-3 model name, e.g. maia3-79m")
     parser.add_argument("--out", default="maia3-5m.onnx")
+    parser.add_argument(
+        "--margin", type=float, default=MIN_MARGIN, help="minimum lead of a reference move"
+    )
     parser.add_argument("--golden", help="write reference moves for the Java tests here")
     return parser.parse_args()
 
@@ -76,7 +82,7 @@ def main():
     from maia3.uci import load_model, parse_args as maia3_args
     from maia3.utils import get_all_possible_moves, mirror_move
 
-    cfg = maia3_args(["--model", MODEL, "--device", "cpu", "--no-use-amp"])
+    cfg = maia3_args(["--model", args.model, "--device", "cpu", "--no-use-amp"])
     cfg.checkpoint_path = resolve_checkpoint_path(
         cfg.model_spec,
         checkpoint_filename=cfg.checkpoint_filename,
@@ -199,7 +205,7 @@ def main():
             if board.turn == chess.BLACK:
                 onnx_move = mirror_move(onnx_move)
             margin = ranked[0][1] - (ranked[1][1] if len(ranked) > 1 else 0.0)
-            if margin >= MIN_MARGIN:
+            if margin >= args.margin:
                 if onnx_move != ranked[0][0]:
                     raise SystemExit(f"export disagrees with PyTorch: {line!r} elo {elo}")
                 cases.append((elo, ranked[0][0], ranked[0][1], line))

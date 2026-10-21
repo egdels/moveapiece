@@ -8,6 +8,9 @@ includes it only with `-Pmaia960eval`.
 
 - `reproduce.sh`: the Chess960 study (strength shift, castling bonus).
 - `opening-study.sh`: the study of sampled opening moves in standard chess.
+- `GoldenCheck`: `MaiaEngineGoldenTest` for any model file, ONNX Runtime and
+  JVM; with `tools/maia3/export_onnx.py --model` and `quantize_int8.py` it
+  reproduces the Maia-3 79M and int8 experiment.
 
 ## Data
 

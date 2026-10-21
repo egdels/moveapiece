@@ -352,3 +352,131 @@ harness samples this way by default.
   moves vary too.
 - Stockfish's skill-level randomness is time-seeded, so stage B is not
   bit-reproducible; the CIs cover that noise.
+
+## Experiment: Maia-3 79M and int8 quantization (2026-10-21)
+
+Question: would the largest Maia-3 network, `UofTCSSLab/Maia3-79M`, play
+noticeably more human-like or better-graded than the bundled 5M one, and can
+quantization make it small enough for the app? Measured on `main` at 45711b1;
+nothing in the app was changed. Numbers from `results-79m/`.
+
+### Models
+
+- **79M:** checkpoint `maia3-79m.pt` (Hugging Face revision a107d6c, SHA-256
+  `3fc6181d…`), exported with `tools/maia3/export_onnx.py --model maia3-79m`;
+  same inputs and outputs as 5M. 311,736,457 bytes, largest
+  logit difference to PyTorch 1.9e-4, byte-identical on a second export.
+- **int8:** `tools/maia3/quantize_int8.py`, i.e.
+  `onnxruntime.quantization.quantize_dynamic` (ONNX Runtime 1.30.0),
+  `weight_type=QInt8`, `op_types_to_quantize=["MatMul", "Gemm"]`, per tensor.
+  79M-int8 80,421,725 bytes, 5M-int8 6,562,782 bytes. `reduce_range=True` and
+  per-channel weights were tried as well; neither agreed better with the
+  reference (below).
+
+### Accuracy and strength
+
+Move-matching accuracy on the first 2000 qualifying standard games of the
+Lichess August 2026 dump (rated, ≥ 180 s estimated duration; 135,068
+positions, the same for every model; `human-std-*.md`):
+
+| Model | Size | Plies 0–9 | 10–19 | 20–29 | 30+ | All |
+|---|---|---|---|---|---|---|
+| 5M (bundled) | 21 MB | 50.2 % | 52.1 % | 53.3 % | 57.1 % | 54.80 % |
+| 5M-int8 | 6.6 MB | 50.1 % | 52.1 % | 53.4 % | 57.0 % | 54.81 % |
+| 79M | 312 MB | 50.4 % | 53.5 % | 54.3 % | 59.0 % | 56.29 % |
+| 79M-int8 | 80 MB | 50.5 % | 53.3 % | 54.2 % | 58.9 % | 56.19 % |
+
+Strength against Stockfish with the app's opening sampling (`t10n2`), 1200
+games per model, shift against 5M (run `results-opening/t10n2-mvs`) with
+bootstrap 95 % CI over position pairs (`comparison.md`, `int8-vs-fp32.md`):
+
+| Model | 1400 | 1700 | 2000 | 2300 | Mean shift [95 % CI] |
+|---|---|---|---|---|---|
+| 5M (perf.) | 1619 | 1710 | 1764 | 1903 | – |
+| 79M | −22 [−97, +53] | +95 [+19, +175] | +164 [+88, +241] | +133 [+44, +219] | **+92** [+53, +133] |
+| 79M-int8 | +4 [−68, +83] | +15 [−62, +91] | +111 [+38, +183] | +102 [+22, +187] | **+58** [+18, +97] |
+
+79M-int8 against 79M directly: −34 [−75, +7]. 79M spreads the levels further
+apart (about 440 rating points of performance from 1400 to 2300, against 280
+for 5M), but at 1400 both play equally strongly. None of the sampled opening
+moves of either 79M variant lost more than 200 cp; no engine errors.
+
+### Platforms and reference cases
+
+Reference cases: the moves the PyTorch model picks, kept only where they lead
+the runner-up by at least 5 percentage points (529 for 5M, 417 for 79M), as
+in `MaiaEngineGoldenTest`. Times are per move through `MaiaEngine`, measured
+with `GoldenCheck` (harness) on the desktop setups and with a temporary
+instrumented test on the emulator.
+
+| Setup | 5M | 5M-int8 | 79M | 79M-int8 |
+|---|---|---|---|---|
+| Apple M4, ORT 1.29.0 | 3.2 ms, 0 differ | 3.3 ms, 1 | 13.8 ms, 0 | 11.1 ms, 0 |
+| Apple M4, ORT 1.16.3 | 5.3 ms, 0 | 4.6 ms, 0 | 47.6 ms, 0 | 33.7 ms, 0 |
+| x86_64 under Rosetta, ORT 1.16.3 | 9.1 ms, 0 | 9.4 ms, 0 | 76.9 ms, 0 | 79.1 ms, 1 |
+| Android emulator (arm64, 4 cores), ORT 1.29.0 | 5.3 ms, 0 | 3.3 ms, 0 | 49.7 ms, 0 | 19.1 ms, 2 |
+
+- The float models agree with PyTorch everywhere. int8 flips 0–2 of the
+  close cases, differently per platform (e.g. two different ways of taking a
+  queen). With a margin of 15 points (`export_onnx.py --margin 0.15`, 252
+  cases for 79M) 79M-int8 matched all
+  of them on both ORT versions on the Mac and under Rosetta; the two cases
+  that differed on Android are not among them, but that set was not run on
+  the emulator.
+- ORT 1.16.3, which the desktop build uses on Intel Macs, runs the int8
+  operators; checked with its x86_64 natives under Rosetta (Temurin 21 x64),
+  not on Intel hardware.
+- On Android, `MaiaEngine.start(InputStream)` fails for 79M-int8 with an
+  `OutOfMemoryError`: it reads the model into the Java heap (growth limit
+  192 MB on the emulator) and needs a 134 MB buffer. Loaded from a file
+  (`createSession(path)`, patched in for the test only), it uses 175 MB PSS
+  after loading and 188 MB at most, against 111 / 138 MB for 5M. On Android
+  int8 is 2.6 times as fast as float32; on the Mac it is not faster.
+- The emulator runs on the M4 at close to its speed; a phone will be slower.
+  Not measured on a real device.
+
+### Chess960
+
+The same comparison in Chess960, where 5M is weakest. Accuracy on the first
+1000 qualifying games of the Lichess Chess960 dump of August 2026 (SP 518
+excluded; 62,249 positions; `human-960-*.md`), with the app's castling bonus
+of 1:
+
+| Model | Plies 0–9 | 10–19 | 20–29 | 30+ | All | Maia castles / humans castle |
+|---|---|---|---|---|---|---|
+| 5M | 31.3 % | 44.8 % | 49.0 % | 56.4 % | 49.66 % | 1325 / 1231 |
+| 79M | 24.1 % | 44.9 % | 50.7 % | 58.6 % | 49.93 % | 1059 / 1231 |
+| 79M-int8 | 23.9 % | 44.8 % | 50.6 % | 58.6 % | 49.89 % | 1100 / 1231 |
+
+In the first ten plies of Chess960 the larger network is clearly worse, 7
+points below 5M, float and int8 alike, so this is the model, not the
+quantization; later in the game it is better, as in standard chess. The
+castling bonus fits 79M as well: accuracy is highest at 1 to 1.5 (bonus 0,
+0.5, 1, 1.5 and 2 measured), and at 1 it castles about as often as the
+humans.
+
+Strength in Chess960 against Stockfish, castling bonus 1, the 50 Chess960
+positions of the main run with both colours, 1200 games per model
+(`960-mvs-*`, `960-gap-*`, `960-comparison.md`):
+
+| Model | 1400 | 1700 | 2000 | 2300 | Mean |
+|---|---|---|---|---|---|
+| 5M, 960 − standard | −151 [−226, −77] | −230 [−302, −155] | −143 [−212, −75] | −260 [−342, −172] | |
+| 79M-int8, 960 − standard | −368 [−460, −284] | −280 [−361, −203] | −366 [−450, −285] | −316 [−398, −231] | |
+| 79M-int8 − 5M in 960 | −212 [−297, −134] | −36 [−111, +37] | −112 [−187, −38] | +45 [−37, +127] | **−79** [−117, −41] |
+
+The standard rows are the runs above. 79M-int8 loses 280–370 Elo in Chess960
+against 150–260 for 5M, and in Chess960 it is weaker than 5M on average. The
+float 79M was not played in Chess960; its accuracy suggests the same.
+
+### Assessment
+
+79M-int8 would make Maia slightly more human-like in standard chess (+1.4
+points of accuracy, mostly from ply 10 on) and clearly stronger above 1400,
+with levels further apart. In Chess960 it is worse: its opening moves match
+humans far less often and it plays about 80 Elo weaker than 5M, so the gap
+the help warns about would grow. It also costs 59 MB per APK and desktop
+package, about four times the inference time, file-based model loading on
+Android, a golden test with a wider margin, and a provenance record for the
+quantization. 5M-int8 alone would save 14 MB at no measurable loss. Not
+adopted.
