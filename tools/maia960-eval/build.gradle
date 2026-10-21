@@ -1,0 +1,30 @@
+// Plays Maia against Stockfish and against itself in standard chess and Chess960 and writes the
+// games and a summary - see REPORT.md. Part of the build only with -Pmaia960eval (see
+// settings.gradle); reproduce.sh runs everything.
+//
+//   ./gradlew -Pmaia960eval :maia960-eval:installDist
+//   tools/maia960-eval/build/install/maia960-eval/bin/maia960-eval [options]
+plugins {
+    id 'application'
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+dependencies {
+    implementation project(':core')
+    implementation project(':chesslib')
+    implementation "com.microsoft.onnxruntime:onnxruntime:${rootProject.ext.onnxruntimeVersion}"
+}
+
+application {
+    mainClass = 'de.schliweb.moveapiece.maia960eval.Maia960Eval'
+    applicationDefaultJvmArgs = ['-Xmx2g']
+}
+
+// The Stockfish the desktop app bundles, built from app/src/main/cpp/stockfish.
+tasks.named('installDist') {
+    dependsOn ':desktop:buildStockfishHost'
+}

@@ -1,0 +1,7 @@
+# Raw output of a run (every game as PGN and CSV, every event with its FEN) and the downloaded
+# Lichess data stay out of the repository; reproduce.sh regenerates them. The files of the runs in
+# REPORT.md are kept on the branch maia960-eval.
+/data/
+games*.pgn
+games.csv
+events.tsv

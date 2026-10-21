@@ -25,3 +25,11 @@ include ':desktop'
 include ':chesslib'
 project(':chesslib').projectDir = file('third_party/chesslib')
 
+
+// Measurement harness for Maia in Chess960, never part of an app; see tools/maia960-eval/REPORT.md.
+// Only included with -Pmaia960eval, so that no other build (the F-Droid build of :app included)
+// configures, compiles or resolves anything for it.
+if (providers.gradleProperty('maia960eval').isPresent()) {
+    include ':maia960-eval'
+    project(':maia960-eval').projectDir = file('tools/maia960-eval')
+}
