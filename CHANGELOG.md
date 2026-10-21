@@ -8,6 +8,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versions follow [Semantic Versioning](https://semver.org/). Release
 candidates (`-rc`) and test tags are not listed.
 
+## [Unreleased]
+
+### Changed
+
+- Maia varies its openings in standard chess: in a new game it picks its
+  first two moves at random, weighted by how likely players of its rating
+  are to play them, instead of always the same ones, and then plays as
+  before. Measured without a
+  noticeable loss of strength. Chess960 games and games continued from the
+  Opening Trainer, the board or an import are not affected.
+
 ## [1.8.1] - 2026-10-21
 
 ### Fixed

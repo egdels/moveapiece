@@ -18,7 +18,6 @@ import java.io.InputStream;
 import java.nio.FloatBuffer;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
@@ -268,40 +267,20 @@ public class MaiaEngine {
     }
 
     private Move chooseMove(List<Move> legalMoves, float[] policy, double temperature) {
-        List<Move> candidates = legalMoves;
-        List<Float> logits = new ArrayList<>(legalMoves.size());
-        for (Move move : legalMoves) {
-            logits.add(MaiaMoveIndexer.logitOf(board, move, policy));
+        float[] logits = new float[legalMoves.size()];
+        for (int i = 0; i < logits.length; i++) {
+            logits[i] = MaiaMoveIndexer.logitOf(board, legalMoves.get(i), policy);
         }
-        if (temperature <= 0.0) {
-            int bestAt = 0;
-            for (int i = 1; i < logits.size(); i++) {
-                if (logits.get(i) > logits.get(bestAt)) {
-                    bestAt = i;
-                }
-            }
-            return candidates.get(bestAt);
+        if (temperature > 0.0) {
+            return legalMoves.get(MaiaOpeningSampling.sample(logits, temperature, random));
         }
-        return sample(candidates, logits, temperature);
-    }
-
-    private Move sample(List<Move> candidates, List<Float> logits, double temperature) {
-        double max = Collections.max(logits);
-        double[] weights = new double[logits.size()];
-        double sum = 0;
-        for (int i = 0; i < logits.size(); i++) {
-            weights[i] = Math.exp((logits.get(i) - max) / temperature);
-            sum += weights[i];
-        }
-        double pick = random.nextDouble() * sum;
-        double acc = 0;
-        for (int i = 0; i < weights.length; i++) {
-            acc += weights[i];
-            if (pick <= acc) {
-                return candidates.get(i);
+        int bestAt = 0;
+        for (int i = 1; i < logits.length; i++) {
+            if (logits[i] > logits[bestAt]) {
+                bestAt = i;
             }
         }
-        return candidates.get(candidates.size() - 1);
+        return legalMoves.get(bestAt);
     }
 
     private static float[] extractRow(OrtSession.Result result, String outputName)

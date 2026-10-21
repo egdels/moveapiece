@@ -422,6 +422,11 @@ public class ChessGame {
         return startFen;
     }
 
+    /** Whether the move history starts from the standard starting position. */
+    public boolean startsFromStandardPosition() {
+        return START_FEN.equals(startFen);
+    }
+
     /**
      * How many half-moves lie between White's move 1 and this game's first move, per {@link
      * #startFen()}: 0 for a game from the initial position, 1 when it starts with Black to move at

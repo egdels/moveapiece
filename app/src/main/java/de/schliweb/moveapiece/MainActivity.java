@@ -59,6 +59,7 @@ import de.schliweb.moveapiece.databinding.DialogPromotionBinding;
 import de.schliweb.moveapiece.engine.EngineListener;
 import de.schliweb.moveapiece.engine.MaiaEngine;
 import de.schliweb.moveapiece.engine.MaiaEngineListener;
+import de.schliweb.moveapiece.engine.MaiaOpeningSampling;
 import de.schliweb.moveapiece.engine.MaiaRatings;
 import de.schliweb.moveapiece.engine.NnueAssets;
 import de.schliweb.moveapiece.engine.StockfishEngine;
@@ -154,6 +155,10 @@ public class MainActivity extends AppCompatActivity
     // here (this app has no persistent sidebar to put one in) - matches how Stockfish's own Elo is
     // also a one-time dialog choice on this platform, not a live slider.
     private MaiaEngine maiaEngine;
+    // Whether the game began with New Game, so Maia may sample its first moves (see
+    // MaiaOpeningSampling); false for a game taken over from training, the board, an import or a
+    // restore.
+    private boolean newGameStarted;
     private final NewGamePressGate newGameGate = new NewGamePressGate();
     private boolean maiaReady = false;
     private int currentMaiaRating;
@@ -1142,6 +1147,7 @@ public class MainActivity extends AppCompatActivity
         }
         searchFlow.abandonPendingSearches();
         game.loadFen(fen);
+        newGameStarted = false;
         setLastMove(null, null);
         binding.boardView.setCheckedKingSquare(null);
         binding.boardView.setTrainingHint(null, null);
@@ -1556,6 +1562,7 @@ public class MainActivity extends AppCompatActivity
         trainingSession = trainingFlow.session();
         binding.undoButton.setEnabled(true);
 
+        newGameStarted = true;
         if (lastSetup.chess960()) {
             // A new starting position for every game, also for a rematch from the board's NEW
             // GAME button.
@@ -2137,6 +2144,7 @@ public class MainActivity extends AppCompatActivity
         binding.boardView.setTrainingHint(null, null);
         binding.boardView.clearSelection();
         board.resetForNewGame();
+        newGameStarted = false;
         if (engineReady) {
             engine.newGame();
             engine.setFullStrength();
@@ -2160,7 +2168,7 @@ public class MainActivity extends AppCompatActivity
             maiaSearchGeneration = searchFlow.generation();
             maiaRequestStartElapsedMs = SystemClock.elapsedRealtime();
             maiaEngine.setPosition(game.startFen(), game.toUciMoveList());
-            maiaEngine.go();
+            maiaEngine.go(MaiaOpeningSampling.temperature(game, newGameStarted));
             return;
         }
         if (!engineReady) {
@@ -2417,6 +2425,7 @@ public class MainActivity extends AppCompatActivity
                                 (dialog, which) -> {
                                     trainingFlow.stop();
                                     trainingSession = null;
+                                    newGameStarted = false;
                                     Opponent chosen =
                                             dialogBinding.opponentEngine.isChecked()
                                                     ? Opponent.STOCKFISH

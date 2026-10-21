@@ -26,6 +26,7 @@ import de.schliweb.moveapiece.desktop.pegasus.WindowsPegasusBleTransport;
 import de.schliweb.moveapiece.engine.EngineListener;
 import de.schliweb.moveapiece.engine.MaiaEngine;
 import de.schliweb.moveapiece.engine.MaiaEngineListener;
+import de.schliweb.moveapiece.engine.MaiaOpeningSampling;
 import de.schliweb.moveapiece.engine.MaiaRatings;
 import de.schliweb.moveapiece.engine.NnueAssets;
 import de.schliweb.moveapiece.engine.StockfishEngine;
@@ -240,6 +241,10 @@ final class GameController
     // constructor and live for the app's whole lifetime - a different rating is a different
     // bundled model file, not a UCI option to change on a running instance.
     private MaiaEngine maiaEngine;
+    // Whether the game began with New Game, so Maia may sample its first moves (see
+    // MaiaOpeningSampling); false for a game taken over from training, the board, an import or a
+    // restore.
+    private boolean newGameStarted;
     private final NewGamePressGate newGameGate = new NewGamePressGate();
     private boolean maiaReady = false;
     private int currentMaiaRating;
@@ -927,7 +932,7 @@ final class GameController
             maiaSearchGeneration = searchFlow.generation();
             maiaRequestStartNanos = System.nanoTime();
             maiaEngine.setPosition(game.startFen(), game.toUciMoveList());
-            maiaEngine.go();
+            maiaEngine.go(MaiaOpeningSampling.temperature(game, newGameStarted));
             return;
         }
         if (!engineReady) {
@@ -1273,6 +1278,7 @@ final class GameController
         }
         searchFlow.abandonPendingSearches();
         game.loadFen(fen);
+        newGameStarted = false;
         boardCanvas.setLastMove(null, null);
         boardCanvas.setTrainingHint(null, null);
         boardCanvas.clearSelection();
@@ -1655,6 +1661,7 @@ final class GameController
         } else {
             game.reset();
         }
+        newGameStarted = true;
         boardCanvas.setLastMove(null, null);
         if (pegasusBridge != null) {
             pegasusBridge.resetForNewGame(game.startFen());
@@ -2354,6 +2361,7 @@ final class GameController
         }
         trainingFlow.stop();
         trainingSession = null;
+        newGameStarted = false;
         humanSide = trainedSide;
         boardCanvas.setTrainingHint(null, null);
         // Explicitly chosen by the user, so it is what the board's NEW GAME button repeats next.
@@ -2489,6 +2497,7 @@ final class GameController
         }
         trainingFlow.stop();
         trainingSession = null;
+        newGameStarted = false;
         mode = Mode.HUMAN_VS_HUMAN;
         humanSide = Side.WHITE;
         boardFlipped = false;

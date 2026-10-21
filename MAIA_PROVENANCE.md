@@ -153,10 +153,28 @@ the data exists (about 29.8 million rated Chess960 games in the Lichess
 database). A fine-tuned network would be a derivative under AGPL-3.0 and
 need its own provenance record.
 
+## Opening sampling
+
+The highest-scoring legal move alone opens every standard game the same way
+(Maia against Maia: two lines in 100 games). In a standard game started with
+New Game from the start position, Maia therefore samples its first two own
+moves from the network's own distribution (temperature 1.0) and plays its
+top move from then on (`MaiaOpeningSampling`). Never in Chess960, in a game
+continued from the Opening Trainer, from a position taken from the board or
+from an import.
+
+Measured in `tools/maia960-eval/REPORT.md` ("Study: more variety in Maia's
+standard openings") against 11 settings and 1000 Lichess games per rating
+band: White's first move is as distributed as in human games of the same
+rating (total variation distance 0.08–0.09, argmax 0.39–0.41), 24 opening
+families instead of two, 0.06 % of the sampled moves lose more than 200 cp,
+and the strength against Stockfish shifts by −18 Elo (95 % CI −57 to +20).
+
 ## Not covered
 
-- The model plays the reference presets' way: the highest-scoring legal move,
-  no sampling. The Chess960 castling bonus is MoveAPiece's own addition.
+- Apart from the first two moves above, the model plays the reference
+  presets' way: the highest-scoring legal move. The opening sampling and the
+  Chess960 castling bonus are MoveAPiece's own additions.
 - ONNX Runtime 1.16.3, which the desktop build uses on Intel Macs, loads the
   file and returns the same result as 1.29.0, but that was checked with its
   Apple Silicon natives; on Intel hardware only CI exercises it.

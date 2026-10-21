@@ -5,6 +5,7 @@
 
 package de.schliweb.moveapiece.maia960eval;
 
+import de.schliweb.moveapiece.engine.MaiaOpeningSampling;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -62,8 +63,11 @@ record Config(
                 ints(a.getOrDefault("sf", "1400,1800,2200")),
                 pairs(a.getOrDefault("pairs", "1400-2000,1700-2300")),
                 Integer.parseInt(a.getOrDefault("movetime", "100")),
-                Integer.parseInt(a.getOrDefault("sampled", "2")),
-                Double.parseDouble(a.getOrDefault("temperature", "1.0")),
+                // The app's opening sampling by default; unlike the app, the harness also samples
+                // in Chess960, so that the two games of a position pair differ.
+                Integer.parseInt(a.getOrDefault("sampled", "" + MaiaOpeningSampling.SAMPLED_MOVES)),
+                Double.parseDouble(
+                        a.getOrDefault("temperature", "" + MaiaOpeningSampling.TEMPERATURE)),
                 Integer.parseInt(a.getOrDefault("topk", "0")),
                 Integer.parseInt(a.getOrDefault("maxplies", "300")),
                 Boolean.parseBoolean(a.getOrDefault("adjudicate", "true")),

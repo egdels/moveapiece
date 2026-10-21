@@ -336,6 +336,9 @@ network's own distribution), then argmax. It is the most human-like variety
 that stays clearly inside both limits. `t07n4` would give somewhat more
 distinct lines but is borderline on strength.
 
+Adopted in the app (`MaiaOpeningSampling`, see MAIA_PROVENANCE.md); the
+harness samples this way by default.
+
 ### Limits
 
 - With 1200 games per variant the CI of the mean shift is about ±40 Elo, so
