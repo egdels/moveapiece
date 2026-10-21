@@ -7,6 +7,7 @@ package de.schliweb.moveapiece.maia960eval;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -27,8 +28,8 @@ import java.util.stream.Collectors;
  */
 final class Summary {
 
-    private static final int BOOTSTRAP = 2000;
-    private static final long BOOTSTRAP_SEED = 4242;
+    static final int BOOTSTRAP = 2000;
+    static final long BOOTSTRAP_SEED = 4242;
     private static final String[] VARIANTS = {"std", "960"};
 
     /** One row of games.csv. */
@@ -48,10 +49,15 @@ final class Summary {
             int[] w,
             int[] b,
             int collisions,
-            int anomalies) {
+            int anomalies,
+            int[] sampledW,
+            int[] sampledB,
+            String opening) {
 
+        /** Parses a row; runs before the opening study have no sampled-move or opening columns. */
         static Row parse(String line) {
-            String[] f = line.split(",");
+            String[] f = line.split(",", -1);
+            boolean extended = f.length > 29;
             return new Row(
                     f[0],
                     f[1],
@@ -78,7 +84,18 @@ final class Summary {
                         Integer.parseInt(f[19])
                     },
                     Integer.parseInt(f[20]),
-                    Integer.parseInt(f[21]));
+                    Integer.parseInt(f[21]),
+                    extended ? ints(f, 23, 3) : new int[3],
+                    extended ? ints(f, 26, 3) : new int[3],
+                    extended ? f[29] : "");
+        }
+
+        private static int[] ints(String[] f, int from, int n) {
+            int[] out = new int[n];
+            for (int i = 0; i < n; i++) {
+                out[i] = Integer.parseInt(f[from + i]);
+            }
+            return out;
         }
 
         boolean ok() {
@@ -117,12 +134,18 @@ final class Summary {
 
     private Summary() {}
 
-    static void write(Config config, List<Integer> positions) throws IOException {
+    /** The rows of {@code dir}/games.csv. */
+    static List<Row> readRows(Path dir) throws IOException {
         List<Row> rows = new ArrayList<>();
-        List<String> lines = Files.readAllLines(config.out().resolve("games.csv"));
+        List<String> lines = Files.readAllLines(dir.resolve("games.csv"));
         for (String line : lines.subList(1, lines.size())) {
             rows.add(Row.parse(line));
         }
+        return rows;
+    }
+
+    static void write(Config config, List<Integer> positions) throws IOException {
+        List<Row> rows = readRows(config.out());
         StringBuilder md = new StringBuilder();
         md.append("# Maia960 eval: summary\n\n");
         md.append("Generated from games.csv by `Summary`; see REPORT.md for the discussion.\n\n");
@@ -141,6 +164,7 @@ final class Summary {
         blunders(md, config, rows);
         diagnostics(md, config, rows);
         terminations(md, rows);
+        sampledMoves(md, config);
         Files.writeString(config.out().resolve("summary.md"), md.toString());
         System.out.println("Wrote " + config.out().resolve("summary.md"));
     }
@@ -162,7 +186,15 @@ final class Summary {
                         .map(p -> p[0] + " vs " + p[1])
                         .collect(Collectors.joining(", ")));
         row(md, "Stockfish movetime", c.movetimeMs() + " ms");
-        row(md, "Maia sampled moves (T = 1) per side", "" + c.sampledMoves());
+        row(
+                md,
+                "Maia's sampled opening moves per side",
+                c.sampledMoves() == 0
+                        ? "none"
+                        : c.sampledMoves()
+                                + " at temperature "
+                                + c.sampledTemperature()
+                                + (c.sampledTopK() > 0 ? ", top " + c.sampledTopK() : ""));
         row(md, "Ply limit (draw)", "" + c.maxPlies());
         row(
                 md,
@@ -202,7 +234,7 @@ final class Summary {
     }
 
     /** The games of one pairing, scored for the player {@code (maia, elo)}. */
-    private static Pairing pairing(List<Row> games, boolean maia, int elo, int opponentElo) {
+    static Pairing pairing(List<Row> games, boolean maia, int elo, int opponentElo) {
         Map<Integer, List<Double>> byPair = new TreeMap<>();
         for (Row r : games) {
             byPair.computeIfAbsent(r.pair(), k -> new ArrayList<>()).add(r.scoreOf(maia, elo));
@@ -252,11 +284,11 @@ final class Summary {
         md.append('\n');
     }
 
-    private static int maiaElo(Row r) {
+    static int maiaElo(Row r) {
         return r.whiteMaia() ? r.whiteElo() : r.blackElo();
     }
 
-    private static int sfElo(Row r) {
+    static int sfElo(Row r) {
         return r.whiteMaia() ? r.blackElo() : r.whiteElo();
     }
 
@@ -423,7 +455,7 @@ final class Summary {
         md.append('\n');
     }
 
-    private static List<Pairing> resample(List<Pairing> pairings, Random random) {
+    static List<Pairing> resample(List<Pairing> pairings, Random random) {
         List<Pairing> out = new ArrayList<>();
         for (Pairing p : pairings) {
             out.add(p.resample(random));
@@ -662,6 +694,58 @@ final class Summary {
                             key,
                             plies.get(key)[0] / plies.get(key)[1],
                             counts.get(key)));
+        }
+        md.append('\n');
+    }
+
+    /**
+     * Losses of Maia's sampled opening moves by rating, and the worst 20, from sampled-moves.tsv.
+     */
+    private static void sampledMoves(StringBuilder md, Config c) throws IOException {
+        Path file = c.out().resolve("sampled-moves.tsv");
+        if (!Files.exists(file)) {
+            return;
+        }
+        List<String[]> moves = new ArrayList<>();
+        for (String line : Files.readAllLines(file)) {
+            moves.add(line.split("\t"));
+        }
+        md.append("## Sampled opening moves\n\n");
+        md.append(
+                "Loss by the referee (eval before minus after, mover's view, capped at ±"
+                        + c.evalCapCp()
+                        + " cp).\n\n");
+        md.append("| Maia | Sampled moves | Loss > 100 cp | Loss > 200 cp |\n|---|---|---|---|\n");
+        Map<Integer, long[]> byElo = new TreeMap<>();
+        for (String[] m : moves) {
+            long[] t = byElo.computeIfAbsent(Integer.parseInt(m[1]), k -> new long[3]);
+            int loss = Integer.parseInt(m[5]);
+            t[0]++;
+            t[1] += loss > 100 ? 1 : 0;
+            t[2] += loss > 200 ? 1 : 0;
+        }
+        for (Map.Entry<Integer, long[]> e : byElo.entrySet()) {
+            long[] t = e.getValue();
+            md.append(
+                    String.format(
+                            Locale.ROOT,
+                            "| %d | %d | %.2f %% (%d) | %.2f %% (%d) |%n",
+                            e.getKey(),
+                            t[0],
+                            100.0 * t[1] / t[0],
+                            t[1],
+                            100.0 * t[2] / t[0],
+                            t[2]));
+        }
+        moves.sort((x, y) -> Integer.compare(Integer.parseInt(y[5]), Integer.parseInt(x[5])));
+        md.append(
+                "\nThe 20 worst:\n\n| Loss | Maia | Move | FEN | Game, ply |\n"
+                        + "|---|---|---|---|---|\n");
+        for (String[] m : moves.subList(0, Math.min(20, moves.size()))) {
+            md.append(
+                    String.format(
+                            "| %s | %s | %s | `%s` | %s, %s |%n",
+                            m[5], m[1], m[4], m[3], m[0], m[2]));
         }
         md.append('\n');
     }

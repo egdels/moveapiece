@@ -41,13 +41,22 @@ final class GameRunner {
         }
     }
 
-    /** Per side: Maia's move count, blunders, castling ply (-1: none), top-slot-illegal count. */
+    /**
+     * Per side: Maia's move count, blunders, castling ply (-1: none), top-slot-illegal count, and
+     * how many of Maia's sampled opening moves lost more than 100 and 200 cp.
+     */
     static final class SideStats {
         int maiaMoves;
         int blunders;
         int castlePly = -1;
         int topIllegal;
+        int sampled;
+        int sampledLoss100;
+        int sampledLoss200;
     }
+
+    /** One of Maia's sampled opening moves and what the referee says it lost. */
+    record SampledMove(String gameId, int elo, int ply, String fen, String move, int loss) {}
 
     record Result(
             Job job,
@@ -59,7 +68,9 @@ final class GameRunner {
             int slotCollisions,
             int anomalies,
             long millis,
-            String pgn) {}
+            String pgn,
+            String opening,
+            List<SampledMove> sampledMoves) {}
 
     private final Config config;
     private final SyncMaia maia;
@@ -102,6 +113,7 @@ final class GameRunner {
         SideStats black = new SideStats();
         List<Integer> evals = new ArrayList<>();
         List<Boolean> byMaia = new ArrayList<>();
+        List<SampledMove> sampledMoves = new ArrayList<>();
         evals.add(analyzer.eval(startFen, ""));
         int collisions = 0;
         int anomalies = 0;
@@ -151,13 +163,19 @@ final class GameRunner {
                                 startFen,
                                 game.toUciMoveList(),
                                 player.elo(),
-                                sampled ? 1.0 : 0.0,
+                                sampled ? config.sampledTemperature() : 0.0,
                                 seed,
                                 shadow,
                                 new ArrayList<>(history),
-                                config.castleVariant());
+                                config.castleVariant(),
+                                config.sampledTopK());
                 uci = d.move();
                 stats.maiaMoves++;
+                if (sampled) {
+                    stats.sampled++;
+                    // The loss is filled in after the game, once every position is evaluated.
+                    sampledMoves.add(new SampledMove(job.id(), player.elo(), ply, fen, uci, 0));
+                }
                 if (!d.topSlotLegal()) {
                     stats.topIllegal++;
                     log.event(
@@ -250,6 +268,26 @@ final class GameRunner {
             }
         }
 
+        for (int i = 0; i < sampledMoves.size(); i++) {
+            SampledMove m = sampledMoves.get(i);
+            if (m.ply() + 1 >= evals.size()) {
+                continue; // the game ended on an error right at this move
+            }
+            int loss = cap(evals.get(m.ply())) + cap(evals.get(m.ply() + 1));
+            sampledMoves.set(
+                    i, new SampledMove(m.gameId(), m.elo(), m.ply(), m.fen(), m.move(), loss));
+            SideStats side = (game.startPly() + m.ply()) % 2 == 0 ? white : black;
+            if (loss > 100) {
+                side.sampledLoss100++;
+            }
+            if (loss > 200) {
+                side.sampledLoss200++;
+            }
+        }
+        String[] played = game.toUciMoveList().split(" ");
+        String opening =
+                String.join(" ", java.util.Arrays.copyOf(played, Math.min(12, played.length)));
+
         String pgn = pgn(game, job, result, termination);
         return new Result(
                 job,
@@ -261,7 +299,9 @@ final class GameRunner {
                 collisions,
                 anomalies,
                 System.currentTimeMillis() - started,
-                pgn);
+                pgn,
+                opening,
+                sampledMoves);
     }
 
     private int cap(int cp) {

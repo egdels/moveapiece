@@ -82,6 +82,27 @@ record CastleVariant(String mapping, double bonus) {
     }
 
     /**
+     * Samples among the {@code k} highest-scoring moves only, weighted by exp(score / temperature)
+     * - an experimental opening choice, not something MaiaEngine does.
+     */
+    static Move chooseTopK(
+            List<Move> legal, double[] scores, int k, double temperature, Random random) {
+        Integer[] order = new Integer[scores.length];
+        for (int i = 0; i < order.length; i++) {
+            order[i] = i;
+        }
+        java.util.Arrays.sort(order, (x, y) -> Double.compare(scores[y], scores[x]));
+        int n = Math.min(k, order.length);
+        List<Move> top = new java.util.ArrayList<>(n);
+        double[] topScores = new double[n];
+        for (int i = 0; i < n; i++) {
+            top.add(legal.get(order[i]));
+            topScores[i] = scores[order[i]];
+        }
+        return choose(top, topScores, temperature, random);
+    }
+
+    /**
      * Picks a move the way {@code MaiaEngine.chooseMove} does: the first highest score at
      * temperature 0, else a draw from {@code random} weighted by exp(score / temperature).
      */

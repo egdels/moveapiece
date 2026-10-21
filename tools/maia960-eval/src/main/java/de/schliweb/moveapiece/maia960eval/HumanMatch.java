@@ -75,6 +75,10 @@ public final class HumanMatch {
         }
         int maxGames = Integer.parseInt(a.getOrDefault("games", "1000"));
         int minTime = Integer.parseInt(a.getOrDefault("mintime", "180"));
+        if (a.containsKey("openings")) {
+            openings(a, minTime);
+            return;
+        }
         standard = Boolean.parseBoolean(a.getOrDefault("standard", "false"));
         bonus = Double.parseDouble(a.getOrDefault("bonus", "1"));
         margin = Double.parseDouble(a.getOrDefault("margin", "0.3"));
@@ -129,6 +133,86 @@ public final class HumanMatch {
         if (a.containsKey("out")) {
             Files.writeString(Path.of(a.get("out")), report);
         }
+    }
+
+    private static void openings(Map<String, String> a, int minTime) throws Exception {
+        standard = true;
+        List<int[]> bands = new ArrayList<>();
+        List<String> names = new ArrayList<>();
+        for (String spec : a.get("openings").split(",")) {
+            String[] p = spec.split("[-:]");
+            bands.add(
+                    new int[] {
+                        Integer.parseInt(p[0]), Integer.parseInt(p[1]), Integer.parseInt(p[2])
+                    });
+            names.add(p[0] + "-" + p[1]);
+        }
+        int perBand = Integer.parseInt(a.getOrDefault("perband", "1000"));
+        int[] found = new int[bands.size()];
+        StringBuilder out = new StringBuilder();
+        long read = 0;
+        try (BufferedReader in =
+                new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8))) {
+            StringBuilder text = new StringBuilder();
+            Map<String, String> tags = new HashMap<>();
+            String line;
+            boolean done = false;
+            while (!done && (line = in.readLine()) != null) {
+                if (line.startsWith("[Event ") && text.length() > 0) {
+                    read++;
+                    if (read % 200_000 == 0) {
+                        System.err.printf(
+                                "%d games read, found %s%n",
+                                read, java.util.Arrays.toString(found));
+                    }
+                    int band = qualifies(tags, minTime) ? band(tags, bands) : -1;
+                    if (band >= 0 && found[band] < perBand) {
+                        ChessGame game = new ChessGame();
+                        if (game.loadPgn(text.toString()) && !game.isChess960()) {
+                            String[] plies = game.toUciMoveList().split(" ");
+                            out.append(names.get(band))
+                                    .append('\t')
+                                    .append(tags.get("WhiteElo"))
+                                    .append('\t')
+                                    .append(tags.get("BlackElo"))
+                                    .append('\t')
+                                    .append(
+                                            String.join(
+                                                    " ",
+                                                    java.util.Arrays.copyOf(
+                                                            plies, Math.min(12, plies.length))))
+                                    .append('\n');
+                            found[band]++;
+                        }
+                    }
+                    done = java.util.Arrays.stream(found).allMatch(f -> f >= perBand);
+                    text.setLength(0);
+                    tags.clear();
+                }
+                Matcher m = TAG.matcher(line);
+                if (m.matches()) {
+                    tags.put(m.group(1), m.group(2));
+                }
+                text.append(line).append('\n');
+            }
+        }
+        System.err.printf("%d games read, found %s%n", read, java.util.Arrays.toString(found));
+        Files.writeString(Path.of(a.get("out")), out.toString());
+    }
+
+    /** The band whose lower and higher rating the game's two ratings fall into, or -1. */
+    private static int band(Map<String, String> tags, List<int[]> bands) {
+        int w = Integer.parseInt(tags.get("WhiteElo"));
+        int b = Integer.parseInt(tags.get("BlackElo"));
+        int lo = Math.min(w, b);
+        int hi = Math.max(w, b);
+        for (int i = 0; i < bands.size(); i++) {
+            int[] band = bands.get(i);
+            if (Math.abs(lo - band[0]) <= band[2] && Math.abs(hi - band[1]) <= band[2]) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     private static boolean qualifies(Map<String, String> tags, int minTime) {

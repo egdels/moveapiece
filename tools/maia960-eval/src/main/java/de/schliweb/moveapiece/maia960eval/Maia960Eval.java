@@ -27,8 +27,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * Maia in Chess960 against standard chess: Maia against Stockfish at fixed strengths and Maia
  * against Maia, every position played with both colour assignments. Writes games.csv (one row per
- * game), one PGN file per mode and variant, events.tsv (every anomaly with its FEN) and summary.md.
- * A run picks up where an interrupted one stopped: games already in games.csv are skipped.
+ * game), one PGN file per mode and variant, events.tsv (every anomaly with its FEN),
+ * sampled-moves.tsv (every sampled opening move of Maia with its FEN and loss) and summary.md. A
+ * run picks up where an interrupted one stopped: games already in games.csv are skipped.
  */
 public final class Maia960Eval {
 
@@ -36,7 +37,9 @@ public final class Maia960Eval {
             "id,mode,variant,sp,pair,white,white_elo,black,black_elo,result,termination,plies,"
                     + "w_maia_moves,w_blunders,w_castle_ply,w_top_illegal,"
                     + "b_maia_moves,b_blunders,b_castle_ply,b_top_illegal,"
-                    + "slot_collisions,anomalies,ms";
+                    + "slot_collisions,anomalies,ms,"
+                    + "w_sampled,w_sampled_loss100,w_sampled_loss200,"
+                    + "b_sampled,b_sampled_loss100,b_sampled_loss200,opening12";
 
     private Maia960Eval() {}
 
@@ -67,7 +70,8 @@ public final class Maia960Eval {
         List<Job> jobs = new ArrayList<>();
         for (int p = 0; p < positions.size(); p++) {
             for (boolean c960 : new boolean[] {false, true}) {
-                if (config.only().contains("960only") && !c960) {
+                if (config.only().contains("960only") && !c960
+                        || config.only().contains("stdonly") && c960) {
                     continue;
                 }
                 int sp = c960 ? positions.get(p) : -1;
@@ -216,7 +220,8 @@ public final class Maia960Eval {
                             new GameRunner.SideStats(),
                             0,
                             1,
-                            0);
+                            0,
+                            "");
         } else {
             row =
                     csvRow(
@@ -228,7 +233,27 @@ public final class Maia960Eval {
                             r.black(),
                             r.slotCollisions(),
                             r.anomalies(),
-                            r.millis());
+                            r.millis(),
+                            r.opening());
+            StringBuilder sampled = new StringBuilder();
+            for (GameRunner.SampledMove m : r.sampledMoves()) {
+                sampled.append(
+                        String.join(
+                                "\t",
+                                m.gameId(),
+                                "" + m.elo(),
+                                "" + m.ply(),
+                                m.fen(),
+                                m.move(),
+                                "" + m.loss()));
+                sampled.append('\n');
+            }
+            Files.writeString(
+                    config.out().resolve("sampled-moves.tsv"),
+                    sampled.toString(),
+                    StandardCharsets.UTF_8,
+                    StandardOpenOption.CREATE,
+                    StandardOpenOption.APPEND);
             String pgnFile =
                     "games-"
                             + (job.mvm() ? "mvm" : "mvs")
@@ -258,7 +283,8 @@ public final class Maia960Eval {
             GameRunner.SideStats b,
             int collisions,
             int anomalies,
-            long ms) {
+            long ms,
+            String opening) {
         return String.join(
                 ",",
                 job.id(),
@@ -283,6 +309,13 @@ public final class Maia960Eval {
                 "" + b.topIllegal,
                 "" + collisions,
                 "" + anomalies,
-                "" + ms);
+                "" + ms,
+                "" + w.sampled,
+                "" + w.sampledLoss100,
+                "" + w.sampledLoss200,
+                "" + b.sampled,
+                "" + b.sampledLoss100,
+                "" + b.sampledLoss200,
+                opening);
     }
 }

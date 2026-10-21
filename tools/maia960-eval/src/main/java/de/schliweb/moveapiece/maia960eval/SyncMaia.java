@@ -92,7 +92,8 @@ final class SyncMaia implements AutoCloseable {
      * Asks Maia for a move exactly as the app does (setElo, setPosition, go), with {@code
      * temperature} > 0 only for the sampled opening moves. With a {@code variant} other than the
      * app's, the move played is instead chosen from the diagnostic policy with that variant's
-     * castle scoring, drawing from the same seed.
+     * castle scoring, drawing from the same seed; with {@code topK} > 0 a sampled move is drawn
+     * from the {@code topK} highest-scoring moves only.
      *
      * @param board the current position, replayed the same way as inside MaiaEngine
      * @param history placements of the last positions, oldest first, as inside MaiaEngine
@@ -105,7 +106,8 @@ final class SyncMaia implements AutoCloseable {
             long seed,
             Board board,
             List<int[]> history,
-            CastleVariant variant)
+            CastleVariant variant,
+            int topK)
             throws Exception {
         random.setSeed(seed);
         engine.setElo(elo);
@@ -142,11 +144,21 @@ final class SyncMaia implements AutoCloseable {
                         ? "(none)"
                         : CastleVariant.choose(legal, appScores, temperature, new Random(seed))
                                 .toString();
-        String played =
-                variant.isApp() || legal.isEmpty()
-                        ? engineMove
-                        : CastleVariant.choose(legal, variantScores, temperature, new Random(seed))
-                                .toString();
+        String played;
+        if (legal.isEmpty()) {
+            played = engineMove;
+        } else if (topK > 0 && temperature > 0) {
+            played =
+                    CastleVariant.chooseTopK(
+                                    legal, variantScores, topK, temperature, new Random(seed))
+                            .toString();
+        } else if (variant.isApp()) {
+            played = engineMove;
+        } else {
+            played =
+                    CastleVariant.choose(legal, variantScores, temperature, new Random(seed))
+                            .toString();
+        }
         return new Decision(played, engineMove, topLegal, top, appMove, collisions);
     }
 

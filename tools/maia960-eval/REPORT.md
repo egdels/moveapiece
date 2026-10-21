@@ -244,3 +244,108 @@ on the castle only, the castle always scores higher, whatever the order of
 the move list.
 
 Adopted in the app with bonus 1 (see MAIA_PROVENANCE.md).
+
+## Study: more variety in Maia's standard openings (2026-10-21)
+
+Branch `maia-opening-variance`, from `main` at e476b49. Question: does sampling
+Maia's first own moves in standard chess, instead of always playing the most
+likely move, give human-like opening variety without a notable strength loss
+and without inhuman moves? Numbers from `results-opening/comparison.md`
+(`VarianceReport.java`); `opening-study.sh` reproduces everything.
+
+### Setup
+
+- **Baseline:** pure argmax from move 1 (the app today).
+- **Variants:** temperature T ∈ {0.5, 0.7, 1.0} for Maia's first N ∈ {2, 4, 6}
+  own moves (`tTnN`, e.g. `t07n4`), plus the three best moves at T = 1.0 for
+  N = 4 (`top3n4`). After move N Maia plays argmax again.
+- **Variety:** 100 games Maia against Maia each for 1700–1700 and
+  1400–2000, standard start position, 50 seeds with both colour assignments.
+- **Human-likeness:** 1000 rated Lichess games (August 2026, ≥ 180 s
+  estimated duration) per band: both players 1650–1750, and one player
+  1300–1500 against one 1900–2100. Opening names from
+  lichess-org/chess-openings (CC0) at a6189a3; the family is the name up to
+  the first colon. TV is the total variation distance to the humans.
+- **Strength:** Maia 1400/1700/2000/2300 against Stockfish 1400/1800/2200,
+  50 position pairs (both colours) each, 1200 games per variant; shift of the
+  performance rating against the baseline, bootstrap 95 % CI over pairs.
+- **Outliers:** every sampled move rated by Stockfish 19 at depth 12; loss
+  in cp from the mover's view, evals capped at ±1000.
+
+**Reduced selection.** The full grid (11 variants × 1400 games) would have
+taken about 4 h. Stage A ran the variety games for all 11 variants (about
+40 min). The N = 6 variants failed the outlier rule there (1.5–3.4 % of
+sampled moves over 200 cp, because moves 5–6 are already in sharper
+positions), and T = 0.5 gave little variety. Stage B measured strength for the
+baseline and the four candidates left: `t07n4`, `t10n4`, `top3n4`, `t10n2`
+(about 100 min). No engine errors; the only events are the informational
+top-slot-illegal ones.
+
+### Results
+
+| Variant | Distinct @8 (1700 / 1400–2000) | TV first move | TV family | Top-10 share | > 200 cp | > 100 cp | Mean shift [95 % CI] |
+|---|---|---|---|---|---|---|---|
+| base | 1 / 2 | 0.39 / 0.41 | 0.95 / 0.84 | 100 / 100 % | – | – | – |
+| t07n4 | 24 / 31 | 0.14 / 0.16 | 0.69 / 0.64 | 55 / 48 % | 0.31 % | 1.59 % | −28 [−66, +13] |
+| t10n2 | 28 / 28 | 0.08 / 0.09 | 0.67 / 0.69 | 65 / 58 % | 0.06 % | 0.84 % | −18 [−57, +20] |
+| t10n4 | 44 / 49 | 0.08 / 0.09 | 0.64 / 0.66 | 42 / 29 % | 0.67 % | 3.06 % | −16 [−57, +23] |
+| top3n4 | 14 / 21 | 0.11 / 0.11 | 0.74 / 0.70 | 81 / 70 % | 0.13 % | 0.55 % | +9 [−31, +49] |
+| humans | 98.9 / 97.7 | – | – | 57 / 55 % | | | |
+
+Per Maia level (shift against the baseline):
+
+| Variant | 1400 | 1700 | 2000 | 2300 |
+|---|---|---|---|---|
+| t07n4 | −83 [−155, −7] | −36 [−116, +44] | +4 [−73, +80] | +4 [−78, +91] |
+| t10n2 | −33 [−109, +41] | −61 [−140, +17] | −15 [−86, +57] | +36 [−49, +120] |
+| t10n4 | −77 [−154, −2] | −65 [−141, +11] | +13 [−65, +94] | +64 [−13, +136] |
+| top3n4 | −33 [−117, +52] | −57 [−135, +23] | +65 [−8, +141] | +62 [−19, +140] |
+
+The baseline plays two openings (Italian 75 %, Sicilian 25 %); the humans
+play 91 families, led by the Sicilian (12 %) and the Queen's Pawn Game (11 %).
+`t10n2` plays 24 families, `t10n4` 26, `top3n4` only 8 (its top three
+moves skip the humans' second and third choices often enough to stay narrow).
+
+The worst sampled moves of `t10n2` (2 of 3200 over 200 cp): 2…f5 after
+1.e4 Nc6 2.d4 (212 cp, Maia 2000) and 2…Nb8 after 1.g4 Nc6 2.Bg2 (210 cp).
+`t07n4` has 20 over 200 cp, 9 of them at 1400 and almost all in plies 4–7
+(piece moves such as an early Bxf7). The 20
+worst moves of each run with FEN are in `results-opening/<variant>-m*/summary.md`.
+
+### Assessment
+
+All four candidates pass the rule as written: mean shift under 30 Elo and
+under 1 % of sampled moves over 200 cp. They differ in how human the variety
+is:
+
+- `t10n4` spreads more than humans (top-10 share 29–42 % against 55–57 %)
+  and costs about 70 Elo at 1400 and 1700, the CI at 1400 excluding zero.
+- `t07n4` costs 83 Elo at 1400 (CI excludes zero) and its mean of −28 sits
+  right at the threshold; its first-move distribution is further from the
+  humans' (TV 0.14–0.16).
+- `top3n4` is the strongest but the least human: it never plays the long
+  tail and stays at 8 families.
+- `t10n2` has the humans' first-move distribution (TV 0.08–0.09), a top-10
+  share close to theirs (58–65 %), the fewest bad moves (0.06 % over 200 cp)
+  and no level with a CI excluding zero.
+
+### Recommendation
+
+**`t10n2`:** sample Maia's first two own moves at temperature 1.0 (the
+network's own distribution), then argmax. It is the most human-like variety
+that stays clearly inside both limits. `t07n4` would give somewhat more
+distinct lines but is borderline on strength.
+
+### Limits
+
+- With 1200 games per variant the CI of the mean shift is about ±40 Elo, so
+  the 30 Elo threshold is near the resolution of the measurement; none of the
+  candidates shows a significant mean loss, but a 30 Elo loss could not be
+  excluded either.
+- Distinct lines in Maia against Maia stay far below the humans' (28 against
+  about 98 of 100): after the sampled moves Maia plays argmax, so lines
+  converge, and two humans of the same rating bring two different
+  repertoires. Against a human player the variety is larger, since the human's
+  moves vary too.
+- Stockfish's skill-level randomness is time-seeded, so stage B is not
+  bit-reproducible; the CIs cover that noise.
