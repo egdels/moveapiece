@@ -116,6 +116,14 @@ an alternative, human-like opponent to Stockfish - see
 (test data only, not shipped) lists moves the PyTorch original picks; it is
 written by the same script.
 
+The Chess960 castling bonus (`MaiaMoveIndexer.CHESS960_CASTLE_BONUS`) was
+calibrated on games from the Lichess database (https://database.lichess.org,
+released under CC0), and the move sequence in `MaiaEngineChess960Test` comes
+from one of those games. They were measured with `tools/maia960-eval/` (a
+development tool only, not part of the shipped apps and in the build only with
+`-Pmaia960eval`); its `reproduce.sh` downloads the data, none of which is in
+the repository.
+
 ## Chess piece artwork (and app icon)
 
 `app/src/main/res/drawable-nodpi/piece_*.png`, rasterized from the **cburnett**
