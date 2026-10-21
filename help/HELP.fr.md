@@ -54,9 +54,9 @@ souvient pour la prochaine fois.
   contre Stockfish, Maia ou une deuxième personne ; l'application
   affiche le numéro de la position.
 - Maia n'a appris que sur des parties d'échecs classiques. En Chess960,
-  Maia joue nettement plus faiblement que le classement choisi et roque
-  rarement ; un classement plus élevé reste toutefois plus fort qu'un
-  classement plus bas.
+  Maia joue nettement plus faiblement que le classement choisi ; un
+  classement plus élevé reste toutefois plus fort qu'un classement plus
+  bas.
 - Pour roquer, placez le roi sur sa propre tour. Roi et tour se
   retrouvent alors comme aux échecs classiques : en g1 et f1 ou en c1 et
   d1. Si aucun coup ordinaire du roi ne mène en g1 ou c1, vous pouvez

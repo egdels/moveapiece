@@ -49,8 +49,8 @@ the New Game dialog, and the app remembers it for next time.
   works against Stockfish, Maia or a second person; the app shows the
   number of the position.
 - Maia learnt from standard games only. In Chess960 it plays noticeably
-  weaker than the chosen rating and rarely castles; a higher rating still
-  plays stronger than a lower one.
+  weaker than the chosen rating; a higher rating still plays stronger than
+  a lower one.
 - To castle, move the king onto its own rook. King and rook then stand as
   in standard chess: on g1 and f1 or on c1 and d1. If no ordinary king
   move goes to g1 or c1, you can also move the king straight there.

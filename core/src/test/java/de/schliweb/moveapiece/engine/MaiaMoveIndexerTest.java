@@ -73,6 +73,42 @@ public class MaiaMoveIndexerTest {
         assertEquals(7 * 64 + 5, index("1r4kr/8/8/8/8/8/8/1R4KR w HBhb - 0 1", "g1h1"));
     }
 
+    /**
+     * A Chess960 castle ranks with the bonus; the king step on its slot does not, so with the same
+     * logit the castle wins whatever the order of the move list.
+     */
+    @Test
+    public void chess960Castling_getsTheBonusAndBeatsTheKingStepOnItsSlot() {
+        Board board = new Board();
+        board.loadFromFen("rk4r1/pppppppp/8/8/8/8/PPPPPPPP/RK4R1 w GAga - 0 1", true);
+        float[] policy = new float[MaiaMoveIndexer.POLICY_SIZE];
+        policy[1 * 64 + 2] = 3f; // b1c1, shared by O-O-O (b1a1) and the plain step
+        policy[1 * 64 + 6] = 2f; // b1g1 (O-O)
+        policy[8 * 64 + 16] = 1f; // a2a3
+        Move castle = new Move("b1a1", Side.WHITE);
+        Move step = new Move("b1c1", Side.WHITE);
+        assertEquals(
+                3f + MaiaMoveIndexer.CHESS960_CASTLE_BONUS,
+                MaiaMoveIndexer.logitOf(board, castle, policy),
+                0f);
+        assertEquals(3f, MaiaMoveIndexer.logitOf(board, step, policy), 0f);
+        assertEquals(
+                2f + MaiaMoveIndexer.CHESS960_CASTLE_BONUS,
+                MaiaMoveIndexer.logitOf(board, new Move("b1g1", Side.WHITE), policy),
+                0f);
+        assertEquals(1f, MaiaMoveIndexer.logitOf(board, new Move("a2a3", Side.WHITE), policy), 0f);
+    }
+
+    /** Standard castling learnt from standard games gets no bonus. */
+    @Test
+    public void standardCastling_getsNoBonus() {
+        Board board = new Board();
+        board.loadFromFen("r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1");
+        float[] policy = new float[MaiaMoveIndexer.POLICY_SIZE];
+        policy[4 * 64 + 6] = 2f;
+        assertEquals(2f, MaiaMoveIndexer.logitOf(board, new Move("e1g1", Side.WHITE), policy), 0f);
+    }
+
     /** In a standard game the board-aware lookup is the plain one. */
     @Test
     public void standardCastling_unchangedWithTheBoard() {

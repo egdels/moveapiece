@@ -53,8 +53,8 @@ la próxima vez.
   están como siempre. Funciona contra Stockfish, Maia u otra persona; la
   aplicación muestra el número de la posición.
 - Maia solo aprendió de partidas de ajedrez normal. En Chess960 juega
-  bastante más débil que la puntuación elegida y rara vez enroca; aun así,
-  una puntuación más alta sigue jugando mejor que una más baja.
+  bastante más débil que la puntuación elegida; aun así, una puntuación más
+  alta sigue jugando mejor que una más baja.
 - Para enrocar, mueve el rey sobre su propia torre. Después, rey y torre
   quedan como en el ajedrez normal: en g1 y f1 o en c1 y d1. Si ninguna
   jugada normal del rey lleva a g1 o c1, también puedes mover el rey

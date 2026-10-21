@@ -116,10 +116,37 @@ the network's top move is the castle in 19.9 % of the positions where the
 player castled (top 3: 34.8 %); scored by the king-onto-rook slot it was
 2.8 %.
 
-Known limitation: when the king's castling square is next to it (e.g. king
-b1, rook a1, castling square c1), the castle and the plain king step to that
-square share one slot, so the network cannot tell them apart. Only training
-on Chess960 games would fix this and the weaker opening play. That is not
+Even so, Maia castled far less often than human players, so
+`MaiaMoveIndexer.logitOf` adds `CHESS960_CASTLE_BONUS` (1.0) to a Chess960
+castle's logit. The value was calibrated on 1000 rated Chess960 games
+(Lichess, August 2026, blitz and slower) and checked on 1000 further games:
+
+| Bonus | Accuracy | Castle top when the player castled | Maia's castles / players' castles |
+|---|---|---|---|
+| 0 | 50.97 % | 17.2 % | 448 / 1220 |
+| 1 | 51.03 % | 34.7 % | 1205 / 1220 |
+
+(held-out games, counted over positions where castling was legal). Scoring
+the castle by the standard castling slot (e1g1/e1c1) instead was worse (11 %
+castle hits). In play against Stockfish, Maia now castles in 35–39 % of its
+Chess960 games instead of 17–19 %, at unchanged strength. **The bonus belongs
+to this mapping and to `maia3-5m.onnx`: it has to be measured again whenever
+either changes.** Harness, data and numbers: `tools/maia960-eval/REPORT.md`.
+
+Where the castle and the king's plain step to its castling square share a
+slot (king next to that square, e.g. king b1, rook a1, castling square c1),
+the step gets no bonus, so the castle always ranks first. Human players
+castled in 286 of the 291 such positions in which they played one of the two.
+
+Strength: against Stockfish at fixed strength, Maia plays about 200 Elo
+(Stockfish's scale) weaker in Chess960 than in standard chess at every
+rating, with the order of the ratings kept. The castling bonus does not
+change that. Move-matching accuracy from ply 20 on is close to standard chess
+(54.9 % against 56.4 %), so the gap lies in the opening.
+
+Known limitation: the network itself still cannot tell the castle and the
+plain king step on a shared slot apart. Only training on Chess960 games
+would fix this and the weaker opening play. That is not
 done: the `maia3` repository has inference code only, no training code, so
 data preparation and training would have to be written from scratch, though
 the data exists (about 29.8 million rated Chess960 games in the Lichess
@@ -129,7 +156,7 @@ need its own provenance record.
 ## Not covered
 
 - The model plays the reference presets' way: the highest-scoring legal move,
-  no sampling.
+  no sampling. The Chess960 castling bonus is MoveAPiece's own addition.
 - ONNX Runtime 1.16.3, which the desktop build uses on Intel Macs, loads the
   file and returns the same result as 1.29.0, but that was checked with its
   Apple Silicon natives; on Intel hardware only CI exercises it.

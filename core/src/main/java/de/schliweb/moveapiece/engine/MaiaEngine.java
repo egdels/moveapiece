@@ -271,7 +271,7 @@ public class MaiaEngine {
         List<Move> candidates = legalMoves;
         List<Float> logits = new ArrayList<>(legalMoves.size());
         for (Move move : legalMoves) {
-            logits.add(policy[MaiaMoveIndexer.indexOf(board, move)]);
+            logits.add(MaiaMoveIndexer.logitOf(board, move, policy));
         }
         if (temperature <= 0.0) {
             int bestAt = 0;

@@ -23,13 +23,21 @@ import com.github.bhlangonijr.chesslib.move.Move;
  * <p>Like the input (see {@link MaiaPositionEncoder}) the output is from the side to move's point
  * of view, so a move of Black is flipped top to bottom first. Castling is the plain king move
  * ({@code e1g1}), a promotion always uses its promotion slot. A Chess960 castle takes the slot of
- * the king's move to its castling square, see {@link #indexOf(Board, Move)}.
+ * the king's move to its castling square, see {@link #indexOf(Board, Move)}, and is ranked with a
+ * bonus, see {@link #logitOf(Board, Move, float[])}.
  */
 final class MaiaMoveIndexer {
 
     private static final int SQUARES = 64;
 
     static final int POLICY_SIZE = SQUARES * SQUARES + 8 * 8 * 4;
+
+    /**
+     * Added to a Chess960 castle's logit. Calibrated on human Chess960 games so that Maia castles
+     * about as often as the players did, at unchanged move-matching accuracy; tied to this mapping
+     * and to maia3-5m.onnx, see MAIA_PROVENANCE.md.
+     */
+    static final float CHESS960_CASTLE_BONUS = 1f;
 
     private MaiaMoveIndexer() {}
 
@@ -58,12 +66,7 @@ final class MaiaMoveIndexer {
      */
     static int indexOf(Board board, Move move) {
         boolean blackToMove = board.getSideToMove() == Side.BLACK;
-        Piece king = board.getPiece(move.getFrom());
-        Piece target = board.getPiece(move.getTo());
-        if (board.getContext().getVariationType() == VariationType.CHESS960
-                && king.getPieceType() == PieceType.KING
-                && target.getPieceType() == PieceType.ROOK
-                && target.getPieceSide() == king.getPieceSide()) {
+        if (isChess960Castle(board, move)) {
             boolean kingSide = file(move.getTo()) > file(move.getFrom());
             Rank rank = move.getFrom().getRank();
             Square kingTo = Square.encode(rank, kingSide ? File.FILE_G : File.FILE_C);
@@ -74,6 +77,28 @@ final class MaiaMoveIndexer {
             return indexOf(new Move(move.getTo(), rookTo), blackToMove);
         }
         return indexOf(move, blackToMove);
+    }
+
+    /**
+     * The logit Maia ranks {@code move} by: that of its slot ({@link #indexOf(Board, Move)}), plus
+     * {@link #CHESS960_CASTLE_BONUS} for a Chess960 castle. Where the king's plain step to its
+     * castling square shares the castle's slot (king next to that square), the step gets no bonus,
+     * so the castle always ranks first: human players castled in 286 of 291 such positions where
+     * they played one of the two.
+     */
+    static float logitOf(Board board, Move move, float[] policy) {
+        float logit = policy[indexOf(board, move)];
+        return isChess960Castle(board, move) ? logit + CHESS960_CASTLE_BONUS : logit;
+    }
+
+    /** A Chess960 castle: the king moving onto its own rook. */
+    private static boolean isChess960Castle(Board board, Move move) {
+        Piece king = board.getPiece(move.getFrom());
+        Piece target = board.getPiece(move.getTo());
+        return board.getContext().getVariationType() == VariationType.CHESS960
+                && king.getPieceType() == PieceType.KING
+                && target.getPieceType() == PieceType.ROOK
+                && target.getPieceSide() == king.getPieceSide();
     }
 
     private static int file(Square square) {

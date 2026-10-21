@@ -50,8 +50,8 @@ in het venster Nieuw spel, en de app onthoudt het voor de volgende keer.
   zoals altijd. Dat kan tegen Stockfish, Maia of een tweede persoon; de
   app toont het nummer van de opstelling.
 - Maia heeft alleen van gewone schaakpartijen geleerd. In Chess960
-  speelt Maia daarom merkbaar zwakker dan de gekozen rating en rokeert
-  zelden; een hogere rating speelt wel nog steeds sterker dan een lagere.
+  speelt Maia daarom merkbaar zwakker dan de gekozen rating; een hogere
+  rating speelt wel nog steeds sterker dan een lagere.
 - Om te rokeren zet je de koning op zijn eigen toren. Koning en toren
   staan daarna zoals bij gewoon schaken: op g1 en f1 of op c1 en d1. Leidt
   geen gewone koningszet naar g1 of c1, dan kun je de koning ook direct
