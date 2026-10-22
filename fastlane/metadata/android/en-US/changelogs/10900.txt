@@ -1,0 +1,2 @@
+* Maia varies its openings: in a new standard game it no longer always plays the same first moves.
+* Chess960: Maia castles about as often as human players.

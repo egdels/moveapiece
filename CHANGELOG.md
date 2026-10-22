@@ -10,8 +10,13 @@ candidates (`-rc`) and test tags are not listed.
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-10-22
+
 ### Changed
 
+- Maia castles in Chess960 about as often as human players of its rating,
+  in roughly a third of its games instead of under a fifth, at unchanged
+  strength.
 - Maia varies its openings in standard chess: in a new game it picks its
   first two moves at random, weighted by how likely players of its rating
   are to play them, instead of always the same ones, and then plays as
@@ -451,6 +456,7 @@ Linux .deb).
 - Windows: move sounds were silent because of a malformed ID3 tag in the
   mp3 files.
 
+[1.9.0]: https://github.com/egdels/moveapiece/compare/v1.8.1...v1.9.0
 [1.8.1]: https://github.com/egdels/moveapiece/compare/v1.8.0...v1.8.1
 [1.8.0]: https://github.com/egdels/moveapiece/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/egdels/moveapiece/compare/v1.6.0...v1.7.0
