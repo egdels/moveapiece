@@ -10,7 +10,7 @@ candidates (`-rc`) and test tags are not listed.
 
 ## [Unreleased]
 
-## [1.9.0] - 2026-10-22
+## [1.9.0] - 2026-10-26
 
 ### Changed
 
@@ -456,8 +456,8 @@ Linux .deb).
 - Windows: move sounds were silent because of a malformed ID3 tag in the
   mp3 files.
 
-[1.9.0]: https://github.com/egdels/moveapiece/compare/v1.8.1...v1.9.0
-[1.8.1]: https://github.com/egdels/moveapiece/compare/v1.8.0...v1.8.1
+[1.9.0]: https://github.com/egdels/moveapiece/compare/v1.8.1-rc1...v1.9.0
+[1.8.1]: https://github.com/egdels/moveapiece/compare/v1.8.0...v1.8.1-rc1
 [1.8.0]: https://github.com/egdels/moveapiece/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/egdels/moveapiece/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/egdels/moveapiece/compare/v1.5.2...v1.6.0
