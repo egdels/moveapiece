@@ -11,6 +11,11 @@ APPRENDRE LES OUVERTURES D'ÉCHECS
 • Bibliothèque d'ouvertures pour revoir chaque ligne coup par coup
 • Suggestions de coups pendant l'apprentissage, désactivables
 
+RÉSOUDRE DES PROBLÈMES TACTIQUES
+• Environ 4 600 problèmes tirés de vraies parties, issus de la base de problèmes libre de Lichess
+• Adaptés à votre niveau : votre classement de problèmes s'ajuste après chaque problème, et vous pouvez les rendre plus faciles ou plus difficiles
+• Un indice ou toute la solution quand vous êtes bloqué
+
 PROGRESSER
 • Bouton d'indice, évaluation en direct optionnelle, avertissement après une gaffe
 • Analyse de la partie qui note chaque coup

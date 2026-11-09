@@ -28,6 +28,9 @@ is. The full license texts and notices follow at the end.
 - **Maia-3**, the neural network of the human-like opponent, by the CSSLab at
   the University of Toronto, converted to the ONNX format for MoveAPiece. GNU
   Affero General Public License, version 3. https://github.com/CSSLab/maia3
+- **Tactics puzzles**, about 4,600 puzzles selected from the Lichess puzzle
+  database. Released into the public domain by lichess.org under CC0 1.0.
+  https://database.lichess.org
 - **Chess pieces**, the cburnett set, also used for the app icon. Copyright
   Colin M.L. Burnett. GNU General Public License, version 2 or later, used
   here under version 3. https://github.com/lichess-org/lila

@@ -11,6 +11,11 @@ SCHAAKOPENINGEN LEREN
 • Openingsbibliotheek om elke variant zet voor zet door te nemen
 • Zetsuggesties tijdens het leren, uit te schakelen
 
+TACTISCHE PUZZELS OPLOSSEN
+• Ongeveer 4.600 puzzels uit echte partijen, uit de vrije puzzeldatabase van Lichess
+• Afgestemd op jouw niveau: je puzzelrating past zich na elke puzzel aan, en je kunt ze makkelijker of moeilijker maken
+• Een hint of de hele oplossing als je vastzit
+
 BETER WORDEN
 • Hintknop, optionele live-evaluatie, waarschuwing na een blunder
 • Partijanalyse die elke zet beoordeelt

@@ -124,6 +124,21 @@ development tool only, not part of the shipped apps and in the build only with
 `-Pmaia960eval`); its `reproduce.sh` downloads the data, none of which is in
 the repository.
 
+## Tactics puzzles
+
+One file, copied by each app's build into its resources (desktop:
+`de/schliweb/moveapiece/desktop/puzzles/puzzles.csv`) or assets (Android:
+`puzzles.csv`):
+
+- `puzzles/puzzles.csv`: 4,616 puzzles selected from the Lichess puzzle
+  database (https://database.lichess.org/#puzzles) by
+  `tools/puzzle-export/export_puzzles.py`
+- License: CC0 (public domain dedication), as stated on the database page;
+  no attribution is required, the source is named here and in the apps'
+  help and licenses page all the same
+- Full provenance (the dump used and its SHA-256, the selection rules, the
+  file format and how every puzzle is checked): see `PUZZLE_PROVENANCE.md`
+
 ## Chess piece artwork (and app icon)
 
 `app/src/main/res/drawable-nodpi/piece_*.png`, rasterized from the **cburnett**

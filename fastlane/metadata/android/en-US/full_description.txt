@@ -11,6 +11,11 @@ LEARN CHESS OPENINGS
 • Step-through opening library to review every line move by move
 • Optional move hints while you learn
 
+SOLVE TACTICS PUZZLES
+• About 4,600 puzzles from real games, from the free Lichess puzzle database
+• Picked to match your level: your puzzle rating adjusts after every puzzle, and you can make them easier or harder
+• A hint or the whole solution when you are stuck
+
 IMPROVE YOUR GAME
 • Hint button, optional live evaluation, blunder warning after a bad move
 • Post-game analysis that grades every move

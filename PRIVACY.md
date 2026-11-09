@@ -1,7 +1,7 @@
 # Privacy Policy
 
 *MoveAPiece for Android and desktop (Windows, macOS, Linux). Effective
-2026-10-20. Both apps show this text in their menu.*
+2026-11-09. Both apps show this text in their menu.*
 
 ## Who is responsible
 
@@ -21,14 +21,19 @@ app never opens a network connection either.
 
 ## What the app stores on your device
 
-- **Settings**: the last game setup (opponent, colour, strength, opening),
-  whether the evaluation is shown and which type of board was connected
-  last. On Android they are in the app's private storage, on the desktop
+- **Settings**: the last game setup (opponent, colour, strength, opening,
+  puzzle difficulty), whether the evaluation is shown and which type of
+  board was connected last. On Android they are in the app's private storage, on the desktop
   in the operating system's user preferences.
-- **The game in progress**: its moves, opponent and colour, or the opening
-  line you are training and how far you got, so the game picks up where it
-  was when you open the app again. It is stored next to the settings and
-  deleted when the game or the opening line ends.
+- **Puzzles**: your puzzle rating, how many puzzles you have played and
+  which ones you played recently, so the next puzzles fit your level and
+  do not repeat soon. Stored next to the settings.
+- **The game in progress**: its moves, opponent and colour, the opening
+  line you are training and how far you got, or the puzzle you are
+  solving, so it picks up where it was when you open the app again. It is
+  stored next to the settings and deleted when the game or the opening
+  line ends; after a puzzle only puzzle mode itself is kept, so the next
+  start goes on with a new puzzle.
 - **The chess engine's network file**: on Android, Stockfish's evaluation
   network is unpacked from the app into its private storage on first
   start.

@@ -11,6 +11,11 @@ IMPARARE LE APERTURE DI SCACCHI
 • Libreria delle aperture per ripassare ogni linea mossa per mossa
 • Suggerimenti di mossa mentre impari, disattivabili
 
+RISOLVERE PROBLEMI TATTICI
+• Circa 4.600 problemi tratti da partite vere, dal database libero di problemi di Lichess
+• Scelti in base al tuo livello: il tuo punteggio problemi si adatta dopo ogni problema, e puoi renderli più facili o più difficili
+• Un suggerimento o l'intera soluzione quando sei bloccato
+
 MIGLIORARE IL PROPRIO GIOCO
 • Pulsante suggerimento, valutazione in tempo reale opzionale, avviso dopo un errore grave
 • Analisi della partita che valuta ogni mossa

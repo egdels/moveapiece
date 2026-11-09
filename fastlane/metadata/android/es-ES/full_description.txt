@@ -11,6 +11,11 @@ APRENDER APERTURAS DE AJEDREZ
 • Biblioteca de aperturas para repasar cada línea jugada a jugada
 • Sugerencias de jugada mientras aprendes, desactivables
 
+RESOLVER EJERCICIOS TÁCTICOS
+• Unos 4.600 ejercicios de partidas reales, de la base de datos libre de ejercicios de Lichess
+• Elegidos según tu nivel: tu puntuación de ejercicios se ajusta tras cada ejercicio, y puedes hacerlos más fáciles o más difíciles
+• Una pista o la solución completa cuando te atascas
+
 MEJORAR TU JUEGO
 • Botón de pista, evaluación en vivo opcional, aviso tras un error grave
 • Análisis de la partida que califica cada jugada

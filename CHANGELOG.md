@@ -10,6 +10,30 @@ candidates (`-rc`) and test tags are not listed.
 
 ## [Unreleased]
 
+### Added
+
+- Tactics puzzles, in both apps: "Puzzles" in New Game sets positions from
+  real games in which one move or a short sequence wins material or mates,
+  about 4,600 of them from the free Lichess puzzle database.
+  - The app makes the opponent's move, then you find the best reply; any
+    move that mates solves the puzzle. A wrong move is shown briefly and
+    taken back. Hint marks the piece to move, Show solution plays the rest.
+  - A puzzle rating starts at 1200 and adapts after every puzzle, fast at
+    first; the next puzzle is picked close to it, and Easier / Normal /
+    Harder in New Game shifts that by about 300 points. Recently played
+    puzzles do not come back soon. A puzzle solved without a wrong move,
+    hint or the solution raises the rating; one left unsolved counts as not
+    solved.
+  - After a clean solve the next puzzle follows by itself. A puzzle in
+    progress is kept when the app is closed.
+  - Electronic boards are not used for puzzles yet; the Chessnut's NEW
+    GAME button starts the next puzzle.
+
+### Changed
+
+- The privacy policy names the puzzle data the app keeps on the device:
+  the puzzle rating and the recently played puzzles.
+
 ## [1.9.0] - 2026-10-26
 
 ### Changed
