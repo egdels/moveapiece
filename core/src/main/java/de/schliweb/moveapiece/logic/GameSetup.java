@@ -27,7 +27,8 @@ import java.util.Objects;
  * @param opening the line to drill; null unless {@code opponent} is {@link Opponent#TRAINER}
  * @param hintsEnabled trainer only: whether the expected next move is highlighted
  * @param chess960 whether each game starts from a random Chess960 starting position; always false
- *     for the trainer, whose lines start from the standard position
+ *     for the trainer, whose lines start from the standard position, and for puzzles, which start
+ *     from their own position
  */
 public record GameSetup(
         Opponent opponent, Side side, OpeningLine opening, boolean hintsEnabled, boolean chess960) {
@@ -60,12 +61,20 @@ public record GameSetup(
      * half the time (48 %, against 54 % in standard chess), lower mainly in the first moves.
      */
     public static boolean supportsChess960(Opponent opponent) {
-        return opponent != Opponent.TRAINER;
+        return opponent != Opponent.TRAINER && opponent != Opponent.PUZZLE;
     }
 
     /** A non-trainer setup; {@code side} is the human's colour. */
     public static GameSetup of(Opponent opponent, Side side) {
         return new GameSetup(opponent, side, null, true);
+    }
+
+    /**
+     * Tactics puzzles. Each puzzle decides the colour the trainee plays; {@code side} is kept only
+     * so that switching back to another opponent in the dialog keeps the colour chosen there.
+     */
+    public static GameSetup puzzles(Side side) {
+        return new GameSetup(Opponent.PUZZLE, side, null, true);
     }
 
     /** A trainer setup drilling {@code opening} as {@code side}. */

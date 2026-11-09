@@ -14,7 +14,9 @@ public enum Opponent {
     HUMAN("human"),
     STOCKFISH("stockfish"),
     MAIA("maia"),
-    TRAINER("trainer");
+    TRAINER("trainer"),
+    /** Tactics puzzles from the bundled set; the puzzle decides the colour. */
+    PUZZLE("puzzle");
 
     private final String key;
 

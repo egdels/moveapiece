@@ -55,7 +55,17 @@ public class GameSetupTest {
         assertEquals(new GameSetup(Opponent.STOCKFISH, Side.BLACK, null, true, true), restored);
         assertTrue(GameSetup.fromKeys("maia", "WHITE", null, true, true).chess960());
         assertFalse(GameSetup.fromKeys("trainer", "WHITE", null, true, true).chess960());
+        assertFalse(GameSetup.fromKeys("puzzle", "WHITE", null, true, true).chess960());
         assertFalse(GameSetup.fromKeys("stockfish", "WHITE", null, true).chess960());
+    }
+
+    @Test
+    public void puzzles_restoreWithSideAndWithoutOpening() {
+        GameSetup puzzles = GameSetup.puzzles(Side.BLACK);
+        assertSame(Opponent.PUZZLE, puzzles.opponent());
+        assertNull(puzzles.opening());
+        assertFalse(puzzles.chess960());
+        assertEquals(puzzles, GameSetup.fromKeys("puzzle", "BLACK", "ruy_lopez", true));
     }
 
     @Test
