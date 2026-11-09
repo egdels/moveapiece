@@ -10,6 +10,8 @@ candidates (`-rc`) and test tags are not listed.
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-11-09
+
 ### Added
 
 - Tactics puzzles, in both apps: "Puzzles" in New Game sets positions from
@@ -495,6 +497,7 @@ Linux .deb).
 - Windows: move sounds were silent because of a malformed ID3 tag in the
   mp3 files.
 
+[1.10.0]: https://github.com/egdels/moveapiece/compare/v1.9.0...v1.10.0
 [1.9.0]: https://github.com/egdels/moveapiece/compare/v1.8.1-rc1...v1.9.0
 [1.8.1]: https://github.com/egdels/moveapiece/compare/v1.8.0...v1.8.1-rc1
 [1.8.0]: https://github.com/egdels/moveapiece/compare/v1.7.0...v1.8.0

@@ -1,0 +1,2 @@
+* Tactics puzzles: about 4,600 from real games (Lichess, CC0), picked to match a puzzle rating that adapts after every puzzle; easier or harder on request, hints and solutions.
+* Practise your mistakes: after the game analysis, each mistake comes back as a puzzle.
