@@ -517,11 +517,11 @@ final class GameController
      */
     private void saveGame() {
         if (mode == Mode.PUZZLE) {
-            // A finished puzzle is not kept either: the next start begins a new one.
+            // A finished puzzle is kept as puzzle mode without a puzzle: the next start goes on
+            // with a new one (see restorePuzzles).
             PuzzleFlow.Progress progress = puzzleFlow.progress();
             if (progress == null) {
-                forgetSavedGame();
-                return;
+                progress = new PuzzleFlow.Progress(null, 0, false);
             }
             storeSavedGame(
                     new Settings.SavedGame(
@@ -607,21 +607,9 @@ final class GameController
             return false;
         }
         if (savedMode == Mode.PUZZLE) {
-            PuzzleRepository repository = puzzleRepository();
-            Puzzle puzzle = repository == null ? null : repository.byId(saved.puzzleId());
-            if (puzzle == null) {
-                return false;
-            }
-            // Set before resuming: the flow refreshes the screen, which reads the mode.
-            mode = Mode.PUZZLE;
-            humanSide = puzzle.humanSide();
-            if (!puzzleFlow.resume(puzzle, saved.puzzlePly(), saved.puzzleFailed())) {
-                mode = Mode.HUMAN_VS_STOCKFISH;
-                humanSide = Side.WHITE;
-                game.reset();
-                return false;
-            }
-        } else if (savedMode == Mode.TRAINING) {
+            return restorePuzzles(saved);
+        }
+        if (savedMode == Mode.TRAINING) {
             OpeningLine line =
                     saved.trainingLine() == null
                             ? null
@@ -655,6 +643,34 @@ final class GameController
             boardCanvas.setLastMove(UciMoves.from(lastMove), UciMoves.to(lastMove));
         }
         scrollMoveHistoryToEnd = true;
+        return true;
+    }
+
+    /**
+     * {@link #restoreSavedGame} for puzzle mode: the puzzle in progress where it was, or - after a
+     * finished puzzle, or one no longer in the set - a new one. Returns false only if the puzzle
+     * set cannot be read.
+     */
+    private boolean restorePuzzles(Settings.SavedGame saved) {
+        PuzzleRepository repository = puzzleRepository();
+        if (repository == null) {
+            return false;
+        }
+        // Set before the flow refreshes the screen, which reads them.
+        mode = Mode.PUZZLE;
+        strengthSlider.setDisable(true);
+        updateStrengthControlsVisibility();
+        Puzzle puzzle = repository.byId(saved.puzzleId());
+        if (puzzle != null) {
+            humanSide = puzzle.humanSide();
+            boardFlipped = saved.flipped();
+            boardCanvas.setFlipped(boardFlipped);
+            if (puzzleFlow.resume(puzzle, saved.puzzlePly(), saved.puzzleFailed())) {
+                scrollMoveHistoryToEnd = true;
+                return true;
+            }
+        }
+        nextPuzzle();
         return true;
     }
 
@@ -1413,11 +1429,17 @@ final class GameController
 
     @Override
     public void onPromotionRequired() {
+        if (mode == Mode.PUZZLE) {
+            return; // puzzles do not use the board yet
+        }
         showPhysicalPromotionDialog();
     }
 
     @Override
     public void onAmbiguousMove(List<String> candidateUcis) {
+        if (mode == Mode.PUZZLE) {
+            return;
+        }
         showAmbiguousMoveDialog(candidateUcis);
     }
 
@@ -1428,6 +1450,9 @@ final class GameController
 
     @Override
     public void onEngineMoveGuidanceComplete() {
+        if (mode == Mode.PUZZLE) {
+            return;
+        }
         if (mode == Mode.TRAINING && trainingFlow.onGuidanceComplete()) {
             return;
         }
@@ -1560,6 +1585,7 @@ final class GameController
      * controller goes through here (or the {@link Stage} overload) for that reason.
      */
     private <T> Optional<T> showTracked(Dialog<T> dialog) {
+        cancelNextPuzzleTimer(); // no puzzle may replace the game behind a dialog
         Runnable previous = closeCurrentModal;
         closeCurrentModal = dialog::close;
         try {
@@ -1571,6 +1597,7 @@ final class GameController
 
     /** {@link #showTracked(Dialog)} for a hand-built modal {@link Stage} (the promotion prompt). */
     private void showTracked(Stage modal) {
+        cancelNextPuzzleTimer();
         Runnable previous = closeCurrentModal;
         closeCurrentModal = modal::close;
         try {
@@ -2527,7 +2554,14 @@ final class GameController
         humanSide = trainedSide;
         boardCanvas.setTrainingHint(null, null);
         // Explicitly chosen by the user, so it is what the board's NEW GAME button repeats next.
-        rememberSetup(GameSetup.of(choice.get().opponent(), trainedSide));
+        rememberSetup(
+                new GameSetup(
+                        choice.get().opponent(),
+                        trainedSide,
+                        null,
+                        true,
+                        false,
+                        lastSetup.puzzleDifficulty()));
         switch (choice.get().opponent()) {
             case STOCKFISH -> {
                 mode = Mode.HUMAN_VS_STOCKFISH;
@@ -2610,19 +2644,26 @@ final class GameController
         mode = Mode.PUZZLE;
         strengthSlider.setDisable(true);
         updateStrengthControlsVisibility();
+        if (pegasusBridge != null) {
+            pegasusBridge.resetForNewGame(); // clears a guide left over from the last game
+        }
         nextPuzzle();
     }
 
-    /** Picks a puzzle near the trainee's rating, not one played lately, and sets it up. */
+    /**
+     * Picks a puzzle near the trainee's rating - shifted by the difficulty chosen in New Game - and
+     * not one played lately, and sets it up.
+     */
     private void nextPuzzle() {
         cancelNextPuzzleTimer();
+        puzzleFlow.abandon(); // a puzzle left unsolved counts as lost
         PuzzleRepository repository = puzzleRepository();
         Puzzle puzzle =
                 repository == null
                         ? null
                         : PuzzleSelector.next(
                                 repository.all(),
-                                puzzleRating.rating(),
+                                lastSetup.puzzleDifficulty().target(puzzleRating.rating()),
                                 recentPuzzles,
                                 ThreadLocalRandom.current());
         if (puzzle == null) {
@@ -2642,10 +2683,13 @@ final class GameController
         puzzleFlow.start(puzzle); // sets the position up, refreshes, schedules the first move
     }
 
-    /** Leaves puzzles for another mode, a PGN import or the trainer. */
+    /**
+     * Leaves puzzles for another mode, a PGN import or the trainer; a puzzle left unsolved counts
+     * as lost (see {@link PuzzleFlow#abandon()}).
+     */
     private void stopPuzzles() {
         cancelNextPuzzleTimer();
-        puzzleFlow.stop();
+        puzzleFlow.abandon();
         puzzleRatingDelta = null;
         puzzleHintSquare = null;
     }
@@ -2760,6 +2804,7 @@ final class GameController
      * MainActivity.onPgnFileSelected}/{@code showPgnGameSelectionDialog}.
      */
     private void importPgn() {
+        cancelNextPuzzleTimer(); // the file chooser runs the event loop, and the timer with it
         FileChooser chooser = new FileChooser();
         chooser.setTitle(Messages.get("action_import_pgn"));
         chooser.getExtensionFilters()
@@ -2855,6 +2900,7 @@ final class GameController
     }
 
     private void exportPgn() {
+        cancelNextPuzzleTimer(); // else the next puzzle could be exported instead of this one
         FileChooser chooser = new FileChooser();
         chooser.setTitle(Messages.get("action_export_pgn"));
         chooser.getExtensionFilters()
@@ -3261,7 +3307,6 @@ final class GameController
 
         @Override
         public void puzzleComplete(Puzzle puzzle, boolean solved) {
-            GameController.this.refresh();
             if (!solved) {
                 return; // leave the line on the board to look at; "Next puzzle" moves on
             }

@@ -6,6 +6,7 @@
 package de.schliweb.moveapiece.logic;
 
 import com.github.bhlangonijr.chesslib.Side;
+import de.schliweb.moveapiece.puzzle.PuzzleDifficulty;
 import de.schliweb.moveapiece.training.OpeningLine;
 import de.schliweb.moveapiece.training.OpeningRepository;
 import java.util.Objects;
@@ -29,9 +30,16 @@ import java.util.Objects;
  * @param chess960 whether each game starts from a random Chess960 starting position; always false
  *     for the trainer, whose lines start from the standard position, and for puzzles, which start
  *     from their own position
+ * @param puzzleDifficulty puzzles only: easier, normal or harder than the trainee's rating; kept
+ *     for every opponent, like {@code side}, so that the dialog remembers it
  */
 public record GameSetup(
-        Opponent opponent, Side side, OpeningLine opening, boolean hintsEnabled, boolean chess960) {
+        Opponent opponent,
+        Side side,
+        OpeningLine opening,
+        boolean hintsEnabled,
+        boolean chess960,
+        PuzzleDifficulty puzzleDifficulty) {
 
     /** What both front ends start in: Human vs Stockfish, human as White. */
     public static final GameSetup DEFAULT =
@@ -48,6 +56,19 @@ public record GameSetup(
         if (!supportsChess960(opponent)) {
             chess960 = false;
         }
+        if (puzzleDifficulty == null) {
+            puzzleDifficulty = PuzzleDifficulty.NORMAL;
+        }
+    }
+
+    /** A setup with the normal puzzle difficulty. */
+    public GameSetup(
+            Opponent opponent,
+            Side side,
+            OpeningLine opening,
+            boolean hintsEnabled,
+            boolean chess960) {
+        this(opponent, side, opening, hintsEnabled, chess960, PuzzleDifficulty.NORMAL);
     }
 
     /** A standard-chess setup. */
@@ -73,8 +94,8 @@ public record GameSetup(
      * Tactics puzzles. Each puzzle decides the colour the trainee plays; {@code side} is kept only
      * so that switching back to another opponent in the dialog keeps the colour chosen there.
      */
-    public static GameSetup puzzles(Side side) {
-        return new GameSetup(Opponent.PUZZLE, side, null, true);
+    public static GameSetup puzzles(Side side, PuzzleDifficulty difficulty) {
+        return new GameSetup(Opponent.PUZZLE, side, null, true, false, difficulty);
     }
 
     /** A trainer setup drilling {@code opening} as {@code side}. */
@@ -101,16 +122,31 @@ public record GameSetup(
             String openingId,
             boolean hintsEnabled,
             boolean chess960) {
+        return fromKeys(opponentKey, sideKey, openingId, hintsEnabled, chess960, null);
+    }
+
+    /**
+     * {@link #fromKeys(String, String, String, boolean, boolean)} with the persisted puzzle
+     * difficulty; an unknown or missing key is {@link PuzzleDifficulty#NORMAL}.
+     */
+    public static GameSetup fromKeys(
+            String opponentKey,
+            String sideKey,
+            String openingId,
+            boolean hintsEnabled,
+            boolean chess960,
+            String puzzleDifficultyKey) {
         Opponent opponent = Opponent.fromKey(opponentKey);
         Side side = Side.BLACK.name().equals(sideKey) ? Side.BLACK : Side.WHITE;
+        PuzzleDifficulty difficulty = PuzzleDifficulty.fromKey(puzzleDifficultyKey);
         if (opponent != Opponent.TRAINER) {
-            return new GameSetup(opponent, side, null, hintsEnabled, chess960);
+            return new GameSetup(opponent, side, null, hintsEnabled, chess960, difficulty);
         }
         OpeningLine opening = openingId == null ? null : OpeningRepository.byId(openingId);
         if (opening == null) {
             opening = OpeningRepository.ALL.get(0);
         }
-        return new GameSetup(opponent, side, opening, hintsEnabled);
+        return new GameSetup(opponent, side, opening, hintsEnabled, false, difficulty);
     }
 
     /** The persisted form of {@link #opening()}: its id, or null when there is none. */

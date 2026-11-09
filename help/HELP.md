@@ -6,8 +6,8 @@ the New Game dialog, and the app remembers it for next time.
 ## Playing
 
 - **New Game** (the first button) picks the opponent: Stockfish, Maia, a
-  second person at the same screen, or the Opening Trainer. Choose your
-  colour and the strength there.
+  second person at the same screen, the Opening Trainer, or Puzzles.
+  Choose your colour and the strength there.
 - **Stockfish** plays at an Elo strength from 1320 to 3190. **Maia**
   plays like a human player of the chosen rating, from 800 to 2400,
   mistakes included. On the desktop the strength can also be changed with
@@ -40,6 +40,38 @@ the New Game dialog, and the app remembers it for next time.
   repeat the line, pick another one or play on freely.
 - The **Opening Library** in the menu shows each opening move by move,
   without a game.
+
+## Puzzles
+
+- **Puzzles** in New Game sets tactics puzzles: positions from real games
+  in which one move or a short sequence wins material or mates. The
+  puzzle decides which colour you play.
+- The opponent moves first; its move is marked on the board. Then find
+  the best move for your side. If the solution takes several moves, the
+  app answers each correct one until the puzzle is solved. Any move that
+  mates solves it, even if the stored solution mates another way.
+- A wrong move is shown briefly and taken back; try again.
+- **Hint** marks the piece that has to move. **Show solution** plays the
+  rest of the solution move by move.
+- Your **puzzle rating** starts at 1200 and is shown next to the puzzle's
+  own rating. Solving a puzzle without a wrong move, hint or solution
+  raises it; otherwise it falls, and harder puzzles count for more. The
+  first puzzles count most, so the rating usually finds your level within
+  a few puzzles. The next puzzle is picked close to your rating; puzzles
+  you played recently do not come up again soon. Leaving a puzzle
+  unsolved, for a new game or another puzzle, counts as not solved.
+- If the puzzles are still too easy or too hard, set them **Easier** or
+  **Harder** than your rating in New Game, by about 300 points;
+  **Normal** is the default. Your rating counts the same way: a harder
+  puzzle solved simply brings more.
+- After a clean solve the next puzzle follows by itself. Otherwise the
+  position stays on the board until you press **Next puzzle**.
+- Undo, the evaluation and the engine's hints are off during puzzles.
+  Electronic boards are not used for puzzles yet; play them on the
+  screen. The NEW GAME button of a Chessnut starts the next puzzle.
+- When the app is closed, a puzzle in progress is kept; after a finished
+  one, the next start goes on with a new puzzle. The roughly 4,600
+  puzzles come from the free Lichess puzzle database.
 
 ## Chess960
 

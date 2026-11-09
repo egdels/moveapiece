@@ -6,8 +6,8 @@ in het venster Nieuw spel, en de app onthoudt het voor de volgende keer.
 ## Spelen
 
 - **Nieuw spel** (de eerste knop) kiest de tegenstander: Stockfish, Maia,
-  een tweede persoon aan hetzelfde scherm of de Openingstraining. Daar
-  kies je ook de kleur en de speelsterkte.
+  een tweede persoon aan hetzelfde scherm, de Openingstraining of
+  Puzzels. Daar kies je ook de kleur en de speelsterkte.
 - **Stockfish** speelt met een Elo-sterkte van 1320 tot 3190. **Maia**
   speelt als een menselijke speler met de gekozen rating, van 800 tot
   2400, fouten inbegrepen. Op de desktop kun je de sterkte tijdens de
@@ -41,6 +41,43 @@ in het venster Nieuw spel, en de app onthoudt het voor de volgende keer.
   eind kun je de lijn herhalen, een andere kiezen of vrij verdergaan.
 - De **Openingsbibliotheek** in het menu toont elke opening zet voor zet,
   zonder partij.
+
+## Puzzels
+
+- **Puzzels** in Nieuw spel geeft tactische opgaven: stellingen uit
+  echte partijen waarin één zet of een korte reeks materiaal wint of mat
+  zet. De puzzel bepaalt welke kleur je speelt.
+- Eerst zet de tegenstander; die zet is op het bord gemarkeerd. Zoek dan
+  de beste zet voor jouw kant. Bestaat de oplossing uit meerdere zetten,
+  dan antwoordt de app op elke juiste zet tot de puzzel is opgelost. Elke
+  zet die mat zet lost hem op, ook als de opgeslagen oplossing op een
+  andere manier mat zet.
+- Een verkeerde zet wordt even getoond en teruggenomen; probeer het
+  opnieuw.
+- **Hint** markeert het stuk dat moet zetten. **Oplossing tonen** speelt
+  de rest van de oplossing zet voor zet.
+- Je **puzzelrating** begint bij 1200 en staat naast de rating van de
+  puzzel. Los je een puzzel op zonder verkeerde zet, hint of oplossing,
+  dan stijgt hij, anders daalt hij; moeilijkere puzzels tellen zwaarder.
+  De eerste puzzels tellen het zwaarst, zo vindt de rating meestal na
+  een paar puzzels je niveau. De volgende puzzel wordt dicht bij je
+  rating gekozen; puzzels die je kort geleden speelde, komen niet snel
+  terug. Verlaat je een puzzel onopgelost, voor een nieuw spel of een
+  andere puzzel, dan telt hij als niet opgelost.
+- Zijn de puzzels toch te makkelijk of te moeilijk, zet ze dan in Nieuw
+  spel op **Makkelijker** of **Moeilijker** dan je rating, met ongeveer
+  300 punten; **Normaal** is de standaard. Je rating telt op dezelfde
+  manier: een moeilijkere puzzel oplossen levert gewoon meer op.
+- Na een foutloze oplossing volgt de volgende puzzel vanzelf. Anders
+  blijft de stelling staan tot je op **Volgende puzzel** drukt.
+- Zet terugnemen, de waardering en de hints van de engine staan uit bij
+  puzzels. Elektronische borden worden nog niet voor puzzels gebruikt;
+  speel ze op het scherm. De NEW GAME-knop van een Chessnut start de
+  volgende puzzel.
+- Als de app wordt gesloten, blijft een begonnen puzzel bewaard; na een
+  afgeronde puzzel gaat de volgende start verder met een nieuwe puzzel.
+  De ongeveer 4.600 puzzels komen uit de vrije puzzeldatabase van
+  Lichess.
 
 ## Chess960
 

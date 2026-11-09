@@ -7,8 +7,8 @@ successiva.
 ## Giocare
 
 - **Nuova partita** (il primo pulsante) sceglie l'avversario: Stockfish,
-  Maia, una seconda persona allo stesso schermo o l'Allenamento aperture.
-  Lì scegli anche il colore e la forza.
+  Maia, una seconda persona allo stesso schermo, l'Allenamento aperture o
+  i Problemi. Lì scegli anche il colore e la forza.
 - **Stockfish** gioca con una forza Elo da 1320 a 3190. **Maia** gioca
   come un giocatore umano del rating scelto, da 800 a 2400, errori
   compresi. Sul desktop la forza si può cambiare anche durante la partita
@@ -43,6 +43,44 @@ successiva.
   liberamente.
 - La **Libreria delle aperture** nel menu mostra ogni apertura mossa per
   mossa, senza partita.
+
+## Problemi
+
+- **Problemi** in Nuova partita propone problemi tattici: posizioni di
+  partite vere in cui una mossa o una breve sequenza guadagna materiale o
+  dà matto. È il problema a decidere quale colore giochi.
+- Muove prima l'avversario; la sua mossa è evidenziata sulla scacchiera.
+  Poi trova la mossa migliore per la tua parte. Se la soluzione ha più
+  mosse, l'app risponde a ogni mossa giusta finché il problema è risolto.
+  Qualsiasi mossa che dà matto lo risolve, anche se la soluzione salvata
+  dà matto in un altro modo.
+- Una mossa sbagliata viene mostrata per un attimo e ritirata; riprova.
+- **Suggerimento** evidenzia il pezzo che deve muovere. **Mostra
+  soluzione** gioca il resto della soluzione mossa per mossa.
+- Il tuo **punteggio problemi** parte da 1200 e compare accanto al
+  punteggio del problema. Risolvere un problema senza mosse sbagliate,
+  suggerimenti o soluzione lo fa salire; altrimenti scende, e i problemi
+  più difficili contano di più. I primi problemi contano di più, così il
+  punteggio di solito trova il tuo livello in pochi problemi. Il
+  problema successivo viene scelto vicino al tuo punteggio; i problemi
+  giocati di recente non tornano presto. Lasciare un problema irrisolto,
+  per una nuova partita o un altro problema, conta come non risolto.
+- Se i problemi restano troppo facili o troppo difficili, impostali
+  **Più facile** o **Più difficile** rispetto al tuo punteggio in Nuova
+  partita, di circa 300 punti; **Normale** è l'impostazione predefinita.
+  Il tuo punteggio conta allo stesso modo: un problema più difficile
+  risolto porta semplicemente di più.
+- Dopo una soluzione pulita il problema successivo arriva da solo.
+  Altrimenti la posizione resta sulla scacchiera finché non premi
+  **Problema successivo**.
+- Annulla mossa, la valutazione e i suggerimenti del motore sono
+  disattivati durante i problemi. Le scacchiere elettroniche non sono
+  ancora usate per i problemi; giocali sullo schermo. Il pulsante NEW
+  GAME di una Chessnut avvia il problema successivo.
+- Quando l'app viene chiusa, un problema iniziato viene conservato; dopo
+  un problema concluso, l'avvio successivo prosegue con un problema
+  nuovo. I circa 4.600 problemi provengono dal database libero di
+  problemi di Lichess.
 
 ## Chess960
 

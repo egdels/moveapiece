@@ -29,6 +29,7 @@ final class Settings {
     private static final String KEY_LAST_OPENING = "lastOpening";
     private static final String KEY_LAST_TRAINING_HINTS = "lastTrainingHints";
     private static final String KEY_LAST_CHESS960 = "lastChess960";
+    private static final String KEY_LAST_PUZZLE_DIFFICULTY = "lastPuzzleDifficulty";
     private static final String KEY_PUZZLE_RATING = "puzzleRating";
     private static final String KEY_RECENT_PUZZLES = "recentPuzzles";
     private static final int DEFAULT_ENGINE_ELO = 2200;
@@ -87,7 +88,8 @@ final class Settings {
                 PREFS.get(KEY_LAST_SIDE, null),
                 PREFS.get(KEY_LAST_OPENING, null),
                 PREFS.getBoolean(KEY_LAST_TRAINING_HINTS, true),
-                PREFS.getBoolean(KEY_LAST_CHESS960, false));
+                PREFS.getBoolean(KEY_LAST_CHESS960, false),
+                PREFS.get(KEY_LAST_PUZZLE_DIFFICULTY, null));
     }
 
     static void setLastGameSetup(GameSetup setup) {
@@ -100,6 +102,7 @@ final class Settings {
         }
         PREFS.putBoolean(KEY_LAST_TRAINING_HINTS, setup.hintsEnabled());
         PREFS.putBoolean(KEY_LAST_CHESS960, setup.chess960());
+        PREFS.put(KEY_LAST_PUZZLE_DIFFICULTY, setup.puzzleDifficulty().key());
     }
 
     // ---- Puzzles ----------------------------------------------------------------------------

@@ -8,6 +8,7 @@ package de.schliweb.moveapiece.desktop;
 import com.github.bhlangonijr.chesslib.Side;
 import de.schliweb.moveapiece.logic.GameSetup;
 import de.schliweb.moveapiece.logic.Opponent;
+import de.schliweb.moveapiece.puzzle.PuzzleDifficulty;
 import de.schliweb.moveapiece.training.OpeningLine;
 import de.schliweb.moveapiece.training.OpeningRepository;
 import de.schliweb.moveapiece.training.OpeningSearch;
@@ -132,6 +133,21 @@ final class GameSetupDialog {
         CheckBox chess960Box = new CheckBox(Messages.get("dialog_chess960_checkbox"));
         chess960Box.setSelected(initial.chess960());
 
+        // Puzzles only: aims the puzzles below, at or above the trainee's rating.
+        ToggleGroup difficultyGroup = new ToggleGroup();
+        RadioButton easierRadio = new RadioButton(Messages.get("puzzle_difficulty_easier"));
+        RadioButton normalRadio = new RadioButton(Messages.get("puzzle_difficulty_normal"));
+        RadioButton harderRadio = new RadioButton(Messages.get("puzzle_difficulty_harder"));
+        easierRadio.setToggleGroup(difficultyGroup);
+        normalRadio.setToggleGroup(difficultyGroup);
+        harderRadio.setToggleGroup(difficultyGroup);
+        switch (initial.puzzleDifficulty()) {
+            case EASIER -> easierRadio.setSelected(true);
+            case HARDER -> harderRadio.setSelected(true);
+            default -> normalRadio.setSelected(true);
+        }
+        HBox difficultyBox = new HBox(16, easierRadio, normalRadio, harderRadio);
+
         VBox content =
                 new VBox(
                         8,
@@ -142,6 +158,7 @@ final class GameSetupDialog {
                         puzzleRadio,
                         colorBox,
                         chess960Box,
+                        difficultyBox,
                         openingBox,
                         hintsBox);
         // No explicit prefHeight: unlike the old opening-trainer-only dialog, this one's height
@@ -168,6 +185,8 @@ final class GameSetupDialog {
                     boolean offersChess960 = !isTrainer && !isPuzzle;
                     chess960Box.setVisible(offersChess960);
                     chess960Box.setManaged(offersChess960);
+                    difficultyBox.setVisible(isPuzzle);
+                    difficultyBox.setManaged(isPuzzle);
                     if (content.getScene() != null) {
                         content.getScene().getWindow().sizeToScene();
                     }
@@ -223,12 +242,19 @@ final class GameSetupDialog {
                     if (opponent == Opponent.TRAINER && opening == null) {
                         return null;
                     }
+                    PuzzleDifficulty difficulty =
+                            easierRadio.isSelected()
+                                    ? PuzzleDifficulty.EASIER
+                                    : harderRadio.isSelected()
+                                            ? PuzzleDifficulty.HARDER
+                                            : PuzzleDifficulty.NORMAL;
                     return new GameSetup(
                             opponent,
                             side,
                             opening,
                             hintsBox.isSelected(),
-                            chess960Box.isSelected());
+                            chess960Box.isSelected(),
+                            difficulty);
                 });
 
         return dialog;

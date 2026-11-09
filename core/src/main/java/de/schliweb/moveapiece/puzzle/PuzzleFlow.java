@@ -176,7 +176,20 @@ public final class PuzzleFlow {
         return true;
     }
 
-    /** Leaves the puzzle (new game, PGN import): drops it and any pending move. */
+    /**
+     * The trainee leaves the puzzle unsolved - a new game, another puzzle, a PGN import. Once its
+     * position was posed (the app's first move played), a puzzle not yet rated counts as lost, so
+     * leaving is no free way past a hard one; then the flow {@link #stop()}s. Closing the app is
+     * not leaving: the host keeps {@link #progress()} and resumes it.
+     */
+    public void abandon() {
+        if (puzzle != null && state != State.COMPLETE && ply >= 1 && !rated) {
+            markFailed();
+        }
+        stop();
+    }
+
+    /** Drops the puzzle and any pending move, without rating it; see {@link #abandon()}. */
     public void stop() {
         cancelScheduled();
         puzzle = null;

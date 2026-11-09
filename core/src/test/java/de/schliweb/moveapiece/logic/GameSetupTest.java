@@ -12,6 +12,7 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 import com.github.bhlangonijr.chesslib.Side;
+import de.schliweb.moveapiece.puzzle.PuzzleDifficulty;
 import de.schliweb.moveapiece.training.OpeningLine;
 import de.schliweb.moveapiece.training.OpeningRepository;
 import org.junit.Test;
@@ -61,11 +62,34 @@ public class GameSetupTest {
 
     @Test
     public void puzzles_restoreWithSideAndWithoutOpening() {
-        GameSetup puzzles = GameSetup.puzzles(Side.BLACK);
+        GameSetup puzzles = GameSetup.puzzles(Side.BLACK, PuzzleDifficulty.NORMAL);
         assertSame(Opponent.PUZZLE, puzzles.opponent());
         assertNull(puzzles.opening());
         assertFalse(puzzles.chess960());
         assertEquals(puzzles, GameSetup.fromKeys("puzzle", "BLACK", "ruy_lopez", true));
+    }
+
+    @Test
+    public void puzzleDifficulty_roundTripsAndDefaultsToNormal() {
+        GameSetup harder = GameSetup.puzzles(Side.WHITE, PuzzleDifficulty.HARDER);
+        assertEquals(
+                harder,
+                GameSetup.fromKeys(
+                        "puzzle", "WHITE", null, true, false, PuzzleDifficulty.HARDER.key()));
+        assertSame(
+                PuzzleDifficulty.NORMAL,
+                GameSetup.fromKeys("puzzle", "WHITE", null, true, false, "nonsense")
+                        .puzzleDifficulty());
+        assertSame(PuzzleDifficulty.NORMAL, GameSetup.DEFAULT.puzzleDifficulty());
+        // Kept for other opponents too, so the dialog remembers it.
+        assertSame(
+                PuzzleDifficulty.EASIER,
+                GameSetup.fromKeys("stockfish", "WHITE", null, true, false, "easier")
+                        .puzzleDifficulty());
+        assertSame(
+                PuzzleDifficulty.EASIER,
+                GameSetup.fromKeys("trainer", "WHITE", "ruy_lopez", true, false, "easier")
+                        .puzzleDifficulty());
     }
 
     @Test

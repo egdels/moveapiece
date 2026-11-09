@@ -7,8 +7,8 @@ la próxima vez.
 ## Jugar
 
 - **Partida nueva** (el primer botón) elige el rival: Stockfish, Maia,
-  una segunda persona en la misma pantalla o el Entrenamiento de
-  aperturas. Ahí eliges también el color y la fuerza.
+  una segunda persona en la misma pantalla, el Entrenamiento de
+  aperturas o los Ejercicios. Ahí eliges también el color y la fuerza.
 - **Stockfish** juega con una fuerza Elo de 1320 a 3190. **Maia** juega
   como un jugador humano del rating elegido, de 800 a 2400, errores
   incluidos. En el escritorio la fuerza también se puede cambiar durante
@@ -44,6 +44,45 @@ la próxima vez.
   libremente.
 - La **Biblioteca de aperturas** en el menú muestra cada apertura jugada
   a jugada, sin partida.
+
+## Ejercicios
+
+- **Ejercicios** en Partida nueva plantea ejercicios tácticos:
+  posiciones de partidas reales en las que una jugada o una secuencia
+  corta gana material o da mate. El ejercicio decide qué color juegas.
+- Primero juega el rival; su jugada queda marcada en el tablero. Después
+  encuentra la mejor jugada para tu bando. Si la solución tiene varias
+  jugadas, la aplicación responde a cada jugada correcta hasta resolver
+  el ejercicio. Cualquier jugada que dé mate lo resuelve, aunque la
+  solución guardada dé mate de otra manera.
+- Una jugada incorrecta se muestra un momento y se deshace; inténtalo de
+  nuevo.
+- **Pista** marca la pieza que tiene que moverse. **Ver solución** juega
+  el resto de la solución jugada a jugada.
+- Tu **puntuación de ejercicios** empieza en 1200 y aparece junto a la
+  puntuación del ejercicio. Resolver un ejercicio sin jugada incorrecta,
+  pista ni solución la sube; si no, baja, y los ejercicios más difíciles
+  cuentan más. Los primeros ejercicios son los que más cuentan, así que
+  la puntuación suele encontrar tu nivel en pocos ejercicios. El
+  siguiente ejercicio se elige cerca de tu puntuación; los ejercicios
+  jugados hace poco no vuelven pronto. Dejar un ejercicio sin resolver,
+  por una partida nueva u otro ejercicio, cuenta como no resuelto.
+- Si los ejercicios siguen siendo demasiado fáciles o difíciles,
+  ponlos **Más fácil** o **Más difícil** que tu puntuación en Partida
+  nueva, en unos 300 puntos; **Normal** es lo predeterminado. Tu
+  puntuación cuenta igual: un ejercicio más difícil resuelto simplemente
+  da más.
+- Tras una solución limpia, el siguiente ejercicio llega solo. Si no, la
+  posición se queda en el tablero hasta que pulses **Siguiente
+  ejercicio**.
+- Deshacer jugada, la evaluación y las pistas del motor están
+  desactivadas en los ejercicios. Los tableros electrónicos todavía no se
+  usan para los ejercicios; juégalos en la pantalla. El botón NEW GAME
+  de un Chessnut inicia el siguiente ejercicio.
+- Al cerrar la aplicación, un ejercicio empezado se conserva; tras uno
+  terminado, el próximo inicio sigue con un ejercicio nuevo. Los unos
+  4.600 ejercicios proceden de la base de datos libre de ejercicios de
+  Lichess.
 
 ## Chess960
 

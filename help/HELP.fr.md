@@ -7,9 +7,9 @@ souvient pour la prochaine fois.
 ## Jouer
 
 - **Nouvelle partie** (le premier bouton) choisit l'adversaire :
-  Stockfish, Maia, une deuxième personne devant le même écran ou
-  l'Entraînement d'ouvertures. Vous y choisissez aussi la couleur et la
-  force.
+  Stockfish, Maia, une deuxième personne devant le même écran,
+  l'Entraînement d'ouvertures ou les Problèmes. Vous y choisissez aussi
+  la couleur et la force.
 - **Stockfish** joue avec une force Elo de 1320 à 3190. **Maia** joue
   comme un joueur humain du classement choisi, de 800 à 2400, erreurs
   comprises. Sur ordinateur, la force peut aussi être modifiée en cours
@@ -44,6 +44,46 @@ souvient pour la prochaine fois.
   ligne, en choisir une autre ou continuer librement.
 - La **Bibliothèque d'ouvertures** dans le menu montre chaque ouverture
   coup par coup, sans partie.
+
+## Problèmes
+
+- **Problèmes** dans Nouvelle partie propose des problèmes tactiques :
+  des positions de vraies parties dans lesquelles un coup ou une courte
+  suite gagne du matériel ou fait mat. Le problème décide de la couleur
+  que vous jouez.
+- L'adversaire joue en premier ; son coup est marqué sur l'échiquier.
+  Trouvez ensuite le meilleur coup pour votre camp. Si la solution
+  compte plusieurs coups, l'application répond à chaque bon coup jusqu'à
+  ce que le problème soit résolu. Tout coup qui fait mat le résout, même
+  si la solution enregistrée mate autrement.
+- Un mauvais coup est montré brièvement puis repris ; réessayez.
+- **Indice** marque la pièce qui doit jouer. **Voir la solution** joue
+  le reste de la solution coup par coup.
+- Votre **classement de problèmes** commence à 1200 et s'affiche à côté
+  du classement du problème. Résoudre un problème sans mauvais coup,
+  indice ni solution le fait monter ; sinon il baisse, et les problèmes
+  plus difficiles comptent davantage. Les premiers problèmes comptent le
+  plus, si bien que le classement trouve en général votre niveau en
+  quelques problèmes. Le problème suivant est choisi près de votre
+  classement ; les problèmes joués récemment ne reviennent pas de sitôt.
+  Quitter un problème non résolu, pour une nouvelle partie ou un autre
+  problème, compte comme non résolu.
+- Si les problèmes restent trop faciles ou trop difficiles, rendez-les
+  **Plus facile** ou **Plus difficile** que votre classement dans
+  Nouvelle partie, d'environ 300 points ; **Normal** est la valeur par
+  défaut. Votre classement compte de la même façon : un problème plus
+  difficile résolu rapporte simplement davantage.
+- Après une résolution sans faute, le problème suivant arrive tout seul.
+  Sinon, la position reste affichée jusqu'à ce que vous appuyiez sur
+  **Problème suivant**.
+- Annuler le coup, l'évaluation et les indices du moteur sont désactivés
+  pendant les problèmes. Les échiquiers électroniques ne sont pas encore
+  utilisés pour les problèmes ; jouez-les à l'écran. Le bouton NEW GAME
+  d'un Chessnut lance le problème suivant.
+- Quand l'application est fermée, un problème en cours est conservé ;
+  après un problème terminé, le prochain démarrage continue avec un
+  nouveau problème. Les quelque 4 600 problèmes proviennent de la base
+  de problèmes libre de Lichess.
 
 ## Chess960
 

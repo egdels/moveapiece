@@ -285,6 +285,85 @@ public class PuzzleFlowTest {
         assertEquals(MoveResult.WRONG, flow.onUserMove("e1e7"));
     }
 
+    /** Lichess puzzle jeC91: the stored solution underpromotes to a rook, which mates. */
+    private static final Puzzle UNDERPROMOTION =
+            new Puzzle(
+                    "jeC91",
+                    "5k2/2P1ppb1/K2n2p1/8/2NP1PPP/1r6/8/8 b - - 3 38",
+                    List.of("d6c4", "c7c8r"),
+                    640,
+                    List.of("mate", "mateIn1", "promotion"));
+
+    /** Lichess puzzle s59tt: the last move of the solution captures en passant. */
+    private static final Puzzle EN_PASSANT =
+            new Puzzle(
+                    "s59tt",
+                    "1r3rk1/5p1p/p5p1/3RP1P1/qp1Q4/2p1P3/PP3PP1/1K5R b - - 2 24",
+                    List.of("c3b2", "d4h4", "h7h5", "g5h6"),
+                    1917,
+                    List.of("crushing", "enPassant"));
+
+    /** Lichess puzzle k2BGn: Black's solution ends castling queenside. */
+    private static final Puzzle CASTLING =
+            new Puzzle(
+                    "k2BGn",
+                    "r3kr2/pppqbpQp/2bp3B/8/2B5/8/PPP2PPP/R4RK1 w q - 3 14",
+                    List.of("c4f7", "f8f7", "g7g8", "f7f8", "h6f8", "e8c8"),
+                    2597,
+                    List.of("advantage", "castling"));
+
+    @Test
+    public void promotion_storedUnderpromotionSolves() {
+        startAndPlayOpening(UNDERPROMOTION);
+
+        assertEquals(MoveResult.CORRECT, flow.onUserMove("c7c8r"));
+        assertEquals(List.of("jeC91/true"), host.completed);
+    }
+
+    @Test
+    public void promotion_toQueenMatesTooAndSolves() {
+        startAndPlayOpening(UNDERPROMOTION);
+
+        assertEquals(MoveResult.CORRECT, flow.onUserMove("c7c8q"));
+        assertTrue(game.isCheckmate());
+    }
+
+    @Test
+    public void promotion_toPieceThatDoesNotMate_isWrong() {
+        startAndPlayOpening(UNDERPROMOTION);
+
+        assertEquals(MoveResult.WRONG, flow.onUserMove("c7c8b"));
+        host.runScheduled();
+        assertEquals(MoveResult.CORRECT, flow.onUserMove("c7c8r"));
+        assertEquals(List.of("jeC91/false"), host.completed);
+    }
+
+    @Test
+    public void enPassant_inSolutionIsAcceptedAndSoundsAsCapture() {
+        startAndPlayOpening(EN_PASSANT);
+        assertEquals(MoveResult.CORRECT, flow.onUserMove("d4h4"));
+        host.runScheduled();
+
+        assertEquals(MoveResult.CORRECT, flow.onUserMove("g5h6"));
+
+        assertEquals("g5h6/true", host.applied.get(host.applied.size() - 1));
+        assertEquals(List.of("s59tt/true"), host.completed);
+    }
+
+    @Test
+    public void castling_inSolutionIsAccepted() {
+        startAndPlayOpening(CASTLING);
+        assertEquals(MoveResult.CORRECT, flow.onUserMove("f8f7"));
+        host.runScheduled();
+        assertEquals(MoveResult.CORRECT, flow.onUserMove("f7f8"));
+        host.runScheduled();
+
+        assertEquals(MoveResult.CORRECT, flow.onUserMove("e8c8"));
+
+        assertEquals(List.of("k2BGn/true"), host.completed);
+        assertTrue(game.toFen().startsWith("2kr"));
+    }
+
     @Test
     public void movesOutsideTraineesTurnOrIllegal_areIgnored() {
         flow.start(SCANDINAVIAN);
@@ -333,6 +412,48 @@ public class PuzzleFlowTest {
         assertEquals(State.IDLE, flow.state());
         assertTrue(host.applied.isEmpty());
         assertNull(flow.progress());
+    }
+
+    @Test
+    public void abandon_afterTheFirstMove_ratesUnratedPuzzleAsLost() {
+        startAndPlayOpening(SCANDINAVIAN);
+
+        flow.abandon();
+
+        assertEquals(List.of("scand/false"), host.rated);
+        assertFalse(flow.isActive());
+        assertTrue(host.completed.isEmpty());
+    }
+
+    @Test
+    public void abandon_beforeTheFirstMove_doesNotRate() {
+        flow.start(SCANDINAVIAN);
+
+        flow.abandon();
+
+        assertTrue(host.rated.isEmpty());
+        assertFalse(flow.isActive());
+    }
+
+    @Test
+    public void abandon_ofRatedOrCompletePuzzle_doesNotRateAgain() {
+        startAndPlayOpening(SCANDINAVIAN);
+        flow.hint();
+        flow.abandon();
+        assertEquals(List.of("scand/false"), host.rated);
+
+        startAndPlayOpening(BACK_RANK);
+        flow.onUserMove("e1e8");
+        flow.abandon();
+        assertEquals(List.of("scand/false", "backrank/true"), host.rated);
+    }
+
+    @Test
+    public void abandon_withoutPuzzle_isHarmless() {
+        flow.abandon();
+
+        assertTrue(host.rated.isEmpty());
+        assertEquals(State.IDLE, flow.state());
     }
 
     @Test

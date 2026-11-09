@@ -7,8 +7,8 @@ nächste Mal.
 ## Spielen
 
 - **Neues Spiel** (der erste Knopf) wählt den Gegner: Stockfish, Maia,
-  eine zweite Person am selben Bildschirm oder das Eröffnungstraining.
-  Dort wählst du auch Farbe und Spielstärke.
+  eine zweite Person am selben Bildschirm, das Eröffnungstraining oder
+  Puzzles. Dort wählst du auch Farbe und Spielstärke.
 - **Stockfish** spielt mit einer Elo-Stärke von 1320 bis 3190. **Maia**
   spielt wie ein menschlicher Spieler mit der gewählten Wertung, von 800
   bis 2400, Fehler inklusive. Auf dem Desktop lässt sich die Stärke
@@ -44,6 +44,43 @@ nächste Mal.
   weiterspielen.
 - Die **Eröffnungsbibliothek** im Menü zeigt jede Eröffnung Zug für Zug,
   ohne Partie.
+
+## Puzzles
+
+- **Puzzles** unter Neues Spiel stellt Taktikaufgaben: Stellungen aus
+  echten Partien, in denen ein Zug oder eine kurze Zugfolge Material
+  gewinnt oder mattsetzt. Welche Farbe du spielst, bestimmt das Puzzle.
+- Zuerst zieht der Gegner; sein Zug ist auf dem Brett markiert. Dann
+  findest du den besten Zug für deine Seite. Hat die Lösung mehrere
+  Züge, antwortet die App auf jeden richtigen, bis das Puzzle gelöst ist.
+  Jeder Zug, der mattsetzt, löst es, auch wenn die gespeicherte Lösung
+  anders mattsetzt.
+- Ein falscher Zug wird kurz gezeigt und zurückgenommen; versuch es noch
+  einmal.
+- **Tipp** markiert die Figur, die ziehen muss. **Lösung zeigen** spielt
+  den Rest der Lösung Zug für Zug vor.
+- Deine **Puzzle-Wertung** beginnt bei 1200 und steht neben der Wertung
+  des Puzzles. Löst du ein Puzzle ohne falschen Zug, Tipp oder Lösung,
+  steigt sie, sonst sinkt sie; schwerere Puzzles zählen mehr. Die ersten
+  Puzzles zählen am stärksten, so findet die Wertung dein Niveau meist
+  nach wenigen Puzzles. Das nächste Puzzle wird nahe deiner Wertung
+  ausgesucht; kürzlich gespielte Puzzles kommen nicht so bald wieder.
+  Verlässt du ein Puzzle ungelöst, für ein neues Spiel oder ein anderes
+  Puzzle, zählt es als nicht gelöst.
+- Sind dir die Puzzles trotzdem zu leicht oder zu schwer, stelle sie
+  unter Neues Spiel **Leichter** oder **Schwerer** als deine Wertung, um
+  etwa 300 Punkte; **Normal** ist voreingestellt. Deine Wertung zählt
+  dabei genauso: Ein schwereres Puzzle bringt beim Lösen einfach mehr.
+- Nach einer sauberen Lösung folgt das nächste Puzzle von selbst. Sonst
+  bleibt die Stellung stehen, bis du **Nächstes Puzzle** drückst.
+- Zug zurücknehmen, die Bewertung und die Tipps der Engine sind bei
+  Puzzles aus. Elektronische Bretter werden für Puzzles noch nicht
+  genutzt; spiele sie auf dem Bildschirm. Der NEW-GAME-Knopf eines
+  Chessnut startet das nächste Puzzle.
+- Wird die App geschlossen, bleibt ein angefangenes Puzzle erhalten;
+  nach einem beendeten geht es beim nächsten Start mit einem neuen
+  Puzzle weiter. Die rund 4.600 Puzzles stammen aus der freien
+  Puzzle-Datenbank von Lichess.
 
 ## Chess960
 
