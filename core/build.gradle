@@ -7,6 +7,16 @@ java {
     targetCompatibility = JavaVersion.VERSION_17
 }
 
+// The bundled puzzle set lives in the repository root (puzzles/, see PUZZLE_PROVENANCE.md) and is
+// copied into each app by its own build; the tests read it from there to validate every puzzle.
+sourceSets {
+    test {
+        resources {
+            srcDir rootProject.file('puzzles')
+        }
+    }
+}
+
 dependencies {
     // The board package (PhysicalBoardBridge and its adapters) is shared by :app and :desktop and
     // speaks in the physical-board types of :chessnut-core and, through it, :pegasus-core.
