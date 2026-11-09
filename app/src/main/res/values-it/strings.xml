@@ -146,4 +146,22 @@
     <string name="opening_preview_progress_format">Mossa %1$d di %2$d</string>
     <string name="action_previous_move">Precedente</string>
     <string name="action_next_move">Successiva</string>
+
+    <!-- Puzzles -->
+    <string name="opponent_puzzles">Problemi</string>
+    <string name="dialog_difficulty_title">Difficoltà</string>
+    <string name="puzzle_difficulty_easier">Più facile</string>
+    <string name="puzzle_difficulty_normal">Normale</string>
+    <string name="puzzle_difficulty_harder">Più difficile</string>
+    <string name="action_show_solution">Mostra soluzione</string>
+    <string name="action_next_puzzle">Problema successivo</string>
+    <string name="status_puzzle_find_move_white">Muove il Bianco – trova la mossa migliore</string>
+    <string name="status_puzzle_find_move_black">Muove il Nero – trova la mossa migliore</string>
+    <string name="status_puzzle_wrong">Non è questa – riprova</string>
+    <string name="status_puzzle_solution">Soluzione</string>
+    <string name="status_puzzle_solved">Risolto!</string>
+    <string name="status_puzzle_finished">Problema concluso</string>
+    <string name="puzzle_info_format">Problema %1$d · Il tuo punteggio %2$d</string>
+    <string name="puzzle_info_rated_format">Problema %1$d · Il tuo punteggio %2$d (%3$s)</string>
+    <string name="error_puzzles_unavailable">Impossibile caricare i problemi.</string>
 </resources>

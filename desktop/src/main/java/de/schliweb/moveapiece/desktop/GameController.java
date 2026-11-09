@@ -2460,6 +2460,7 @@ final class GameController
         if (mode == Mode.PUZZLE) {
             // Only the piece to move, not where it goes.
             boardCanvas.setTrainingHint(puzzleFlow.isHumanTurn() ? puzzleHintSquare : null, null);
+            hintAlternativesNote = null; // no engine alternatives from a game before
             return;
         }
         if (mode != Mode.TRAINING
@@ -2872,6 +2873,10 @@ final class GameController
 
     private void finishPgnImport(String pgnText) {
         if (!game.loadPgn(pgnText)) {
+            // A failed load resets the game, so a puzzle cannot go on on it: a new one instead.
+            if (mode == Mode.PUZZLE) {
+                nextPuzzle();
+            }
             showError(Messages.get("pgn_import_failed"));
             return;
         }

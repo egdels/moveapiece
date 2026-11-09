@@ -467,6 +467,16 @@ public class PuzzleFlowTest {
     }
 
     @Test
+    public void progress_isNullWhileSolutionIsShown() {
+        startAndPlayOpening(SCANDINAVIAN);
+
+        flow.showSolution();
+
+        assertEquals(State.SHOWING_SOLUTION, flow.state());
+        assertNull(flow.progress());
+    }
+
+    @Test
     public void resume_onTraineesTurn_waitsForTrainee() {
         assertTrue(flow.resume(SCANDINAVIAN, 1, false));
 

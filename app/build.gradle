@@ -211,8 +211,10 @@ abstract class CopyDocsTask extends DefaultTask {
 androidComponents {
     onVariants(selector().all()) { variant ->
         def copyDocs = project.tasks.register("copyDocs${variant.name.capitalize()}", CopyDocsTask) {
+            // Also the bundled puzzle set (PUZZLE_PROVENANCE.md), shared with the desktop app.
             sources.from(rootProject.file('PRIVACY.md'), rootProject.file('OPEN-SOURCE-LICENSES.md'),
-                    rootProject.fileTree('help') { include '*.md' })
+                    rootProject.fileTree('help') { include '*.md' },
+                    rootProject.file('puzzles/puzzles.csv'))
         }
         variant.sources.assets?.addGeneratedSourceDirectory(copyDocs, { it.outputDirectory })
 

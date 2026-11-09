@@ -34,6 +34,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.PopupMenu;
 import androidx.appcompat.widget.TooltipCompat;
 import androidx.core.content.ContextCompat;
+import androidx.lifecycle.Lifecycle;
 import com.github.bhlangonijr.chesslib.Piece;
 import com.github.bhlangonijr.chesslib.PieceType;
 import com.github.bhlangonijr.chesslib.Side;
@@ -71,6 +72,13 @@ import de.schliweb.moveapiece.logic.GameSetup;
 import de.schliweb.moveapiece.logic.Opponent;
 import de.schliweb.moveapiece.logic.PgnGames;
 import de.schliweb.moveapiece.logic.UciMoves;
+import de.schliweb.moveapiece.puzzle.Puzzle;
+import de.schliweb.moveapiece.puzzle.PuzzleDifficulty;
+import de.schliweb.moveapiece.puzzle.PuzzleFlow;
+import de.schliweb.moveapiece.puzzle.PuzzleRating;
+import de.schliweb.moveapiece.puzzle.PuzzleRepository;
+import de.schliweb.moveapiece.puzzle.PuzzleSelector;
+import de.schliweb.moveapiece.puzzle.RecentPuzzles;
 import de.schliweb.moveapiece.training.OpeningLine;
 import de.schliweb.moveapiece.training.OpeningRepository;
 import de.schliweb.moveapiece.training.TrainingFlow;
@@ -128,7 +136,8 @@ public class MainActivity extends AppCompatActivity
         HUMAN,
         ENGINE,
         MAIA,
-        TRAINING
+        TRAINING,
+        PUZZLE
     }
 
     private ActivityMainBinding binding;
@@ -288,6 +297,30 @@ public class MainActivity extends AppCompatActivity
 
     private final Handler trainingHandler = new Handler(Looper.getMainLooper());
 
+    // ---- Puzzle mode state --------------------------------------------------
+    /** The puzzle's move flow (shared with the desktop app, tested in core's PuzzleFlowTest). */
+    private final PuzzleFlow puzzleFlow = new PuzzleFlow(game, new PuzzleHostAdapter());
+
+    /** Runs the puzzle flow's pauses (its moves) and the next puzzle after a clean solve. */
+    private final Handler puzzleHandler = new Handler(Looper.getMainLooper());
+
+    private static final long NEXT_PUZZLE_DELAY_MS = 1500;
+
+    /** The bundled puzzle set, read on first use; see {@link #puzzleRepository}. */
+    private PuzzleRepository puzzles;
+
+    private PuzzleRating puzzleRating;
+    private RecentPuzzles recentPuzzles;
+
+    /** How the current puzzle changed the rating, once it is rated; null before. */
+    private Integer puzzleRatingDelta;
+
+    /** The piece a puzzle hint points at, until the next move; null without a hint. */
+    private Square puzzleHintSquare;
+
+    /** The next puzzle, due a moment after a clean solve; null while none is due. */
+    private Runnable nextPuzzleRunnable;
+
     // Mirrors state that otherwise lives only inside the (portrait- or
     // landscape-specific) BoardView instance, so it survives that instance
     // being torn down and recreated in bindViews() below.
@@ -306,6 +339,8 @@ public class MainActivity extends AppCompatActivity
         evaluationEnabled = settings.isEvaluationDisplayEnabled(evaluationEnabled);
         boardType = settings.getBoardType();
         lastSetup = settings.getLastGameSetup();
+        puzzleRating = settings.getPuzzleRating();
+        recentPuzzles = settings.getRecentPuzzles();
         board = createBoardBridge(boardType);
         maybeStartPegasusRecording();
         blePermissionLauncher =
@@ -348,6 +383,28 @@ public class MainActivity extends AppCompatActivity
      * pick the game up by themselves, the board is reconnected by the player and synced on connect.
      */
     private void saveGame() {
+        if (mode == GameMode.PUZZLE) {
+            // A finished puzzle is kept as puzzle mode without a puzzle: the next start goes on
+            // with a new one (see restorePuzzles).
+            PuzzleFlow.Progress progress = puzzleFlow.progress();
+            if (progress == null) {
+                progress = new PuzzleFlow.Progress(null, 0, false);
+            }
+            storeSavedGame(
+                    new Settings.SavedGame(
+                            mode.name(),
+                            engineSide.name(),
+                            boardFlipped,
+                            currentMaiaRating,
+                            null,
+                            null,
+                            true,
+                            0,
+                            progress.puzzleId(),
+                            progress.ply(),
+                            progress.failed()));
+            return;
+        }
         TrainingSession session = trainingFlow.session();
         boolean training = mode == GameMode.TRAINING && session != null;
         if (game.isGameOver() || (training && session.isComplete())) {
@@ -369,7 +426,10 @@ public class MainActivity extends AppCompatActivity
                                 null,
                                 session.line().id(),
                                 session.hintsEnabled(),
-                                session.plyIndex())
+                                session.plyIndex(),
+                                null,
+                                0,
+                                false)
                         : new Settings.SavedGame(
                                 mode.name(),
                                 engineSide.name(),
@@ -378,7 +438,14 @@ public class MainActivity extends AppCompatActivity
                                 game.snapshot(),
                                 null,
                                 true,
-                                0);
+                                0,
+                                null,
+                                0,
+                                false);
+        storeSavedGame(saved);
+    }
+
+    private void storeSavedGame(Settings.SavedGame saved) {
         if (!saved.equals(lastSavedGame)) {
             settings.setSavedGame(saved);
             lastSavedGame = saved;
@@ -409,6 +476,9 @@ public class MainActivity extends AppCompatActivity
             savedSide = Side.valueOf(saved.side());
         } catch (IllegalArgumentException e) {
             return false;
+        }
+        if (savedMode == GameMode.PUZZLE) {
+            return restorePuzzles(saved);
         }
         if (savedMode == GameMode.TRAINING) {
             OpeningLine line =
@@ -447,12 +517,39 @@ public class MainActivity extends AppCompatActivity
     }
 
     /**
+     * {@link #restoreSavedGame} for puzzle mode, still before the views are bound: the puzzle in
+     * progress where it was, or - after a finished puzzle, or one no longer in the set - a new one.
+     * Returns false only if the puzzle set cannot be read.
+     */
+    private boolean restorePuzzles(Settings.SavedGame saved) {
+        PuzzleRepository repository = puzzleRepository();
+        if (repository == null) {
+            return false;
+        }
+        mode = GameMode.PUZZLE; // before the flow refreshes, which reads it
+        Puzzle puzzle = repository.byId(saved.puzzleId());
+        if (puzzle != null) {
+            boardFlipped = saved.flipped();
+            if (puzzleFlow.resume(puzzle, saved.puzzlePly(), saved.puzzleFailed())) {
+                scrollMoveHistoryToEnd = true;
+                return true;
+            }
+        }
+        nextPuzzle();
+        return true;
+    }
+
+    /**
      * Second half of a restore, once the views are bound: the board bridge learns the start
      * position (as {@link #startNewGame} tells it), and the opponent takes up its turn. Stockfish
      * does that by itself once it is ready ({@link #onReadyOk}); Maia is loaded here, the trainer
      * moves on from where it was.
      */
     private void resumeRestoredGame() {
+        if (mode == GameMode.PUZZLE) {
+            board.resetForNewGame(); // puzzles leave the board alone; clears any old guide
+            return;
+        }
         if (game.isChess960()) {
             board.resetForNewGame(game.startFen());
         } else {
@@ -514,7 +611,16 @@ public class MainActivity extends AppCompatActivity
         binding.undoButton.setOnClickListener(v -> undo());
         binding.redoButton.setOnClickListener(v -> redo());
         binding.flipBoardButton.setOnClickListener(v -> setBoardFlipped(!boardFlipped));
-        binding.hintButton.setOnClickListener(v -> searchFlow.requestHint());
+        binding.hintButton.setOnClickListener(
+                v -> {
+                    if (mode == GameMode.PUZZLE) {
+                        showPuzzleHint();
+                    } else {
+                        searchFlow.requestHint();
+                    }
+                });
+        binding.showSolutionButton.setOnClickListener(v -> puzzleFlow.showSolution());
+        binding.nextPuzzleButton.setOnClickListener(v -> nextPuzzle());
         binding.pegasusButton.setOnClickListener(v -> onPegasusButtonClicked());
         binding.pegasusMismatchText.setOnClickListener(v -> onMismatchBannerClicked());
         boardButtonDefaultIconTint = binding.pegasusButton.getIconTint();
@@ -561,15 +667,21 @@ public class MainActivity extends AppCompatActivity
         bindViews();
     }
 
+    /** Safe before {@link #bindViews} (a restored puzzle): bindViews applies it then. */
     private void setBoardFlipped(boolean flipped) {
         boardFlipped = flipped;
-        binding.boardView.setFlipped(flipped);
+        if (binding != null) {
+            binding.boardView.setFlipped(flipped);
+        }
     }
 
+    /** Safe before {@link #bindViews}, like {@link #setBoardFlipped}. */
     private void setLastMove(Square from, Square to) {
         lastMoveFrom = from;
         lastMoveTo = to;
-        binding.boardView.setLastMove(from, to);
+        if (binding != null) {
+            binding.boardView.setLastMove(from, to);
+        }
     }
 
     private void startEngine() {
@@ -748,7 +860,7 @@ public class MainActivity extends AppCompatActivity
         popup.getMenu().findItem(R.id.menuExportPgn).setVisible(!training).setEnabled(hasMoves);
         popup.getMenu()
                 .findItem(R.id.menuAnalyzeGame)
-                .setVisible(!training)
+                .setVisible(!isDrillMode())
                 .setEnabled(!searchFlow.isPostGameAnalysisRunning() && engineReady && hasMoves);
         popup.setOnMenuItemClickListener(
                 item -> {
@@ -930,7 +1042,9 @@ public class MainActivity extends AppCompatActivity
             // authoritative position on every (re)connect so the board can
             // resume physical play correctly - see PegasusGameBridge
             // .syncBoardToPosition for how a mismatch is then resolved.
-            board.syncBoardToPosition(game.toFen());
+            if (mode != GameMode.PUZZLE) {
+                board.syncBoardToPosition(game.toFen());
+            }
             if (mode == GameMode.TRAINING) {
                 // Re-issues the current hint (or resumes book-side play) if a
                 // guide was mid-flight when the board disconnected - without
@@ -954,6 +1068,9 @@ public class MainActivity extends AppCompatActivity
 
     @Override
     public void onPhysicalMoveConfirmed(String uci) {
+        if (mode == GameMode.PUZZLE) {
+            return; // puzzles do not use the board yet
+        }
         if (mode == GameMode.TRAINING) {
             onTrainingMoveConfirmedByDetection(uci);
             return;
@@ -982,11 +1099,17 @@ public class MainActivity extends AppCompatActivity
 
     @Override
     public void onPromotionRequired() {
+        if (mode == GameMode.PUZZLE) {
+            return;
+        }
         showPhysicalPromotionDialog();
     }
 
     @Override
     public void onAmbiguousMove(List<String> candidateUcis) {
+        if (mode == GameMode.PUZZLE) {
+            return;
+        }
         showAmbiguousMoveDialog(candidateUcis);
     }
 
@@ -1021,6 +1144,15 @@ public class MainActivity extends AppCompatActivity
 
     /** Banner + board highlight while the physical board disagrees with the position on screen. */
     private void updatePegasusMismatchText() {
+        if (binding == null) {
+            return;
+        }
+        if (mode == GameMode.PUZZLE) {
+            // Puzzles do not use the board yet, so it differing from the screen means nothing.
+            binding.boardView.setMismatchSquares(java.util.Collections.emptyList());
+            binding.pegasusMismatchText.setVisibility(View.GONE);
+            return;
+        }
         boolean mismatched =
                 board.getConnectionState() == ConnectionState.CONNECTED
                         && board.isBoardMismatched();
@@ -1096,7 +1228,8 @@ public class MainActivity extends AppCompatActivity
     private boolean canLoadPositionFromBoard() {
         return board.canLoadPhysicalPosition()
                 && board.getConnectionState() == ConnectionState.CONNECTED
-                && mode != GameMode.TRAINING;
+                && mode != GameMode.TRAINING
+                && mode != GameMode.PUZZLE;
     }
 
     /** Tap on the mismatch banner: ask who is to move, then load the board's position. */
@@ -1171,6 +1304,9 @@ public class MainActivity extends AppCompatActivity
 
     @Override
     public void onEngineMoveGuidanceComplete() {
+        if (mode == GameMode.PUZZLE) {
+            return;
+        }
         if (mode == GameMode.TRAINING && trainingFlow.onGuidanceComplete()) {
             return;
         }
@@ -1283,6 +1419,9 @@ public class MainActivity extends AppCompatActivity
             TrainingSession session = trainingFlow.session();
             return session != null && !session.isComplete();
         }
+        if (mode == GameMode.PUZZLE) {
+            return puzzleFlow.isActive() && puzzleFlow.state() != PuzzleFlow.State.COMPLETE;
+        }
         return true;
     }
 
@@ -1293,6 +1432,10 @@ public class MainActivity extends AppCompatActivity
      */
     private void restartLastActivity() {
         GameMode restartMode = modeFor(lastSetup.opponent());
+        if (restartMode == GameMode.PUZZLE) {
+            startPuzzles();
+            return;
+        }
         // startNewGame takes the engine's side for ENGINE/MAIA, the human's otherwise.
         Side side =
                 restartMode == GameMode.ENGINE || restartMode == GameMode.MAIA
@@ -1316,6 +1459,8 @@ public class MainActivity extends AppCompatActivity
                 return GameMode.MAIA;
             case TRAINER:
                 return GameMode.TRAINING;
+            case PUZZLE:
+                return GameMode.PUZZLE;
             default:
                 return GameMode.ENGINE;
         }
@@ -1329,6 +1474,8 @@ public class MainActivity extends AppCompatActivity
                 return Opponent.MAIA;
             case TRAINING:
                 return Opponent.TRAINER;
+            case PUZZLE:
+                return Opponent.PUZZLE;
             default:
                 return Opponent.STOCKFISH;
         }
@@ -1342,6 +1489,7 @@ public class MainActivity extends AppCompatActivity
     // ---- New game setup ----------------------------------------------------
 
     private void showNewGameDialog() {
+        cancelNextPuzzle(); // no puzzle may replace the game behind the dialog
         DialogNewGameBinding dialogBinding = DialogNewGameBinding.inflate(getLayoutInflater());
         dialogBinding.strengthLabel.setText(getString(R.string.dialog_strength_format, engineElo));
         dialogBinding.strengthSeekBar.setMax(ELO_MAX - ELO_MIN);
@@ -1381,6 +1529,12 @@ public class MainActivity extends AppCompatActivity
         dialogBinding.openingSpinner.setSelection(Math.max(0, openingIndex));
         dialogBinding.hintCheckBox.setChecked(lastSetup.hintsEnabled());
         dialogBinding.chess960CheckBox.setChecked(lastSetup.chess960());
+        dialogBinding.difficultyGroup.check(
+                lastSetup.puzzleDifficulty() == PuzzleDifficulty.EASIER
+                        ? dialogBinding.difficultyEasier.getId()
+                        : lastSetup.puzzleDifficulty() == PuzzleDifficulty.HARDER
+                                ? dialogBinding.difficultyHarder.getId()
+                                : dialogBinding.difficultyNormal.getId());
 
         dialogBinding.opponentGroup.setOnCheckedChangeListener(
                 (group, checkedId) ->
@@ -1407,6 +1561,35 @@ public class MainActivity extends AppCompatActivity
                                             dialogBinding.colorWhite.isChecked()
                                                     ? Side.WHITE
                                                     : Side.BLACK;
+                                    PuzzleDifficulty chosenDifficulty =
+                                            dialogBinding.difficultyEasier.isChecked()
+                                                    ? PuzzleDifficulty.EASIER
+                                                    : dialogBinding.difficultyHarder.isChecked()
+                                                            ? PuzzleDifficulty.HARDER
+                                                            : PuzzleDifficulty.NORMAL;
+                                    if (chosenMode == GameMode.PUZZLE) {
+                                        // The puzzle decides the colour; the one in the dialog is
+                                        // kept for the other opponents.
+                                        rememberSetup(
+                                                new GameSetup(
+                                                        Opponent.PUZZLE,
+                                                        chosenColor,
+                                                        null,
+                                                        dialogBinding.hintCheckBox.isChecked(),
+                                                        false,
+                                                        chosenDifficulty));
+                                        startPuzzles();
+                                        return;
+                                    }
+                                    // Kept for the next puzzles, whatever is started now.
+                                    rememberSetup(
+                                            new GameSetup(
+                                                    lastSetup.opponent(),
+                                                    lastSetup.side(),
+                                                    lastSetup.opening(),
+                                                    lastSetup.hintsEnabled(),
+                                                    lastSetup.chess960(),
+                                                    chosenDifficulty));
                                     int chosenElo =
                                             ELO_MIN + dialogBinding.strengthSeekBar.getProgress();
                                     int chosenMaiaRating =
@@ -1454,6 +1637,8 @@ public class MainActivity extends AppCompatActivity
                 return dialogBinding.opponentMaia.getId();
             case TRAINER:
                 return dialogBinding.opponentTraining.getId();
+            case PUZZLE:
+                return dialogBinding.opponentPuzzle.getId();
             default:
                 return dialogBinding.opponentEngine.getId();
         }
@@ -1469,12 +1654,22 @@ public class MainActivity extends AppCompatActivity
         if (checkedId == dialogBinding.opponentTraining.getId()) {
             return GameMode.TRAINING;
         }
+        if (checkedId == dialogBinding.opponentPuzzle.getId()) {
+            return GameMode.PUZZLE;
+        }
         return GameMode.HUMAN;
     }
 
     private void updateDialogVisibility(DialogNewGameBinding dialogBinding, GameMode dialogMode) {
+        // A puzzle decides the colour itself; it offers the difficulty instead.
         int colorVisibility =
-                dialogMode == GameMode.HUMAN ? android.view.View.GONE : android.view.View.VISIBLE;
+                dialogMode == GameMode.HUMAN || dialogMode == GameMode.PUZZLE
+                        ? android.view.View.GONE
+                        : android.view.View.VISIBLE;
+        int difficultyVisibility =
+                dialogMode == GameMode.PUZZLE ? android.view.View.VISIBLE : android.view.View.GONE;
+        dialogBinding.difficultyLabel.setVisibility(difficultyVisibility);
+        dialogBinding.difficultyGroup.setVisibility(difficultyVisibility);
         int strengthVisibility =
                 dialogMode == GameMode.ENGINE ? android.view.View.VISIBLE : android.view.View.GONE;
         int maiaRatingVisibility =
@@ -1537,6 +1732,7 @@ public class MainActivity extends AppCompatActivity
             boolean chess960) {
         searchFlow.abandonPendingSearches();
         trainingFlow.stop();
+        stopPuzzles();
 
         // chosenSide is the engine's side for ENGINE/MAIA and the human's otherwise; the
         // remembered setup always holds the human's.
@@ -1547,7 +1743,8 @@ public class MainActivity extends AppCompatActivity
                         pairedEngine ? chosenSide.flip() : chosenSide,
                         chosenOpening,
                         hintsEnabled,
-                        chess960));
+                        chess960,
+                        lastSetup.puzzleDifficulty()));
 
         mode = chosenMode;
         engineSide =
@@ -1615,6 +1812,14 @@ public class MainActivity extends AppCompatActivity
         return mode == GameMode.ENGINE || mode == GameMode.MAIA;
     }
 
+    /**
+     * The opening trainer or a puzzle: a fixed line to find, so no evaluation, engine hints, move
+     * grades or game analysis, and a plain move history without jumping around in it.
+     */
+    private boolean isDrillMode() {
+        return mode == GameMode.TRAINING || mode == GameMode.PUZZLE;
+    }
+
     // ---- Board <-> game glue -------------------------------------------------
 
     private void refreshBoard() {
@@ -1633,6 +1838,7 @@ public class MainActivity extends AppCompatActivity
         maybeTriggerAnalysis();
         updateNoteText();
         updateHintButtonState();
+        updatePuzzleControls();
         saveGame();
     }
 
@@ -1658,6 +1864,8 @@ public class MainActivity extends AppCompatActivity
                 return trainingSession != null
                         && !trainingSession.isComplete()
                         && trainingSession.isHumanTurnNow();
+            case PUZZLE:
+                return puzzleFlow.isHumanTurn();
             default:
                 return true;
         }
@@ -1677,6 +1885,8 @@ public class MainActivity extends AppCompatActivity
         TextView info = binding.infoText;
         if (moveQualityNote != null) {
             info.setText(moveQualityNote);
+        } else if (mode == GameMode.PUZZLE && puzzleFlow.puzzle() != null) {
+            info.setText(puzzleInfoText(puzzleFlow.puzzle()));
         } else if (mode == GameMode.TRAINING && trainingSession != null) {
             info.setText(
                     getString(
@@ -1747,6 +1957,13 @@ public class MainActivity extends AppCompatActivity
      * consistent either way.
      */
     private void updateTrainingHintHighlight() {
+        if (mode == GameMode.PUZZLE) {
+            // Only the piece to move, not where it goes; no engine alternatives from a game before.
+            binding.boardView.setTrainingHint(
+                    puzzleFlow.isHumanTurn() ? puzzleHintSquare : null, null);
+            hintAlternativesNote = null;
+            return;
+        }
         if (mode != GameMode.TRAINING
                 || trainingSession == null
                 || trainingSession.isComplete()
@@ -1764,7 +1981,7 @@ public class MainActivity extends AppCompatActivity
     }
 
     private void updateMoveHistory() {
-        if (mode == GameMode.TRAINING) {
+        if (isDrillMode()) {
             // The training line has its own guided navigation (retreat()/advance() paired with
             // undo/redo) - letting the trainee freely jump around the line would cut across the
             // "prove you know the move" hinting, so its history stays plain, unclickable text
@@ -1897,7 +2114,9 @@ public class MainActivity extends AppCompatActivity
 
     private void updateStatusText() {
         TextView status = binding.statusText;
-        if (game.isCheckmate()) {
+        if (mode == GameMode.PUZZLE && puzzleFlow.isActive()) {
+            status.setText(puzzleStatusText());
+        } else if (game.isCheckmate()) {
             boolean whiteWon = game.sideToMove() == Side.BLACK;
             status.setText(
                     whiteWon ? R.string.status_checkmate_white : R.string.status_checkmate_black);
@@ -1923,7 +2142,7 @@ public class MainActivity extends AppCompatActivity
     }
 
     private void undo() {
-        if (waitingForEngineMove) {
+        if (waitingForEngineMove || mode == GameMode.PUZZLE) {
             return;
         }
         if (mode == GameMode.TRAINING) {
@@ -1944,7 +2163,7 @@ public class MainActivity extends AppCompatActivity
      * too, rather than leaving it to move on its own). No-op if there is nothing to redo.
      */
     private void redo() {
-        if (waitingForEngineMove) {
+        if (waitingForEngineMove || mode == GameMode.PUZZLE) {
             return;
         }
         if (mode == GameMode.TRAINING) {
@@ -1994,7 +2213,7 @@ public class MainActivity extends AppCompatActivity
      * board is live-connected.
      */
     private void syncPegasusPosition() {
-        if (board.getConnectionState() == ConnectionState.CONNECTED) {
+        if (mode != GameMode.PUZZLE && board.getConnectionState() == ConnectionState.CONNECTED) {
             board.syncBoardToPosition(game.toFen());
         }
     }
@@ -2049,6 +2268,12 @@ public class MainActivity extends AppCompatActivity
             return;
         }
         searchFlow.abandonPendingSearches();
+        if (mode == GameMode.PUZZLE) {
+            // The import replaces the game on another thread, so no puzzle may move on it
+            // meanwhile; leaving it unsolved counts as lost. A failed import goes on with a new
+            // one (see onPgnImportFailed).
+            stopPuzzles();
+        }
         AlertDialog progress =
                 new MaterialAlertDialogBuilder(this)
                         .setView(R.layout.dialog_pgn_import_progress)
@@ -2073,11 +2298,7 @@ public class MainActivity extends AppCompatActivity
                                 runOnUiThread(
                                         () -> {
                                             progress.dismiss();
-                                            Toast.makeText(
-                                                            this,
-                                                            R.string.pgn_import_failed,
-                                                            Toast.LENGTH_SHORT)
-                                                    .show();
+                                            onPgnImportFailed();
                                         });
                                 return;
                             }
@@ -2088,11 +2309,7 @@ public class MainActivity extends AppCompatActivity
                                         () -> {
                                             progress.dismiss();
                                             if (!loaded) {
-                                                Toast.makeText(
-                                                                this,
-                                                                R.string.pgn_import_failed,
-                                                                Toast.LENGTH_SHORT)
-                                                        .show();
+                                                onPgnImportFailed();
                                                 return;
                                             }
                                             finishPgnImport();
@@ -2121,20 +2338,35 @@ public class MainActivity extends AppCompatActivity
                                 labels,
                                 (dialog, which) -> {
                                     if (!game.loadPgn(games.get(which))) {
-                                        Toast.makeText(
-                                                        this,
-                                                        R.string.pgn_import_failed,
-                                                        Toast.LENGTH_SHORT)
-                                                .show();
+                                        onPgnImportFailed();
                                         return;
                                     }
                                     finishPgnImport();
                                 })
                         .show();
+        // Closed without a pick (back, outside, rotation): puzzle mode goes on with a new puzzle.
+        currentDialog.setOnDismissListener(
+                d -> {
+                    if (mode == GameMode.PUZZLE && !puzzleFlow.isActive()) {
+                        nextPuzzle();
+                    }
+                });
+    }
+
+    /**
+     * A PGN import failed: say so, and in puzzle mode - whose puzzle the import stopped - go on
+     * with a new puzzle rather than leave the board without one.
+     */
+    private void onPgnImportFailed() {
+        Toast.makeText(this, R.string.pgn_import_failed, Toast.LENGTH_SHORT).show();
+        if (mode == GameMode.PUZZLE && !puzzleFlow.isActive()) {
+            nextPuzzle();
+        }
     }
 
     private void finishPgnImport() {
         trainingFlow.stop();
+        stopPuzzles();
         mode = GameMode.HUMAN;
         trainingSession = null;
         binding.undoButton.setEnabled(true);
@@ -2216,9 +2448,17 @@ public class MainActivity extends AppCompatActivity
     }
 
     private void updateHintButtonState() {
+        if (binding == null) {
+            return;
+        }
         int visibility =
                 mode == GameMode.TRAINING ? android.view.View.GONE : android.view.View.VISIBLE;
         binding.hintButton.setVisibility(visibility);
+        if (mode == GameMode.PUZZLE) {
+            // The puzzle's own line, not Stockfish: no engine needed.
+            binding.hintButton.setEnabled(puzzleFlow.isHumanTurn() && puzzleHintSquare == null);
+            return;
+        }
         binding.hintButton.setEnabled(
                 engineReady
                         && !searchFlow.isWaitingForHint()
@@ -2302,15 +2542,185 @@ public class MainActivity extends AppCompatActivity
      * position first, so a second, redundant search is skipped.
      */
     private void maybeTriggerAnalysis() {
-        int evalVisibility =
-                mode == GameMode.TRAINING ? android.view.View.GONE : android.view.View.VISIBLE;
+        int evalVisibility = isDrillMode() ? android.view.View.GONE : android.view.View.VISIBLE;
         binding.evaluationSwitch.setVisibility(evalVisibility);
         binding.evaluationText.setVisibility(evalVisibility);
-        if (!evaluationEnabled || mode == GameMode.TRAINING || game.isGameOver()) {
+        if (!evaluationEnabled || isDrillMode() || game.isGameOver()) {
             binding.evaluationText.setText("");
             return;
         }
         searchFlow.maybeStartAnalysis();
+    }
+
+    // ---- Puzzles ------------------------------------------------------------
+
+    /**
+     * The bundled puzzle set, read from the assets on first use and kept; null if it cannot be
+     * read, which only a broken build could cause.
+     */
+    private PuzzleRepository puzzleRepository() {
+        if (puzzles == null) {
+            try (InputStream in = getAssets().open("puzzles.csv")) {
+                puzzles = PuzzleRepository.load(in);
+            } catch (IOException | IllegalArgumentException e) {
+                Log.w(TAG, "Could not load the puzzles", e);
+                return null;
+            }
+        }
+        return puzzles;
+    }
+
+    private void startPuzzles() {
+        if (puzzleRepository() == null) {
+            Toast.makeText(this, R.string.error_puzzles_unavailable, Toast.LENGTH_LONG).show();
+            return;
+        }
+        searchFlow.abandonPendingSearches();
+        trainingFlow.stop();
+        trainingSession = null;
+        newGameStarted = false;
+        mode = GameMode.PUZZLE;
+        board.resetForNewGame(); // clears a guide left over from the last game
+        if (engineReady) {
+            engine.newGame();
+        }
+        nextPuzzle();
+    }
+
+    /**
+     * Picks a puzzle near the trainee's rating - shifted by the difficulty chosen in New Game - and
+     * not one played lately, and sets it up. Safe before {@link #bindViews} (a restore).
+     */
+    private void nextPuzzle() {
+        cancelNextPuzzle();
+        puzzleFlow.abandon(); // a puzzle left unsolved counts as lost
+        PuzzleRepository repository = puzzleRepository();
+        Puzzle puzzle =
+                repository == null
+                        ? null
+                        : PuzzleSelector.next(
+                                repository.all(),
+                                lastSetup.puzzleDifficulty().target(puzzleRating.rating()),
+                                recentPuzzles,
+                                ThreadLocalRandom.current());
+        if (puzzle == null) {
+            return;
+        }
+        recentPuzzles.add(puzzle.id());
+        settings.setRecentPuzzles(recentPuzzles);
+        searchFlow.abandonPendingSearches();
+        puzzleRatingDelta = null;
+        puzzleHintSquare = null;
+        setBoardFlipped(puzzle.humanSide() == Side.BLACK);
+        setLastMove(null, null);
+        if (binding != null) {
+            binding.boardView.setTrainingHint(null, null);
+            binding.boardView.clearSelection();
+        }
+        puzzleFlow.start(puzzle); // sets the position up, refreshes, schedules the first move
+    }
+
+    /**
+     * Leaves puzzles for another mode or a PGN import; a puzzle left unsolved counts as lost (see
+     * {@link PuzzleFlow#abandon()}).
+     */
+    private void stopPuzzles() {
+        cancelNextPuzzle();
+        puzzleFlow.abandon();
+        puzzleRatingDelta = null;
+        puzzleHintSquare = null;
+    }
+
+    private void cancelNextPuzzle() {
+        if (nextPuzzleRunnable != null) {
+            puzzleHandler.removeCallbacks(nextPuzzleRunnable);
+            nextPuzzleRunnable = null;
+        }
+    }
+
+    /**
+     * A move tapped in a puzzle. The flow applies it itself, right or wrong; this only asks for the
+     * promotion piece first.
+     */
+    private void onPuzzleMoveChosen(Square from, Square to) {
+        if (!puzzleFlow.isHumanTurn()) {
+            return;
+        }
+        String uci =
+                from.toString().toLowerCase(Locale.ROOT) + to.toString().toLowerCase(Locale.ROOT);
+        if (game.isPromotion(from, to)) {
+            String[] suffixes = {"q", "r", "b", "n"};
+            showPromotionPickerDialog(
+                    game.sideToMove(), which -> playPuzzleMove(uci + suffixes[which]));
+            return;
+        }
+        playPuzzleMove(uci);
+    }
+
+    private void playPuzzleMove(String uci) {
+        puzzleHintSquare = null;
+        binding.boardView.clearSelection();
+        if (puzzleFlow.onUserMove(uci) == PuzzleFlow.MoveResult.IGNORED) {
+            refreshBoard();
+        }
+    }
+
+    /** Marks the piece the line moves next; the puzzle then counts as not solved. */
+    private void showPuzzleHint() {
+        String uci = puzzleFlow.hint();
+        if (uci != null) {
+            puzzleHintSquare = UciMoves.from(uci);
+            refreshBoard();
+        }
+    }
+
+    private int puzzleStatusText() {
+        switch (puzzleFlow.state()) {
+            case HUMAN_TO_MOVE:
+                return puzzleFlow.puzzle().humanSide() == Side.WHITE
+                        ? R.string.status_puzzle_find_move_white
+                        : R.string.status_puzzle_find_move_black;
+            case WRONG_MOVE_SHOWN:
+                return R.string.status_puzzle_wrong;
+            case SHOWING_SOLUTION:
+                return R.string.status_puzzle_solution;
+            case COMPLETE:
+                return puzzleFlow.isFailed()
+                        ? R.string.status_puzzle_finished
+                        : R.string.status_puzzle_solved;
+            default:
+                return game.sideToMove() == Side.WHITE
+                        ? R.string.status_white_to_move
+                        : R.string.status_black_to_move;
+        }
+    }
+
+    /** The puzzle's rating and the trainee's, with the change once the puzzle is rated. */
+    private String puzzleInfoText(Puzzle puzzle) {
+        if (puzzleRatingDelta == null) {
+            return getString(R.string.puzzle_info_format, puzzle.rating(), puzzleRating.rating());
+        }
+        return getString(
+                R.string.puzzle_info_rated_format,
+                puzzle.rating(),
+                puzzleRating.rating(),
+                String.format(Locale.ROOT, "%+d", puzzleRatingDelta));
+    }
+
+    private void updatePuzzleControls() {
+        boolean puzzleMode = mode == GameMode.PUZZLE;
+        binding.puzzleRow.setVisibility(puzzleMode ? View.VISIBLE : View.GONE);
+        binding.undoButton.setEnabled(!puzzleMode);
+        binding.redoButton.setEnabled(!puzzleMode);
+        if (!puzzleMode) {
+            return;
+        }
+        PuzzleFlow.State state = puzzleFlow.state();
+        binding.showSolutionButton.setEnabled(
+                state == PuzzleFlow.State.HUMAN_TO_MOVE
+                        || state == PuzzleFlow.State.OPPONENT_TO_MOVE
+                        || state == PuzzleFlow.State.WRONG_MOVE_SHOWN);
+        binding.nextPuzzleButton.setEnabled(state == PuzzleFlow.State.COMPLETE);
     }
 
     // ---- Training mode ------------------------------------------------------
@@ -2434,7 +2844,14 @@ public class MainActivity extends AppCompatActivity
                                                             : Opponent.HUMAN;
                                     // Explicitly chosen by the user, so it is what the board's
                                     // NEW GAME button repeats next.
-                                    rememberSetup(GameSetup.of(chosen, trainedSide));
+                                    rememberSetup(
+                                            new GameSetup(
+                                                    chosen,
+                                                    trainedSide,
+                                                    null,
+                                                    true,
+                                                    false,
+                                                    lastSetup.puzzleDifficulty()));
                                     if (dialogBinding.opponentEngine.isChecked()) {
                                         mode = GameMode.ENGINE;
                                         engineSide =
@@ -2499,6 +2916,10 @@ public class MainActivity extends AppCompatActivity
     public void onMoveChosen(Square from, Square to) {
         if (mode == GameMode.TRAINING) {
             onTrainingMoveChosen(from, to);
+            return;
+        }
+        if (mode == GameMode.PUZZLE) {
+            onPuzzleMoveChosen(from, to);
             return;
         }
         if (game.isPromotion(from, to)) {
@@ -2634,7 +3055,9 @@ public class MainActivity extends AppCompatActivity
     private void playMoveSound(boolean wasCapture) {
         // A connected board with a speaker (Chessnut) answers for the move itself, where the
         // pieces are rather than from the phone - and stays silent for an ordinary move.
-        if (board.playMoveSound(wasCapture, game.isCheck(), game.isCheckmate())) {
+        // Puzzles leave the board alone, its speaker included.
+        if (mode != GameMode.PUZZLE
+                && board.playMoveSound(wasCapture, game.isCheck(), game.isCheckmate())) {
             return;
         }
         if (game.isCheck()) {
@@ -2657,7 +3080,8 @@ public class MainActivity extends AppCompatActivity
 
     @Override
     public boolean isTrainingMode() {
-        return mode == GameMode.TRAINING;
+        // No evaluation, engine hints or move grades in puzzles either: they would give it away.
+        return isDrillMode();
     }
 
     @Override
@@ -2932,6 +3356,7 @@ public class MainActivity extends AppCompatActivity
     @Override
     protected void onDestroy() {
         trainingHandler.removeCallbacksAndMessages(null);
+        puzzleHandler.removeCallbacksAndMessages(null);
         if (engine != null) {
             engine.shutdown();
         }
@@ -3029,6 +3454,96 @@ public class MainActivity extends AppCompatActivity
         @Override
         public void log(String message) {
             Log.i(TAG, message);
+        }
+    }
+
+    /**
+     * Screen effects for {@link PuzzleFlow}; its pauses run on puzzleHandler. Every view access is
+     * guarded: a restored puzzle is resumed before {@link #bindViews}.
+     */
+    private final class PuzzleHostAdapter implements PuzzleFlow.Host {
+        private Runnable pending;
+
+        @Override
+        public void moveApplied(String uci, boolean wasCapture) {
+            setLastMove(UciMoves.from(uci), UciMoves.to(uci));
+            if (binding != null) {
+                MainActivity.this.playMoveSound(wasCapture);
+            }
+            scrollMoveHistoryToEnd = true;
+        }
+
+        @Override
+        public void historyRewritten() {
+            // After a wrong move is taken back, the app's move before it is the last move again.
+            String last = game.lastMoveUci();
+            if (last == null) {
+                setLastMove(null, null);
+            } else {
+                setLastMove(UciMoves.from(last), UciMoves.to(last));
+            }
+        }
+
+        @Override
+        public void refresh() {
+            if (binding != null) {
+                refreshBoard();
+            }
+        }
+
+        @Override
+        public void schedule(Runnable action, long delayMs) {
+            cancelScheduled();
+            pending =
+                    () -> {
+                        pending = null;
+                        action.run();
+                    };
+            puzzleHandler.postDelayed(pending, delayMs);
+        }
+
+        @Override
+        public void cancelScheduled() {
+            if (pending != null) {
+                puzzleHandler.removeCallbacks(pending);
+                pending = null;
+            }
+        }
+
+        @Override
+        public void wrongMove(String uci) {
+            // The status line says so; the move itself stays visible until the flow takes it back.
+        }
+
+        @Override
+        public void puzzleRated(Puzzle puzzle, boolean solved) {
+            puzzleRatingDelta = puzzleRating.delta(puzzle.rating(), solved);
+            puzzleRating = puzzleRating.after(puzzle.rating(), solved);
+            settings.setPuzzleRating(puzzleRating);
+        }
+
+        @Override
+        public void puzzleComplete(Puzzle puzzle, boolean solved) {
+            if (!solved) {
+                return; // leave the line on the board to look at; "Next puzzle" moves on
+            }
+            cancelNextPuzzle();
+            nextPuzzleRunnable =
+                    () -> {
+                        nextPuzzleRunnable = null;
+                        // Not behind a dialog, and not while the app is in the background: the
+                        // trainee would miss it. "Next puzzle" is there for afterwards.
+                        boolean dialogOpen = currentDialog != null && currentDialog.isShowing();
+                        boolean visible =
+                                getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.RESUMED);
+                        if (mode == GameMode.PUZZLE
+                                && puzzleFlow.state() == PuzzleFlow.State.COMPLETE
+                                && !dialogOpen
+                                && visible) {
+                            nextPuzzle();
+                        }
+                    };
+            puzzleHandler.postDelayed(nextPuzzleRunnable, NEXT_PUZZLE_DELAY_MS);
         }
     }
 }

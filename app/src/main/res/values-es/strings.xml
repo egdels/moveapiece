@@ -146,4 +146,22 @@
     <string name="opening_preview_progress_format">Jugada %1$d de %2$d</string>
     <string name="action_previous_move">Anterior</string>
     <string name="action_next_move">Siguiente</string>
+
+    <!-- Puzzles -->
+    <string name="opponent_puzzles">Ejercicios</string>
+    <string name="dialog_difficulty_title">Dificultad</string>
+    <string name="puzzle_difficulty_easier">Más fácil</string>
+    <string name="puzzle_difficulty_normal">Normal</string>
+    <string name="puzzle_difficulty_harder">Más difícil</string>
+    <string name="action_show_solution">Ver solución</string>
+    <string name="action_next_puzzle">Siguiente ejercicio</string>
+    <string name="status_puzzle_find_move_white">Juegan las blancas – encuentra la mejor jugada</string>
+    <string name="status_puzzle_find_move_black">Juegan las negras – encuentra la mejor jugada</string>
+    <string name="status_puzzle_wrong">Esa no es – inténtalo de nuevo</string>
+    <string name="status_puzzle_solution">Solución</string>
+    <string name="status_puzzle_solved">¡Resuelto!</string>
+    <string name="status_puzzle_finished">Ejercicio terminado</string>
+    <string name="puzzle_info_format">Ejercicio %1$d · Tu puntuación %2$d</string>
+    <string name="puzzle_info_rated_format">Ejercicio %1$d · Tu puntuación %2$d (%3$s)</string>
+    <string name="error_puzzles_unavailable">No se pudieron cargar los ejercicios.</string>
 </resources>

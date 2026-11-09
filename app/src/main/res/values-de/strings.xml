@@ -146,4 +146,22 @@
     <string name="opening_preview_progress_format">Zug %1$d von %2$d</string>
     <string name="action_previous_move">Zurück</string>
     <string name="action_next_move">Weiter</string>
+
+    <!-- Puzzles -->
+    <string name="opponent_puzzles">Puzzles</string>
+    <string name="dialog_difficulty_title">Schwierigkeit</string>
+    <string name="puzzle_difficulty_easier">Leichter</string>
+    <string name="puzzle_difficulty_normal">Normal</string>
+    <string name="puzzle_difficulty_harder">Schwerer</string>
+    <string name="action_show_solution">Lösung zeigen</string>
+    <string name="action_next_puzzle">Nächstes Puzzle</string>
+    <string name="status_puzzle_find_move_white">Weiß am Zug – finde den besten Zug</string>
+    <string name="status_puzzle_find_move_black">Schwarz am Zug – finde den besten Zug</string>
+    <string name="status_puzzle_wrong">Nicht dieser Zug – versuch es noch einmal</string>
+    <string name="status_puzzle_solution">Lösung</string>
+    <string name="status_puzzle_solved">Gelöst!</string>
+    <string name="status_puzzle_finished">Puzzle beendet</string>
+    <string name="puzzle_info_format">Puzzle %1$d · Deine Wertung %2$d</string>
+    <string name="puzzle_info_rated_format">Puzzle %1$d · Deine Wertung %2$d (%3$s)</string>
+    <string name="error_puzzles_unavailable">Die Puzzles konnten nicht geladen werden.</string>
 </resources>

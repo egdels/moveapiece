@@ -83,6 +83,12 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/opponent_training" />
+
+        <RadioButton
+            android:id="@+id/opponentPuzzle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/opponent_puzzles" />
     </RadioGroup>
 
     <!-- Right column: colour, then whatever the chosen opponent needs.
@@ -196,6 +202,52 @@
         app:layout_constraintTop_toBottomOf="@id/openingLabel"
         app:layout_constraintStart_toEndOf="@id/columnGuideline"
         app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- Puzzles only, in place of the colour choice (a puzzle decides the colour). -->
+    <TextView
+        android:id="@+id/difficultyLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="@string/dialog_difficulty_title"
+        android:textAppearance="?attr/textAppearanceLabelLarge"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/colorGroup"
+        app:layout_constraintStart_toEndOf="@id/columnGuideline" />
+
+    <RadioGroup
+        android:id="@+id/difficultyGroup"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:baselineAligned="false"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/difficultyLabel"
+        app:layout_constraintStart_toEndOf="@id/columnGuideline"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <RadioButton
+            android:id="@+id/difficultyEasier"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="16dp"
+            android:text="@string/puzzle_difficulty_easier" />
+
+        <RadioButton
+            android:id="@+id/difficultyNormal"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="16dp"
+            android:checked="true"
+            android:text="@string/puzzle_difficulty_normal" />
+
+        <RadioButton
+            android:id="@+id/difficultyHarder"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/puzzle_difficulty_harder" />
+    </RadioGroup>
 
     <CheckBox
         android:id="@+id/hintCheckBox"

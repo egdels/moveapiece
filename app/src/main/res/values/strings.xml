@@ -150,4 +150,22 @@
     <string name="opening_preview_progress_format">Move %1$d of %2$d</string>
     <string name="action_previous_move">Previous</string>
     <string name="action_next_move">Next</string>
+
+    <!-- Puzzles -->
+    <string name="opponent_puzzles">Puzzles</string>
+    <string name="dialog_difficulty_title">Difficulty</string>
+    <string name="puzzle_difficulty_easier">Easier</string>
+    <string name="puzzle_difficulty_normal">Normal</string>
+    <string name="puzzle_difficulty_harder">Harder</string>
+    <string name="action_show_solution">Show solution</string>
+    <string name="action_next_puzzle">Next puzzle</string>
+    <string name="status_puzzle_find_move_white">White to move – find the best move</string>
+    <string name="status_puzzle_find_move_black">Black to move – find the best move</string>
+    <string name="status_puzzle_wrong">Not this move – try again</string>
+    <string name="status_puzzle_solution">Solution</string>
+    <string name="status_puzzle_solved">Solved!</string>
+    <string name="status_puzzle_finished">Puzzle finished</string>
+    <string name="puzzle_info_format">Puzzle %1$d · Your rating %2$d</string>
+    <string name="puzzle_info_rated_format">Puzzle %1$d · Your rating %2$d (%3$s)</string>
+    <string name="error_puzzles_unavailable">The puzzles could not be loaded.</string>
 </resources>

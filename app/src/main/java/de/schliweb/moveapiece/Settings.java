@@ -11,10 +11,12 @@ import de.schliweb.moveapiece.engine.MaiaRatings;
 import de.schliweb.moveapiece.logic.BoardType;
 import de.schliweb.moveapiece.logic.ChessGame;
 import de.schliweb.moveapiece.logic.GameSetup;
+import de.schliweb.moveapiece.puzzle.PuzzleRating;
+import de.schliweb.moveapiece.puzzle.RecentPuzzles;
 
 /**
  * Persists user-adjustable settings (engine strength, Maia rating, evaluation display, physical
- * board type, last game setup) and the game in progress across app restarts.
+ * board type, last game setup), the puzzle rating and the game in progress across app restarts.
  */
 final class Settings {
 
@@ -28,6 +30,9 @@ final class Settings {
     private static final String KEY_LAST_OPENING = "lastOpening";
     private static final String KEY_LAST_TRAINING_HINTS = "lastTrainingHints";
     private static final String KEY_LAST_CHESS960 = "lastChess960";
+    private static final String KEY_LAST_PUZZLE_DIFFICULTY = "lastPuzzleDifficulty";
+    private static final String KEY_PUZZLE_RATING = "puzzleRating";
+    private static final String KEY_RECENT_PUZZLES = "recentPuzzles";
     private static final int DEFAULT_MAIA_RATING = 1500;
 
     /** The game in progress lives in a file of its own, so forgetting it is a plain clear(). */
@@ -91,7 +96,8 @@ final class Settings {
                 prefs.getString(KEY_LAST_SIDE, null),
                 prefs.getString(KEY_LAST_OPENING, null),
                 prefs.getBoolean(KEY_LAST_TRAINING_HINTS, true),
-                prefs.getBoolean(KEY_LAST_CHESS960, false));
+                prefs.getBoolean(KEY_LAST_CHESS960, false),
+                prefs.getString(KEY_LAST_PUZZLE_DIFFICULTY, null));
     }
 
     void setLastGameSetup(GameSetup setup) {
@@ -101,16 +107,38 @@ final class Settings {
                 .putString(KEY_LAST_OPENING, setup.openingId())
                 .putBoolean(KEY_LAST_TRAINING_HINTS, setup.hintsEnabled())
                 .putBoolean(KEY_LAST_CHESS960, setup.chess960())
+                .putString(KEY_LAST_PUZZLE_DIFFICULTY, setup.puzzleDifficulty().key())
                 .apply();
+    }
+
+    // ---- Puzzles ----------------------------------------------------------------------------
+
+    /** The trainee's puzzle rating; {@link PuzzleRating#START} until the first puzzle. */
+    PuzzleRating getPuzzleRating() {
+        return PuzzleRating.fromKey(prefs.getString(KEY_PUZZLE_RATING, null));
+    }
+
+    void setPuzzleRating(PuzzleRating rating) {
+        prefs.edit().putString(KEY_PUZZLE_RATING, rating.toKey()).apply();
+    }
+
+    /** The puzzles played last, so they are not handed out again soon. */
+    RecentPuzzles getRecentPuzzles() {
+        return RecentPuzzles.fromKey(prefs.getString(KEY_RECENT_PUZZLES, null));
+    }
+
+    void setRecentPuzzles(RecentPuzzles recent) {
+        prefs.edit().putString(KEY_RECENT_PUZZLES, recent.toKey()).apply();
     }
 
     // ---- The game in progress ---------------------------------------------------------------
 
     /**
      * The game in progress, kept across a restart of the app (see {@code MainActivity#saveGame}).
-     * {@code side} is the engine's side outside training and the trainee's in training. In training
-     * only the training fields are set and {@code snapshot} is null; otherwise the game is the
-     * snapshot and the training fields are unused.
+     * {@code side} is the engine's side outside training and the trainee's in training and puzzles.
+     * In training only the training fields are set and {@code snapshot} is null, in puzzle mode
+     * only the puzzle fields ({@code puzzleId} null after a finished puzzle); otherwise the game is
+     * the snapshot and the other fields are unused.
      */
     record SavedGame(
             String mode,
@@ -120,7 +148,10 @@ final class Settings {
             ChessGame.Snapshot snapshot,
             String trainingLine,
             boolean trainingHints,
-            int trainingPly) {}
+            int trainingPly,
+            String puzzleId,
+            int puzzlePly,
+            boolean puzzleFailed) {}
 
     private static final String KEY_GAME_MODE = "mode";
     private static final String KEY_GAME_SIDE = "side";
@@ -133,6 +164,9 @@ final class Settings {
     private static final String KEY_GAME_TRAINING_LINE = "trainingLine";
     private static final String KEY_GAME_TRAINING_HINTS = "trainingHints";
     private static final String KEY_GAME_TRAINING_PLY = "trainingPly";
+    private static final String KEY_GAME_PUZZLE_ID = "puzzleId";
+    private static final String KEY_GAME_PUZZLE_PLY = "puzzlePly";
+    private static final String KEY_GAME_PUZZLE_FAILED = "puzzleFailed";
 
     /** Null when no game was kept, see {@link #setSavedGame}. */
     SavedGame getSavedGame() {
@@ -158,7 +192,10 @@ final class Settings {
                 snapshot,
                 gamePrefs.getString(KEY_GAME_TRAINING_LINE, null),
                 gamePrefs.getBoolean(KEY_GAME_TRAINING_HINTS, true),
-                gamePrefs.getInt(KEY_GAME_TRAINING_PLY, 0));
+                gamePrefs.getInt(KEY_GAME_TRAINING_PLY, 0),
+                gamePrefs.getString(KEY_GAME_PUZZLE_ID, null),
+                gamePrefs.getInt(KEY_GAME_PUZZLE_PLY, 0),
+                gamePrefs.getBoolean(KEY_GAME_PUZZLE_FAILED, false));
     }
 
     /** Keeps {@code game} for the next launch, replacing what was kept before. */
@@ -172,7 +209,9 @@ final class Settings {
                         .putBoolean(KEY_GAME_FLIPPED, game.flipped())
                         .putInt(KEY_GAME_MAIA_RATING, game.maiaRating())
                         .putBoolean(KEY_GAME_TRAINING_HINTS, game.trainingHints())
-                        .putInt(KEY_GAME_TRAINING_PLY, game.trainingPly());
+                        .putInt(KEY_GAME_TRAINING_PLY, game.trainingPly())
+                        .putInt(KEY_GAME_PUZZLE_PLY, game.puzzlePly())
+                        .putBoolean(KEY_GAME_PUZZLE_FAILED, game.puzzleFailed());
         ChessGame.Snapshot snapshot = game.snapshot();
         if (snapshot != null) {
             editor.putString(KEY_GAME_START_FEN, snapshot.startFen())
@@ -182,6 +221,9 @@ final class Settings {
         }
         if (game.trainingLine() != null) {
             editor.putString(KEY_GAME_TRAINING_LINE, game.trainingLine());
+        }
+        if (game.puzzleId() != null) {
+            editor.putString(KEY_GAME_PUZZLE_ID, game.puzzleId());
         }
         editor.apply();
     }

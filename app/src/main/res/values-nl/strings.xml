@@ -146,4 +146,22 @@
     <string name="opening_preview_progress_format">Zet %1$d van %2$d</string>
     <string name="action_previous_move">Vorige</string>
     <string name="action_next_move">Volgende</string>
+
+    <!-- Puzzles -->
+    <string name="opponent_puzzles">Puzzels</string>
+    <string name="dialog_difficulty_title">Moeilijkheid</string>
+    <string name="puzzle_difficulty_easier">Makkelijker</string>
+    <string name="puzzle_difficulty_normal">Normaal</string>
+    <string name="puzzle_difficulty_harder">Moeilijker</string>
+    <string name="action_show_solution">Oplossing tonen</string>
+    <string name="action_next_puzzle">Volgende puzzel</string>
+    <string name="status_puzzle_find_move_white">Wit aan zet – vind de beste zet</string>
+    <string name="status_puzzle_find_move_black">Zwart aan zet – vind de beste zet</string>
+    <string name="status_puzzle_wrong">Niet deze zet – probeer het opnieuw</string>
+    <string name="status_puzzle_solution">Oplossing</string>
+    <string name="status_puzzle_solved">Opgelost!</string>
+    <string name="status_puzzle_finished">Puzzel afgelopen</string>
+    <string name="puzzle_info_format">Puzzel %1$d · Jouw rating %2$d</string>
+    <string name="puzzle_info_rated_format">Puzzel %1$d · Jouw rating %2$d (%3$s)</string>
+    <string name="error_puzzles_unavailable">De puzzels konden niet worden geladen.</string>
 </resources>

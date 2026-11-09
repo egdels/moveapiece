@@ -224,10 +224,12 @@ public final class PuzzleFlow {
     }
 
     /**
-     * What to keep for {@link #resume}, or {@code null} outside a puzzle or once it is complete.
+     * What to keep for {@link #resume}, or {@code null} outside a puzzle, once it is complete, and
+     * while its solution is shown: the trainee gave it up then, so a restart goes on with a new
+     * puzzle instead of halfway through the solution with the trainee to move.
      */
     public Progress progress() {
-        if (puzzle == null || state == State.COMPLETE) {
+        if (puzzle == null || state == State.COMPLETE || state == State.SHOWING_SOLUTION) {
             return null;
         }
         return new Progress(puzzle.id(), ply, failed);

@@ -216,6 +216,39 @@
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
 
+    <!-- Puzzle mode only (see MainActivity#updatePuzzleControls): give up and watch the
+         solution, and go on to the next puzzle once this one is over. Text buttons, unlike the icon
+         row above: they are only there in puzzle mode and say what they do. -->
+    <LinearLayout
+        android:id="@+id/puzzleRow"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:paddingBottom="4dp"
+        android:visibility="gone"
+        tools:visibility="visible"
+        app:layout_constraintTop_toBottomOf="@id/actionButtonsFlow"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/showSolutionButton"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="8dp"
+            android:text="@string/action_show_solution" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/nextPuzzleButton"
+            style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/action_next_puzzle" />
+
+    </LinearLayout>
+
     <TextView
         android:id="@+id/noteText"
         android:layout_width="0dp"
@@ -226,7 +259,7 @@
         android:visibility="gone"
         tools:text="Auch gut: d2-d4 (+0.3), g1-f3 (+0.2)"
         tools:visibility="visible"
-        app:layout_constraintTop_toBottomOf="@id/actionButtonsFlow"
+        app:layout_constraintTop_toBottomOf="@id/puzzleRow"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 

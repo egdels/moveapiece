@@ -146,4 +146,22 @@
     <string name="opening_preview_progress_format">Coup %1$d sur %2$d</string>
     <string name="action_previous_move">Précédent</string>
     <string name="action_next_move">Suivant</string>
+
+    <!-- Puzzles -->
+    <string name="opponent_puzzles">Problèmes</string>
+    <string name="dialog_difficulty_title">Difficulté</string>
+    <string name="puzzle_difficulty_easier">Plus facile</string>
+    <string name="puzzle_difficulty_normal">Normal</string>
+    <string name="puzzle_difficulty_harder">Plus difficile</string>
+    <string name="action_show_solution">Voir la solution</string>
+    <string name="action_next_puzzle">Problème suivant</string>
+    <string name="status_puzzle_find_move_white">Les Blancs jouent – trouvez le meilleur coup</string>
+    <string name="status_puzzle_find_move_black">Les Noirs jouent – trouvez le meilleur coup</string>
+    <string name="status_puzzle_wrong">Pas ce coup – réessayez</string>
+    <string name="status_puzzle_solution">Solution</string>
+    <string name="status_puzzle_solved">Résolu !</string>
+    <string name="status_puzzle_finished">Problème terminé</string>
+    <string name="puzzle_info_format">Problème %1$d · Votre classement %2$d</string>
+    <string name="puzzle_info_rated_format">Problème %1$d · Votre classement %2$d (%3$s)</string>
+    <string name="error_puzzles_unavailable">Impossible de charger les problèmes.</string>
 </resources>
