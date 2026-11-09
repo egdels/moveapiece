@@ -6,6 +6,7 @@
 package de.schliweb.moveapiece.desktop;
 
 import com.github.bhlangonijr.chesslib.Piece;
+import com.github.bhlangonijr.chesslib.PieceType;
 import com.github.bhlangonijr.chesslib.Side;
 import com.github.bhlangonijr.chesslib.Square;
 import de.schliweb.chessnut.core.game.InvalidPositionException;
@@ -38,6 +39,12 @@ import de.schliweb.moveapiece.logic.GameSetup;
 import de.schliweb.moveapiece.logic.Opponent;
 import de.schliweb.moveapiece.logic.PgnGames;
 import de.schliweb.moveapiece.logic.UciMoves;
+import de.schliweb.moveapiece.puzzle.Puzzle;
+import de.schliweb.moveapiece.puzzle.PuzzleFlow;
+import de.schliweb.moveapiece.puzzle.PuzzleRating;
+import de.schliweb.moveapiece.puzzle.PuzzleRepository;
+import de.schliweb.moveapiece.puzzle.PuzzleSelector;
+import de.schliweb.moveapiece.puzzle.RecentPuzzles;
 import de.schliweb.moveapiece.training.OpeningLine;
 import de.schliweb.moveapiece.training.OpeningRepository;
 import de.schliweb.moveapiece.training.TrainingFlow;
@@ -50,6 +57,7 @@ import de.schliweb.pegasus.core.transport.PegasusTransport;
 import de.schliweb.pegasus.core.transport.TransportError;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
@@ -105,8 +113,9 @@ import javafx.util.Duration;
  * BoardCanvas} together into a playable window: human-vs-human, human-vs-Stockfish (adjustable
  * playing strength), human-vs-Maia (a human-like opponent at a fixed rating - see {@link
  * #startMaiaGame}), an in-game opening trainer that drills a fixed line from {@code core}'s opening
- * library, undo, and PGN import/export. Mirrors the Android app's {@code MainActivity}
- * orchestration at a much smaller scope (Maia is desktop-only for now).
+ * library, tactics puzzles from the bundled Lichess set, undo, and PGN import/export. Mirrors the
+ * Android app's {@code MainActivity} orchestration at a much smaller scope (Maia is desktop-only
+ * for now).
  *
  * <p>Stockfish and Maia coexist rather than one replacing the other during a Maia game: only
  * generating the opponent's own reply move goes through {@link #maiaEngine} - the live evaluation
@@ -128,7 +137,8 @@ final class GameController
         HUMAN_VS_HUMAN,
         HUMAN_VS_STOCKFISH,
         HUMAN_VS_MAIA,
-        TRAINING
+        TRAINING,
+        PUZZLE
     }
 
     private static final int MOVETIME_MS = 800;
@@ -287,6 +297,31 @@ final class GameController
      */
     private final TrainingFlow trainingFlow =
             new TrainingFlow(game, new TrainingBoardAdapter(), new TrainingHostAdapter());
+
+    // ---- Puzzles ----------------------------------------------------------------------------
+    /** The puzzle's move flow (shared with Android, tested in core's PuzzleFlowTest). */
+    private final PuzzleFlow puzzleFlow = new PuzzleFlow(game, new PuzzleHostAdapter());
+
+    /** The bundled puzzle set, read on first use; see {@link #puzzleRepository}. */
+    private PuzzleRepository puzzles;
+
+    private PuzzleRating puzzleRating = Settings.getPuzzleRating();
+    private final RecentPuzzles recentPuzzles = Settings.getRecentPuzzles();
+
+    /** How the current puzzle changed the rating, once it is rated; null before. */
+    private Integer puzzleRatingDelta;
+
+    /** The piece a puzzle hint points at, until the next move; null without a hint. */
+    private Square puzzleHintSquare;
+
+    /** Starts the next puzzle a moment after a clean solve; null while none is due. */
+    private PauseTransition nextPuzzleTimer;
+
+    private static final Duration NEXT_PUZZLE_DELAY = Duration.millis(1500);
+
+    private final Button showSolutionButton = new Button(Messages.get("action_show_solution"));
+    private final Button nextPuzzleButton = new Button(Messages.get("action_next_puzzle"));
+    private final HBox puzzleBox = new HBox(8, showSolutionButton, nextPuzzleButton);
 
     // ---- Physical board (DGT Pegasus or Chessnut) --------------------------------
     /** The selected board's bridge; null on hosts without a transport (see createBoardBridge). */
@@ -481,13 +516,32 @@ final class GameController
      * synced on connect.
      */
     private void saveGame() {
+        if (mode == Mode.PUZZLE) {
+            // A finished puzzle is not kept either: the next start begins a new one.
+            PuzzleFlow.Progress progress = puzzleFlow.progress();
+            if (progress == null) {
+                forgetSavedGame();
+                return;
+            }
+            storeSavedGame(
+                    new Settings.SavedGame(
+                            mode.name(),
+                            humanSide.name(),
+                            boardFlipped,
+                            currentMaiaRating,
+                            null,
+                            null,
+                            true,
+                            0,
+                            progress.puzzleId(),
+                            progress.ply(),
+                            progress.failed()));
+            return;
+        }
         TrainingSession session = trainingFlow.session();
         boolean trainingComplete = mode == Mode.TRAINING && session != null && session.isComplete();
         if (game.isGameOver() || trainingComplete) {
-            if (lastSavedGame != null || Settings.getSavedGame() != null) {
-                Settings.clearSavedGame();
-                lastSavedGame = null;
-            }
+            forgetSavedGame();
             return;
         }
         Settings.SavedGame saved =
@@ -502,7 +556,10 @@ final class GameController
                                 null,
                                 session.line().id(),
                                 session.hintsEnabled(),
-                                session.plyIndex())
+                                session.plyIndex(),
+                                null,
+                                0,
+                                false)
                         : new Settings.SavedGame(
                                 mode.name(),
                                 humanSide.name(),
@@ -511,10 +568,24 @@ final class GameController
                                 game.snapshot(),
                                 null,
                                 true,
-                                0);
+                                0,
+                                null,
+                                0,
+                                false);
+        storeSavedGame(saved);
+    }
+
+    private void storeSavedGame(Settings.SavedGame saved) {
         if (!saved.equals(lastSavedGame)) {
             Settings.setSavedGame(saved);
             lastSavedGame = saved;
+        }
+    }
+
+    private void forgetSavedGame() {
+        if (lastSavedGame != null || Settings.getSavedGame() != null) {
+            Settings.clearSavedGame();
+            lastSavedGame = null;
         }
     }
 
@@ -535,7 +606,22 @@ final class GameController
         } catch (IllegalArgumentException e) {
             return false;
         }
-        if (savedMode == Mode.TRAINING) {
+        if (savedMode == Mode.PUZZLE) {
+            PuzzleRepository repository = puzzleRepository();
+            Puzzle puzzle = repository == null ? null : repository.byId(saved.puzzleId());
+            if (puzzle == null) {
+                return false;
+            }
+            // Set before resuming: the flow refreshes the screen, which reads the mode.
+            mode = Mode.PUZZLE;
+            humanSide = puzzle.humanSide();
+            if (!puzzleFlow.resume(puzzle, saved.puzzlePly(), saved.puzzleFailed())) {
+                mode = Mode.HUMAN_VS_STOCKFISH;
+                humanSide = Side.WHITE;
+                game.reset();
+                return false;
+            }
+        } else if (savedMode == Mode.TRAINING) {
             OpeningLine line =
                     saved.trainingLine() == null
                             ? null
@@ -576,10 +662,11 @@ final class GameController
      * Second half of a restore, after the first {@link #refresh}: the board bridge learns the start
      * position (as {@link #newGame} tells it), and the opponent takes up its turn. Stockfish does
      * that by itself once it is ready ({@link #onReadyOk}); Maia is loaded here, the trainer moves
-     * on from where it was.
+     * on from where it was. A puzzle has already scheduled its move in {@link #restoreSavedGame},
+     * and leaves the board alone (puzzles do not use it yet).
      */
     private void resumeRestoredGame() {
-        if (pegasusBridge != null) {
+        if (pegasusBridge != null && mode != Mode.PUZZLE) {
             pegasusBridge.resetForNewGame(game.startFen());
         }
         if (mode == Mode.HUMAN_VS_MAIA) {
@@ -720,7 +807,19 @@ final class GameController
                         moreMenu.show(moreButton, javafx.geometry.Side.BOTTOM, 0, 4);
                     }
                 });
-        hintButton.setOnAction(e -> searchFlow.requestHint());
+        hintButton.setOnAction(
+                e -> {
+                    if (mode == Mode.PUZZLE) {
+                        showPuzzleHint();
+                    } else {
+                        searchFlow.requestHint();
+                    }
+                });
+        showSolutionButton.setOnAction(e -> puzzleFlow.showSolution());
+        nextPuzzleButton.setOnAction(e -> nextPuzzle());
+        puzzleBox.setAlignment(Pos.CENTER_LEFT);
+        puzzleBox.setVisible(false);
+        puzzleBox.managedProperty().bind(puzzleBox.visibleProperty());
         pegasusButton.setOnAction(e -> onPegasusButtonClicked());
         pegasusButton.setVisible(pegasusBridge != null);
         pegasusButton.setManaged(pegasusBridge != null);
@@ -761,6 +860,7 @@ final class GameController
                         maiaRatingLabel,
                         maiaRatingSlider,
                         actionBox,
+                        puzzleBox,
                         evalBox,
                         noteLabel,
                         movesHeading,
@@ -794,6 +894,10 @@ final class GameController
             onTrainingMoveChosen(from, to);
             return;
         }
+        if (mode == Mode.PUZZLE) {
+            onPuzzleMoveChosen(from, to);
+            return;
+        }
         Piece promotion = null;
         if (game.isPromotion(from, to)) {
             promotion = askPromotionPiece(game.sideToMove());
@@ -820,7 +924,9 @@ final class GameController
     private void playMoveSound(boolean wasCapture) {
         // A connected board with a speaker (Chessnut) answers for the move itself - and stays
         // silent for an ordinary move.
+        // Puzzles leave the board alone, its speaker included.
         if (pegasusBridge != null
+                && mode != Mode.PUZZLE
                 && pegasusBridge.playMoveSound(wasCapture, game.isCheck(), game.isCheckmate())) {
             return;
         }
@@ -1005,6 +1111,7 @@ final class GameController
      */
     private void syncPegasusPosition() {
         if (pegasusBridge != null
+                && mode != Mode.PUZZLE
                 && pegasusBridge.getConnectionState() == ConnectionState.CONNECTED) {
             pegasusBridge.syncBoardToPosition(game.toFen());
         }
@@ -1063,7 +1170,9 @@ final class GameController
             // leaves its own position stale. Push the authoritative position on
             // every (re)connect so the board can resume physical play correctly -
             // see PegasusGameBridge#syncBoardToPosition.
-            pegasusBridge.syncBoardToPosition(game.toFen());
+            if (mode != Mode.PUZZLE) {
+                pegasusBridge.syncBoardToPosition(game.toFen());
+            }
             if (mode == Mode.TRAINING) {
                 maybeAdvanceTraining();
             }
@@ -1072,6 +1181,9 @@ final class GameController
 
     @Override
     public void onPhysicalMoveConfirmed(String uci) {
+        if (mode == Mode.PUZZLE) {
+            return; // puzzles do not use the board yet
+        }
         if (mode == Mode.TRAINING) {
             onTrainingMoveConfirmedByDetection(uci);
             return;
@@ -1149,6 +1261,12 @@ final class GameController
 
     /** Sidebar banner while the physical board disagrees with the position on screen. */
     private void updatePegasusMismatchLabel() {
+        if (mode == Mode.PUZZLE) {
+            // Puzzles do not use the board yet, so it differing from the screen means nothing.
+            boardCanvas.setMismatchSquares(List.of());
+            pegasusMismatchLabel.setVisible(false);
+            return;
+        }
         boolean mismatched =
                 pegasusBridge != null
                         && pegasusBridge.getConnectionState() == ConnectionState.CONNECTED
@@ -1229,7 +1347,8 @@ final class GameController
         return pegasusBridge != null
                 && pegasusBridge.canLoadPhysicalPosition()
                 && pegasusBridge.getConnectionState() == ConnectionState.CONNECTED
-                && mode != Mode.TRAINING;
+                && mode != Mode.TRAINING
+                && mode != Mode.PUZZLE;
     }
 
     /** Click on the mismatch banner: ask who is to move, then load the board's position. */
@@ -1420,6 +1539,9 @@ final class GameController
             TrainingSession session = trainingFlow.session();
             return session != null && !session.isComplete();
         }
+        if (mode == Mode.PUZZLE) {
+            return puzzleFlow.isActive() && puzzleFlow.state() != PuzzleFlow.State.COMPLETE;
+        }
         return true;
     }
 
@@ -1522,6 +1644,11 @@ final class GameController
     private void updateHintButtonState() {
         hintButton.setVisible(mode != Mode.TRAINING);
         hintButton.setManaged(mode != Mode.TRAINING);
+        if (mode == Mode.PUZZLE) {
+            // The puzzle's own line, not Stockfish: no engine needed.
+            hintButton.setDisable(!puzzleFlow.isHumanTurn() || puzzleHintSquare != null);
+            return;
+        }
         hintButton.setDisable(
                 !engineReady
                         || searchFlow.isWaitingForHint()
@@ -1566,7 +1693,7 @@ final class GameController
         analyzeGameItem.setDisable(
                 searchFlow.isPostGameAnalysisRunning()
                         || !engineReady
-                        || mode == Mode.TRAINING
+                        || isDrillMode()
                         || !hasMoves);
     }
 
@@ -1641,10 +1768,10 @@ final class GameController
      * position first, so a second, redundant search is skipped.
      */
     private void maybeTriggerAnalysis() {
-        boolean visible = mode != Mode.TRAINING;
+        boolean visible = !isDrillMode();
         evaluationCheckbox.setVisible(visible);
         evaluationLabel.setVisible(visible);
-        if (!evaluationEnabled || mode == Mode.TRAINING || game.isGameOver()) {
+        if (!evaluationEnabled || isDrillMode() || game.isGameOver()) {
             evaluationLabel.setText("");
             return;
         }
@@ -1689,6 +1816,7 @@ final class GameController
             case STOCKFISH -> startStockfishGame(setup.side());
             case MAIA -> startMaiaGame(setup.side(), Settings.getMaiaRating());
             case TRAINER -> startTraining(setup.opening(), setup.side(), setup.hintsEnabled());
+            case PUZZLE -> startPuzzles();
         }
     }
 
@@ -1701,6 +1829,7 @@ final class GameController
         mode = Mode.HUMAN_VS_HUMAN;
         trainingSession = null;
         trainingFlow.stop();
+        stopPuzzles();
         humanSide = Side.WHITE;
         boardFlipped = false;
         boardCanvas.setFlipped(false);
@@ -1715,6 +1844,7 @@ final class GameController
         mode = Mode.HUMAN_VS_STOCKFISH;
         trainingSession = null;
         trainingFlow.stop();
+        stopPuzzles();
         humanSide = side;
         boardFlipped = side == Side.BLACK;
         boardCanvas.setFlipped(boardFlipped);
@@ -1737,6 +1867,7 @@ final class GameController
         mode = Mode.HUMAN_VS_MAIA;
         trainingSession = null;
         trainingFlow.stop();
+        stopPuzzles();
         humanSide = side;
         boardFlipped = side == Side.BLACK;
         boardCanvas.setFlipped(boardFlipped);
@@ -1902,6 +2033,14 @@ final class GameController
     }
 
     /**
+     * The opening trainer or a puzzle: a fixed line to find, so no evaluation, engine hints, move
+     * grades or game analysis, and a plain move history without jumping around in it.
+     */
+    private boolean isDrillMode() {
+        return mode == Mode.TRAINING || mode == Mode.PUZZLE;
+    }
+
+    /**
      * Shows the {@link #strengthSlider}/{@link #strengthLabel} pair in a Stockfish game and the
      * {@link #maiaRatingLabel}/{@link #maiaRatingSlider} pair in a Maia game, and neither otherwise
      * (nothing to adjust against a human or inside a training drill) - both pairs are
@@ -1921,6 +2060,9 @@ final class GameController
     }
 
     private void undo() {
+        if (mode == Mode.PUZZLE) {
+            return; // no undo inside a puzzle
+        }
         if (mode == Mode.TRAINING) {
             undoTrainingMove();
             return;
@@ -1941,6 +2083,9 @@ final class GameController
      * No-op if there is nothing to redo.
      */
     private void redo() {
+        if (mode == Mode.PUZZLE) {
+            return;
+        }
         if (mode == Mode.TRAINING) {
             redoTrainingMove();
             return;
@@ -1966,9 +2111,11 @@ final class GameController
         updateMoveHistory();
         statusLabel.setText(statusText());
         statusLabel.getStyleClass().removeAll("check", "gameover");
-        if (game.isGameOver()) {
+        if (game.isGameOver() && mode != Mode.PUZZLE) {
             statusLabel.getStyleClass().add("gameover");
-        } else if (game.isCheck()) {
+        } else if (game.isCheck() && (mode != Mode.PUZZLE || puzzleFlow.isHumanTurn())) {
+            // In a puzzle only while the trainee has to get out of check: a mate that ends it, or
+            // a check while the solution plays, is not a warning.
             statusLabel.getStyleClass().add("check");
         }
         updateInfoLabel();
@@ -1977,9 +2124,11 @@ final class GameController
         maybeTriggerAnalysis();
         updateHintButtonState();
         updateNoteLabel();
+        updatePuzzleControls();
         saveGame();
 
-        if (game.isGameOver()) {
+        // A puzzle that ends in mate ends with its own status line, not the game-over dialog.
+        if (game.isGameOver() && mode != Mode.PUZZLE) {
             showGameOverAlert();
         }
     }
@@ -2010,7 +2159,7 @@ final class GameController
      */
     private void updateMoveHistory() {
         moveListFlow.getChildren().clear();
-        if (mode == Mode.TRAINING) {
+        if (isDrillMode()) {
             moveListFlow.getChildren().add(new Text(game.toSan()));
         } else {
             int ply = 0;
@@ -2115,10 +2264,14 @@ final class GameController
                     trainingSession != null
                             && !trainingSession.isComplete()
                             && trainingSession.isHumanTurnNow();
+            case PUZZLE -> puzzleFlow.isHumanTurn();
         };
     }
 
     private String statusText() {
+        if (mode == Mode.PUZZLE && puzzleFlow.isActive()) {
+            return puzzleStatusText();
+        }
         if (game.isCheckmate()) {
             // Checkmate winner is whoever just moved, i.e. NOT sideToMove().
             return Messages.get(
@@ -2154,6 +2307,7 @@ final class GameController
 
     private void startTraining(OpeningLine opening, Side side, boolean hintsEnabled) {
         searchFlow.abandonPendingSearches();
+        stopPuzzles();
         trainingFlow.start(opening, side, hintsEnabled);
         trainingSession = trainingFlow.session();
         mode = Mode.TRAINING;
@@ -2245,6 +2399,8 @@ final class GameController
         if (moveQualityNote != null) {
             infoLabel.getStyleClass().add("move-quality-label");
             infoLabel.setText(moveQualityNote);
+        } else if (mode == Mode.PUZZLE && puzzleFlow.puzzle() != null) {
+            infoLabel.setText(puzzleInfoText(puzzleFlow.puzzle()));
         } else if (mode == Mode.TRAINING && trainingSession != null) {
             int shownPly = Math.min(trainingSession.plyIndex() + 1, trainingSession.totalPlies());
             infoLabel.setText(
@@ -2274,6 +2430,11 @@ final class GameController
 
     /** On-screen highlight of the trainee's own next expected move, when hints are enabled. */
     private void updateTrainingHint() {
+        if (mode == Mode.PUZZLE) {
+            // Only the piece to move, not where it goes.
+            boardCanvas.setTrainingHint(puzzleFlow.isHumanTurn() ? puzzleHintSquare : null, null);
+            return;
+        }
         if (mode != Mode.TRAINING
                 || trainingSession == null
                 || trainingSession.isComplete()
@@ -2360,6 +2521,7 @@ final class GameController
             return;
         }
         trainingFlow.stop();
+        stopPuzzles();
         trainingSession = null;
         newGameStarted = false;
         humanSide = trainedSide;
@@ -2413,6 +2575,179 @@ final class GameController
         }
         scrollMoveHistoryToEnd = true;
         return true;
+    }
+
+    // ---- puzzles ------------------------------------------------------------
+
+    /**
+     * The bundled puzzle set, read on first use and kept; null if it cannot be read, which only a
+     * broken build could cause.
+     */
+    private PuzzleRepository puzzleRepository() {
+        if (puzzles == null) {
+            try (InputStream in = GameController.class.getResourceAsStream("puzzles/puzzles.csv")) {
+                if (in == null) {
+                    throw new FileNotFoundException("puzzles/puzzles.csv");
+                }
+                puzzles = PuzzleRepository.load(in);
+            } catch (IOException | IllegalArgumentException e) {
+                LOG.log(Level.WARNING, "Could not load the puzzles", e);
+                return null;
+            }
+        }
+        return puzzles;
+    }
+
+    private void startPuzzles() {
+        if (puzzleRepository() == null) {
+            showError(Messages.get("error_puzzles_unavailable"));
+            return;
+        }
+        searchFlow.abandonPendingSearches();
+        trainingFlow.stop();
+        trainingSession = null;
+        newGameStarted = false;
+        mode = Mode.PUZZLE;
+        strengthSlider.setDisable(true);
+        updateStrengthControlsVisibility();
+        nextPuzzle();
+    }
+
+    /** Picks a puzzle near the trainee's rating, not one played lately, and sets it up. */
+    private void nextPuzzle() {
+        cancelNextPuzzleTimer();
+        PuzzleRepository repository = puzzleRepository();
+        Puzzle puzzle =
+                repository == null
+                        ? null
+                        : PuzzleSelector.next(
+                                repository.all(),
+                                puzzleRating.rating(),
+                                recentPuzzles,
+                                ThreadLocalRandom.current());
+        if (puzzle == null) {
+            return;
+        }
+        recentPuzzles.add(puzzle.id());
+        Settings.setRecentPuzzles(recentPuzzles);
+        searchFlow.abandonPendingSearches();
+        puzzleRatingDelta = null;
+        puzzleHintSquare = null;
+        humanSide = puzzle.humanSide();
+        boardFlipped = humanSide == Side.BLACK;
+        boardCanvas.setFlipped(boardFlipped);
+        boardCanvas.setLastMove(null, null);
+        boardCanvas.setTrainingHint(null, null);
+        boardCanvas.clearSelection();
+        puzzleFlow.start(puzzle); // sets the position up, refreshes, schedules the first move
+    }
+
+    /** Leaves puzzles for another mode, a PGN import or the trainer. */
+    private void stopPuzzles() {
+        cancelNextPuzzleTimer();
+        puzzleFlow.stop();
+        puzzleRatingDelta = null;
+        puzzleHintSquare = null;
+    }
+
+    private void cancelNextPuzzleTimer() {
+        if (nextPuzzleTimer != null) {
+            nextPuzzleTimer.stop();
+            nextPuzzleTimer = null;
+        }
+    }
+
+    /**
+     * A move chosen on screen in a puzzle. The flow applies it itself, right or wrong; this only
+     * asks for the promotion piece first.
+     */
+    private void onPuzzleMoveChosen(Square from, Square to) {
+        if (!puzzleFlow.isHumanTurn()) {
+            return;
+        }
+        String uci =
+                from.toString().toLowerCase(Locale.ROOT) + to.toString().toLowerCase(Locale.ROOT);
+        if (game.isPromotion(from, to)) {
+            Piece promotion = askPromotionPiece(game.sideToMove());
+            if (promotion == null) {
+                refresh();
+                return;
+            }
+            uci += promotionSuffix(promotion.getPieceType());
+        }
+        puzzleHintSquare = null;
+        boardCanvas.clearSelection();
+        if (puzzleFlow.onUserMove(uci) == PuzzleFlow.MoveResult.IGNORED) {
+            refresh();
+        }
+    }
+
+    private static String promotionSuffix(PieceType type) {
+        return switch (type) {
+            case ROOK -> "r";
+            case BISHOP -> "b";
+            case KNIGHT -> "n";
+            default -> "q";
+        };
+    }
+
+    /** Marks the piece the line moves next; the puzzle then counts as not solved. */
+    private void showPuzzleHint() {
+        String uci = puzzleFlow.hint();
+        if (uci != null) {
+            puzzleHintSquare = UciMoves.from(uci);
+            refresh();
+        }
+    }
+
+    private String puzzleStatusText() {
+        return switch (puzzleFlow.state()) {
+            case HUMAN_TO_MOVE ->
+                    Messages.get(
+                            humanSide == Side.WHITE
+                                    ? "status_puzzle_find_move_white"
+                                    : "status_puzzle_find_move_black");
+            case WRONG_MOVE_SHOWN -> Messages.get("status_puzzle_wrong");
+            case SHOWING_SOLUTION -> Messages.get("status_puzzle_solution");
+            case COMPLETE ->
+                    Messages.get(
+                            puzzleFlow.isFailed()
+                                    ? "status_puzzle_finished"
+                                    : "status_puzzle_solved");
+            default ->
+                    Messages.get(
+                            game.sideToMove() == Side.WHITE
+                                    ? "status_white_to_move"
+                                    : "status_black_to_move");
+        };
+    }
+
+    /** The puzzle's rating and the trainee's, with the change once the puzzle is rated. */
+    private String puzzleInfoText(Puzzle puzzle) {
+        if (puzzleRatingDelta == null) {
+            return Messages.get("puzzle_info_format", puzzle.rating(), puzzleRating.rating());
+        }
+        return Messages.get(
+                "puzzle_info_rated_format",
+                puzzle.rating(),
+                puzzleRating.rating(),
+                String.format(Locale.ROOT, "%+d", puzzleRatingDelta));
+    }
+
+    private void updatePuzzleControls() {
+        boolean puzzleMode = mode == Mode.PUZZLE;
+        puzzleBox.setVisible(puzzleMode);
+        undoButton.setDisable(puzzleMode);
+        redoButton.setDisable(puzzleMode);
+        if (!puzzleMode) {
+            return;
+        }
+        PuzzleFlow.State state = puzzleFlow.state();
+        showSolutionButton.setDisable(
+                state != PuzzleFlow.State.HUMAN_TO_MOVE
+                        && state != PuzzleFlow.State.OPPONENT_TO_MOVE
+                        && state != PuzzleFlow.State.WRONG_MOVE_SHOWN);
+        nextPuzzleButton.setDisable(state != PuzzleFlow.State.COMPLETE);
     }
 
     // ---- PGN ----------------------------------------------------------------
@@ -2496,6 +2831,7 @@ final class GameController
             return;
         }
         trainingFlow.stop();
+        stopPuzzles();
         trainingSession = null;
         newGameStarted = false;
         mode = Mode.HUMAN_VS_HUMAN;
@@ -2601,7 +2937,8 @@ final class GameController
 
     @Override
     public boolean isTrainingMode() {
-        return mode == Mode.TRAINING;
+        // No evaluation, engine hints or move grades in puzzles either: they would give it away.
+        return isDrillMode();
     }
 
     @Override
@@ -2859,6 +3196,86 @@ final class GameController
         @Override
         public void log(String message) {
             LOG.log(Level.INFO, message);
+        }
+    }
+
+    /** Screen effects for {@link PuzzleFlow}. */
+    private final class PuzzleHostAdapter implements PuzzleFlow.Host {
+        private PauseTransition pending;
+
+        @Override
+        public void moveApplied(String uci, boolean wasCapture) {
+            boardCanvas.setLastMove(UciMoves.from(uci), UciMoves.to(uci));
+            GameController.this.playMoveSound(wasCapture);
+            scrollMoveHistoryToEnd = true;
+        }
+
+        @Override
+        public void historyRewritten() {
+            // After a wrong move is taken back, the app's move before it is the last move again.
+            String last = game.lastMoveUci();
+            if (last == null) {
+                boardCanvas.setLastMove(null, null);
+            } else {
+                boardCanvas.setLastMove(UciMoves.from(last), UciMoves.to(last));
+            }
+        }
+
+        @Override
+        public void refresh() {
+            GameController.this.refresh();
+        }
+
+        @Override
+        public void schedule(Runnable action, long delayMs) {
+            cancelScheduled();
+            PauseTransition transition = new PauseTransition(Duration.millis((double) delayMs));
+            transition.setOnFinished(
+                    e -> {
+                        pending = null;
+                        action.run();
+                    });
+            pending = transition;
+            transition.play();
+        }
+
+        @Override
+        public void cancelScheduled() {
+            if (pending != null) {
+                pending.stop();
+                pending = null;
+            }
+        }
+
+        @Override
+        public void wrongMove(String uci) {
+            // The status line says so; the move itself stays visible until the flow takes it back.
+        }
+
+        @Override
+        public void puzzleRated(Puzzle puzzle, boolean solved) {
+            puzzleRatingDelta = puzzleRating.delta(puzzle.rating(), solved);
+            puzzleRating = puzzleRating.after(puzzle.rating(), solved);
+            Settings.setPuzzleRating(puzzleRating);
+        }
+
+        @Override
+        public void puzzleComplete(Puzzle puzzle, boolean solved) {
+            GameController.this.refresh();
+            if (!solved) {
+                return; // leave the line on the board to look at; "Next puzzle" moves on
+            }
+            cancelNextPuzzleTimer();
+            nextPuzzleTimer = new PauseTransition(NEXT_PUZZLE_DELAY);
+            nextPuzzleTimer.setOnFinished(
+                    e -> {
+                        nextPuzzleTimer = null;
+                        if (mode == Mode.PUZZLE
+                                && puzzleFlow.state() == PuzzleFlow.State.COMPLETE) {
+                            nextPuzzle();
+                        }
+                    });
+            nextPuzzleTimer.play();
         }
     }
 }

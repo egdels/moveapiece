@@ -80,6 +80,11 @@ tasks.named('processResources') {
         include '*.md'
         into 'de/schliweb/moveapiece/desktop/docs'
     }
+    // The bundled puzzle set (PUZZLE_PROVENANCE.md), shared with the Android app's assets.
+    from(rootProject.file('puzzles')) {
+        include 'puzzles.csv'
+        into 'de/schliweb/moveapiece/desktop/puzzles'
+    }
 }
 
 apply from: 'stockfish.gradle'

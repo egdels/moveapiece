@@ -9,11 +9,13 @@ import de.schliweb.moveapiece.engine.MaiaRatings;
 import de.schliweb.moveapiece.logic.BoardType;
 import de.schliweb.moveapiece.logic.ChessGame;
 import de.schliweb.moveapiece.logic.GameSetup;
+import de.schliweb.moveapiece.puzzle.PuzzleRating;
+import de.schliweb.moveapiece.puzzle.RecentPuzzles;
 import java.util.prefs.Preferences;
 
 /**
  * Persists user-adjustable settings (engine strength, Maia rating, evaluation display, physical
- * board type, last game setup) and the game in progress across app restarts.
+ * board type, last game setup), the puzzle rating and the game in progress across app restarts.
  */
 final class Settings {
 
@@ -27,6 +29,8 @@ final class Settings {
     private static final String KEY_LAST_OPENING = "lastOpening";
     private static final String KEY_LAST_TRAINING_HINTS = "lastTrainingHints";
     private static final String KEY_LAST_CHESS960 = "lastChess960";
+    private static final String KEY_PUZZLE_RATING = "puzzleRating";
+    private static final String KEY_RECENT_PUZZLES = "recentPuzzles";
     private static final int DEFAULT_ENGINE_ELO = 2200;
     private static final boolean DEFAULT_EVALUATION_ENABLED = false;
     private static final int DEFAULT_MAIA_RATING = 1500;
@@ -98,12 +102,33 @@ final class Settings {
         PREFS.putBoolean(KEY_LAST_CHESS960, setup.chess960());
     }
 
+    // ---- Puzzles ----------------------------------------------------------------------------
+
+    /** The trainee's puzzle rating; {@link PuzzleRating#START} until the first puzzle. */
+    static PuzzleRating getPuzzleRating() {
+        return PuzzleRating.fromKey(PREFS.get(KEY_PUZZLE_RATING, null));
+    }
+
+    static void setPuzzleRating(PuzzleRating rating) {
+        PREFS.put(KEY_PUZZLE_RATING, rating.toKey());
+    }
+
+    /** The puzzles played last, so they are not handed out again soon. */
+    static RecentPuzzles getRecentPuzzles() {
+        return RecentPuzzles.fromKey(PREFS.get(KEY_RECENT_PUZZLES, null));
+    }
+
+    /** At most {@link RecentPuzzles#CAPACITY} ids of a few characters: well within a value. */
+    static void setRecentPuzzles(RecentPuzzles recent) {
+        PREFS.put(KEY_RECENT_PUZZLES, recent.toKey());
+    }
+
     // ---- The game in progress ---------------------------------------------------------------
 
     /**
      * The game in progress, kept across a restart of the app (see {@code GameController#saveGame}).
-     * In training only the training fields are set and {@code snapshot} is null; otherwise the game
-     * is the snapshot and the training fields are unused.
+     * In training only the training fields are set and {@code snapshot} is null, in a puzzle only
+     * the puzzle fields; otherwise the game is the snapshot and the other fields are unused.
      */
     record SavedGame(
             String mode,
@@ -113,7 +138,10 @@ final class Settings {
             ChessGame.Snapshot snapshot,
             String trainingLine,
             boolean trainingHints,
-            int trainingPly) {}
+            int trainingPly,
+            String puzzleId,
+            int puzzlePly,
+            boolean puzzleFailed) {}
 
     private static final String NODE_SAVED_GAME = "savedGame";
     private static final String KEY_GAME_MODE = "mode";
@@ -127,6 +155,9 @@ final class Settings {
     private static final String KEY_GAME_TRAINING_LINE = "trainingLine";
     private static final String KEY_GAME_TRAINING_HINTS = "trainingHints";
     private static final String KEY_GAME_TRAINING_PLY = "trainingPly";
+    private static final String KEY_GAME_PUZZLE_ID = "puzzleId";
+    private static final String KEY_GAME_PUZZLE_PLY = "puzzlePly";
+    private static final String KEY_GAME_PUZZLE_FAILED = "puzzleFailed";
 
     /** Null when no game was kept, see {@link #setSavedGame}. */
     static SavedGame getSavedGame() {
@@ -153,7 +184,10 @@ final class Settings {
                 snapshot,
                 node.get(KEY_GAME_TRAINING_LINE, null),
                 node.getBoolean(KEY_GAME_TRAINING_HINTS, true),
-                node.getInt(KEY_GAME_TRAINING_PLY, 0));
+                node.getInt(KEY_GAME_TRAINING_PLY, 0),
+                node.get(KEY_GAME_PUZZLE_ID, null),
+                node.getInt(KEY_GAME_PUZZLE_PLY, 0),
+                node.getBoolean(KEY_GAME_PUZZLE_FAILED, false));
     }
 
     /**
@@ -191,6 +225,13 @@ final class Settings {
         }
         node.putBoolean(KEY_GAME_TRAINING_HINTS, game.trainingHints());
         node.putInt(KEY_GAME_TRAINING_PLY, game.trainingPly());
+        if (game.puzzleId() == null) {
+            node.remove(KEY_GAME_PUZZLE_ID);
+        } else {
+            node.put(KEY_GAME_PUZZLE_ID, game.puzzleId());
+        }
+        node.putInt(KEY_GAME_PUZZLE_PLY, game.puzzlePly());
+        node.putBoolean(KEY_GAME_PUZZLE_FAILED, game.puzzleFailed());
     }
 
     /** Forgets the kept game: {@link #getSavedGame} returns null until the next save. */

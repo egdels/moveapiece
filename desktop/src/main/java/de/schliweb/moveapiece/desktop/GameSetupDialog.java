@@ -31,16 +31,16 @@ import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
 /**
- * Modal "New Game" picker: opponent (human, Stockfish, Maia, or the opening trainer), which color
- * the human plays, and - for the opening trainer - which line to drill and whether the trainee's
- * own next move gets a highlighted hint. Mirrors the Android app's single {@code showNewGameDialog}
- * - the one deliberate difference is that neither engine's playing strength is chosen here: both
- * Stockfish's Elo and Maia's rating stay live, always-visible sidebar controls on desktop (see
- * {@link GameController}) rather than a dialog-only, one-time setting, since unlike the Android
- * dialog's SeekBar both can be adjusted mid-game - Maia's by swapping in a different bundled model
- * file (see {@link GameController#startMaiaGame}), not a UCI option on a running instance, but
- * adjustable all the same. A fresh Maia game simply starts at whichever rating was last used (see
- * {@link Settings#getMaiaRating}).
+ * Modal "New Game" picker: opponent (human, Stockfish, Maia, the opening trainer or puzzles), which
+ * color the human plays, and - for the opening trainer - which line to drill and whether the
+ * trainee's own next move gets a highlighted hint. Mirrors the Android app's single {@code
+ * showNewGameDialog} - the one deliberate difference is that neither engine's playing strength is
+ * chosen here: both Stockfish's Elo and Maia's rating stay live, always-visible sidebar controls on
+ * desktop (see {@link GameController}) rather than a dialog-only, one-time setting, since unlike
+ * the Android dialog's SeekBar both can be adjusted mid-game - Maia's by swapping in a different
+ * bundled model file (see {@link GameController#startMaiaGame}), not a UCI option on a running
+ * instance, but adjustable all the same. A fresh Maia game simply starts at whichever rating was
+ * last used (see {@link Settings#getMaiaRating}).
  *
  * <p>Opens pre-filled with {@code initial} - normally the last setup started (see {@link
  * Settings#getLastGameSetup}) - so a regular Maia-as-Black player or someone drilling one line only
@@ -66,15 +66,18 @@ final class GameSetupDialog {
         RadioButton stockfishRadio = new RadioButton(Messages.get("mode_human_vs_stockfish"));
         RadioButton maiaRadio = new RadioButton(Messages.get("mode_human_vs_maia"));
         RadioButton trainerRadio = new RadioButton(Messages.get("mode_opening_trainer"));
+        RadioButton puzzleRadio = new RadioButton(Messages.get("mode_puzzles"));
         humanRadio.setToggleGroup(opponentGroup);
         stockfishRadio.setToggleGroup(opponentGroup);
         maiaRadio.setToggleGroup(opponentGroup);
         trainerRadio.setToggleGroup(opponentGroup);
+        puzzleRadio.setToggleGroup(opponentGroup);
         switch (initial.opponent()) {
             case HUMAN -> humanRadio.setSelected(true);
             case STOCKFISH -> stockfishRadio.setSelected(true);
             case MAIA -> maiaRadio.setSelected(true);
             case TRAINER -> trainerRadio.setSelected(true);
+            case PUZZLE -> puzzleRadio.setSelected(true);
         }
 
         ToggleGroup sideGroup = new ToggleGroup();
@@ -136,6 +139,7 @@ final class GameSetupDialog {
                         stockfishRadio,
                         maiaRadio,
                         trainerRadio,
+                        puzzleRadio,
                         colorBox,
                         chess960Box,
                         openingBox,
@@ -153,13 +157,15 @@ final class GameSetupDialog {
                 () -> {
                     boolean isHuman = humanRadio.isSelected();
                     boolean isTrainer = trainerRadio.isSelected();
-                    colorBox.setVisible(!isHuman);
-                    colorBox.setManaged(!isHuman);
+                    boolean isPuzzle = puzzleRadio.isSelected();
+                    // A puzzle decides the colour itself.
+                    colorBox.setVisible(!isHuman && !isPuzzle);
+                    colorBox.setManaged(!isHuman && !isPuzzle);
                     openingBox.setVisible(isTrainer);
                     openingBox.setManaged(isTrainer);
                     hintsBox.setVisible(isTrainer);
                     hintsBox.setManaged(isTrainer);
-                    boolean offersChess960 = !isTrainer;
+                    boolean offersChess960 = !isTrainer && !isPuzzle;
                     chess960Box.setVisible(offersChess960);
                     chess960Box.setManaged(offersChess960);
                     if (content.getScene() != null) {
@@ -206,7 +212,9 @@ final class GameSetupDialog {
                                             ? Opponent.STOCKFISH
                                             : maiaRadio.isSelected()
                                                     ? Opponent.MAIA
-                                                    : Opponent.TRAINER;
+                                                    : trainerRadio.isSelected()
+                                                            ? Opponent.TRAINER
+                                                            : Opponent.PUZZLE;
                     Side side = whiteRadio.isSelected() ? Side.WHITE : Side.BLACK;
                     OpeningLine opening =
                             opponent == Opponent.TRAINER
