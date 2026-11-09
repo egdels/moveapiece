@@ -130,7 +130,8 @@ public final class PostGameReport {
         return moves;
     }
 
-    static String plyLabel(int plyIndex) {
+    /** "12." for White's move at {@code plyIndex} (0 = White's first move), "12..." for Black's. */
+    public static String plyLabel(int plyIndex) {
         int moveNumber = plyIndex / 2 + 1;
         return plyIndex % 2 == 0 ? moveNumber + "." : moveNumber + "...";
     }

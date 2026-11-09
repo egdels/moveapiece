@@ -36,7 +36,7 @@ The candidates are grouped into rating bands of 100 points. Within each band
 they are ordered by the SHA-256 of their id, not by their place in the dump,
 and the first 210 are taken. The result is sorted by rating, then id.
 
-Result: 4,616 puzzles, rated 502 to 2769. Every band from 600 to 2699 is full;
+Result: 4,616 puzzles, rated 502 to 2765. Every band from 600 to 2699 is full;
 there are only 194 candidates in 500-599, 12 in 2700-2799 and none below 500.
 1,326 end in checkmate. 597 have a one-move solution, 2,095 two moves, 1,505
 three, 419 four. File size 593,855 bytes, SHA-256

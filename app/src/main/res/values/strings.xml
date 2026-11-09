@@ -168,4 +168,11 @@
     <string name="puzzle_info_format">Puzzle %1$d · Your rating %2$d</string>
     <string name="puzzle_info_rated_format">Puzzle %1$d · Your rating %2$d (%3$s)</string>
     <string name="error_puzzles_unavailable">The puzzles could not be loaded.</string>
+
+    <!-- Practising mistakes -->
+    <string name="action_practice_mistakes">Practise mistakes</string>
+    <string name="action_next_mistake">Next mistake</string>
+    <string name="action_back_to_game">Back to the game</string>
+    <string name="status_practice_done">All mistakes practised</string>
+    <string name="practice_info_format">Mistake %1$d of %2$d · played: %3$s %4$s</string>
 </resources>

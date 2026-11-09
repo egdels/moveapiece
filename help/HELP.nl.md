@@ -32,6 +32,19 @@ in het venster Nieuw spel, en de app onthoudt het voor de volgende keer.
   het uit.
 - **Partij analyseren** in het menu (de drie puntjes) controleert een
   partij zet voor zet en somt de fouten van beide kanten op.
+- **Fouten oefenen** in dat overzicht zet elk van je fouten en blunders
+  als puzzel neer: de stelling vóór de laatste zet van de tegenstander,
+  die zet, en dan zoek je een betere zet dan de jouwe. Een van de drie
+  beste zetten van de engine telt ook als die hoogstens een halve pion
+  slechter is dan de beste, net als elke zet die mat zet. Tegen Stockfish
+  of Maia oefen je alleen je eigen fouten; in een partij met z'n tweeën
+  of een geïmporteerde die van beide kanten. **Hint** en **Oplossing
+  tonen** werken zoals bij puzzels, en niets telt mee voor je
+  puzzelrating. Na een foutloze oplossing volgt de volgende fout vanzelf;
+  **Volgende fout** gaat op elk moment verder, en bij de laatste zet
+  **Terug naar de partij** de partij terug zoals hij was. Nieuw spel en
+  PGN importeren beëindigen het oefenen. Ook het sluiten van de app
+  beëindigt het; een partij die nog loopt blijft bewaard.
 
 ## Openingen
 
@@ -72,8 +85,9 @@ in het venster Nieuw spel, en de app onthoudt het voor de volgende keer.
   blijft de stelling staan tot je op **Volgende puzzel** drukt.
 - Zet terugnemen, de waardering en de hints van de engine staan uit bij
   puzzels. Elektronische borden worden nog niet voor puzzels gebruikt;
-  speel ze op het scherm. De NEW GAME-knop van een Chessnut start de
-  volgende puzzel.
+  los ze op het scherm op. De NEW GAME-knop van een Chessnut start de
+  volgende puzzel; zolang een puzzel niet is opgelost, druk je er twee
+  keer op.
 - Als de app wordt gesloten, blijft een begonnen puzzel bewaard; na een
   afgeronde puzzel gaat de volgende start verder met een nieuwe puzzel.
   De ongeveer 4.600 puzzels komen uit de vrije puzzeldatabase van

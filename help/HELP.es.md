@@ -34,6 +34,19 @@ la próxima vez.
   bueno para las blancas. Está desactivada por defecto.
 - **Analizar partida** en el menú (los tres puntos) revisa una partida
   jugada a jugada y enumera los errores de ambos bandos.
+- **Practicar errores** en ese informe plantea cada uno de tus errores y
+  errores garrafales como un ejercicio: la posición antes de la última
+  jugada del rival, esa jugada, y luego encuentras una jugada mejor que
+  la tuya. Una de las tres mejores jugadas del motor también cuenta si
+  está a menos de medio peón de la mejor, igual que cualquier jugada que
+  dé mate. Contra Stockfish o Maia solo se practican tus propios errores;
+  en una partida entre dos o una importada, los de ambos bandos.
+  **Pista** y **Ver solución** funcionan como en los ejercicios, y nada
+  cuenta para la puntuación de ejercicios. Tras una solución limpia, el
+  siguiente error llega solo; **Siguiente error** avanza en cualquier
+  momento, y en el último, **Volver a la partida** deja la partida como
+  estaba. Partida nueva e Importar PGN terminan la práctica. Cerrar la
+  aplicación también la termina; una partida aún en curso se conserva.
 
 ## Aperturas
 
@@ -77,12 +90,13 @@ la próxima vez.
   ejercicio**.
 - Deshacer jugada, la evaluación y las pistas del motor están
   desactivadas en los ejercicios. Los tableros electrónicos todavía no se
-  usan para los ejercicios; juégalos en la pantalla. El botón NEW GAME
-  de un Chessnut inicia el siguiente ejercicio.
+  usan para los ejercicios; resuélvelos en la pantalla. El botón NEW
+  GAME de un Chessnut inicia el siguiente ejercicio; mientras un
+  ejercicio no esté resuelto, púlsalo dos veces.
 - Al cerrar la aplicación, un ejercicio empezado se conserva; tras uno
-  terminado, el próximo inicio sigue con un ejercicio nuevo. Los unos
-  4.600 ejercicios proceden de la base de datos libre de ejercicios de
-  Lichess.
+  terminado, el próximo inicio sigue con un ejercicio nuevo. Los cerca
+  de 4.600 ejercicios proceden de la base de datos libre de ejercicios
+  de Lichess.
 
 ## Chess960
 

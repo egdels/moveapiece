@@ -164,4 +164,11 @@
     <string name="puzzle_info_format">Ejercicio %1$d · Tu puntuación %2$d</string>
     <string name="puzzle_info_rated_format">Ejercicio %1$d · Tu puntuación %2$d (%3$s)</string>
     <string name="error_puzzles_unavailable">No se pudieron cargar los ejercicios.</string>
+
+    <!-- Practising mistakes -->
+    <string name="action_practice_mistakes">Practicar errores</string>
+    <string name="action_next_mistake">Siguiente error</string>
+    <string name="action_back_to_game">Volver a la partida</string>
+    <string name="status_practice_done">Todos los errores practicados</string>
+    <string name="practice_info_format">Error %1$d de %2$d · jugado: %3$s %4$s</string>
 </resources>

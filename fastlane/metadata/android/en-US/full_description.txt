@@ -15,6 +15,7 @@ SOLVE TACTICS PUZZLES
 • About 4,600 puzzles from real games, from the free Lichess puzzle database
 • Picked to match your level: your puzzle rating adjusts after every puzzle, and you can make them easier or harder
 • A hint or the whole solution when you are stuck
+• Practise the mistakes of your own games: after the analysis, each one comes back as a puzzle
 
 IMPROVE YOUR GAME
 • Hint button, optional live evaluation, blunder warning after a bad move

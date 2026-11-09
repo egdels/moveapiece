@@ -39,6 +39,7 @@ import de.schliweb.moveapiece.logic.GameSetup;
 import de.schliweb.moveapiece.logic.Opponent;
 import de.schliweb.moveapiece.logic.PgnGames;
 import de.schliweb.moveapiece.logic.UciMoves;
+import de.schliweb.moveapiece.puzzle.MistakePractice;
 import de.schliweb.moveapiece.puzzle.Puzzle;
 import de.schliweb.moveapiece.puzzle.PuzzleFlow;
 import de.schliweb.moveapiece.puzzle.PuzzleRating;
@@ -323,6 +324,54 @@ final class GameController
     private final Button nextPuzzleButton = new Button(Messages.get("action_next_puzzle"));
     private final HBox puzzleBox = new HBox(8, showSolutionButton, nextPuzzleButton);
 
+    /**
+     * Practising the mistakes of an analysed game (see {@link #startMistakePractice}): puzzle mode,
+     * but the puzzles are those mistakes, nothing is rated, and the game they come from is kept to
+     * return to. Null otherwise.
+     */
+    private MistakeSession practice;
+
+    /** Returning from practice to a finished game: its game-over dialog was already seen. */
+    private boolean suppressGameOverAlert;
+
+    /** The mistakes being practised and the game to return to afterwards. */
+    private static final class MistakeSession {
+        final List<MistakePractice.Mistake> mistakes;
+        final ChessGame.Snapshot game;
+        final Mode mode;
+        final Side humanSide;
+        final boolean flipped;
+
+        /** Whether the game began with New Game, for Maia's opening variety on return. */
+        final boolean newGameStarted;
+
+        /** The mistake on the board; -1 before the first. */
+        int index = -1;
+
+        MistakeSession(
+                List<MistakePractice.Mistake> mistakes,
+                ChessGame.Snapshot game,
+                Mode mode,
+                Side humanSide,
+                boolean flipped,
+                boolean newGameStarted) {
+            this.mistakes = mistakes;
+            this.game = game;
+            this.mode = mode;
+            this.humanSide = humanSide;
+            this.flipped = flipped;
+            this.newGameStarted = newGameStarted;
+        }
+
+        MistakePractice.Mistake current() {
+            return mistakes.get(index);
+        }
+
+        boolean isLast() {
+            return index >= mistakes.size() - 1;
+        }
+    }
+
     // ---- Physical board (DGT Pegasus or Chessnut) --------------------------------
     /** The selected board's bridge; null on hosts without a transport (see createBoardBridge). */
     private PhysicalBoardBridge pegasusBridge;
@@ -516,6 +565,23 @@ final class GameController
      * synced on connect.
      */
     private void saveGame() {
+        if (practice != null) {
+            // Practising a game's mistakes is not kept; the game itself is, as it was.
+            storeSavedGame(
+                    new Settings.SavedGame(
+                            practice.mode.name(),
+                            practice.humanSide.name(),
+                            practice.flipped,
+                            currentMaiaRating,
+                            practice.game,
+                            null,
+                            true,
+                            0,
+                            null,
+                            0,
+                            false));
+            return;
+        }
         if (mode == Mode.PUZZLE) {
             // A finished puzzle is kept as puzzle mode without a puzzle: the next start goes on
             // with a new one (see restorePuzzles).
@@ -1557,6 +1623,9 @@ final class GameController
 
     /** Moves were played and nothing has ended yet: neither the game nor a training line. */
     private boolean isGameInProgress() {
+        if (practice != null) {
+            return true; // leaving practice drops the game it came from: always two presses
+        }
         if (game.moveCount() == 0 || game.isGameOver()) {
             return false;
         }
@@ -1716,7 +1785,9 @@ final class GameController
      */
     private void updateOverflowMenuState() {
         boolean hasMoves = game.moveCount() > 0;
-        exportItem.setDisable(!hasMoves);
+        // In puzzle mode the game is the puzzle's position (or a practised mistake's), not one to
+        // pass on.
+        exportItem.setDisable(!hasMoves || mode == Mode.PUZZLE);
         analyzeGameItem.setDisable(
                 searchFlow.isPostGameAnalysisRunning()
                         || !engineReady
@@ -1772,10 +1843,58 @@ final class GameController
         TextArea reportArea = new TextArea(report.toString());
         reportArea.setEditable(false);
         reportArea.setWrapText(true);
+        // Not focusable from the keyboard: a focused text area keeps Esc to itself, and the
+        // report is only to be read.
+        reportArea.setFocusTraversable(false);
         reportArea.setPrefSize(420, 320);
         alert.getDialogPane().setContent(reportArea);
+        List<MistakePractice.Mistake> mistakes =
+                MistakePractice.find(
+                        game.startFen(),
+                        game.isChess960(),
+                        uciMoves,
+                        evals,
+                        searchFlow.postGameCandidates(),
+                        PostGameReport.sanMoveList(game.toSan()),
+                        practiceSides());
+        ButtonType practiceType =
+                new ButtonType(
+                        Messages.get("action_practice_mistakes"), ButtonBar.ButtonData.OTHER);
+        if (!mistakes.isEmpty()) {
+            // A hidden CLOSE keeps Esc, the window's close button and the board's NEW GAME button
+            // (closeCurrentModal) working: JavaFX only closes a dialog that way when it has a
+            // single button or one with the CANCEL_CLOSE role - see the training-complete dialog.
+            alert.getButtonTypes().setAll(practiceType, ButtonType.OK, ButtonType.CLOSE);
+        }
         Styles.apply(alert.getDialogPane());
-        showTracked(alert);
+        javafx.scene.Node hiddenClose = alert.getDialogPane().lookupButton(ButtonType.CLOSE);
+        if (hiddenClose != null) {
+            hiddenClose.setVisible(false);
+            hiddenClose.setManaged(false);
+        }
+        // A hidden button is no cancel button for Esc, so Esc closes the report by hand - as it
+        // did when OK was its only button.
+        alert.getDialogPane()
+                .addEventFilter(
+                        javafx.scene.input.KeyEvent.KEY_PRESSED,
+                        event -> {
+                            if (event.getCode() == javafx.scene.input.KeyCode.ESCAPE) {
+                                event.consume();
+                                alert.setResult(ButtonType.CLOSE);
+                                alert.close();
+                            }
+                        });
+        Optional<ButtonType> choice = showTracked(alert);
+        if (choice.isPresent() && choice.get() == practiceType) {
+            startMistakePractice(mistakes);
+        }
+    }
+
+    /** Against Stockfish or Maia the player's own mistakes; with two players, both sides'. */
+    private java.util.Set<Side> practiceSides() {
+        return isPairedEngineMode()
+                ? java.util.Set.of(humanSide)
+                : java.util.Set.of(Side.WHITE, Side.BLACK);
     }
 
     private static String postGameSideSummary(String colorKey, PostGameReport.SideSummary side) {
@@ -2155,9 +2274,10 @@ final class GameController
         saveGame();
 
         // A puzzle that ends in mate ends with its own status line, not the game-over dialog.
-        if (game.isGameOver() && mode != Mode.PUZZLE) {
+        if (game.isGameOver() && mode != Mode.PUZZLE && !suppressGameOverAlert) {
             showGameOverAlert();
         }
+        suppressGameOverAlert = false;
     }
 
     /**
@@ -2638,6 +2758,10 @@ final class GameController
             showError(Messages.get("error_puzzles_unavailable"));
             return;
         }
+        if (practice != null) {
+            puzzleFlow.stop(); // a practised mistake is never rated
+            practice = null;
+        }
         searchFlow.abandonPendingSearches();
         trainingFlow.stop();
         trainingSession = null;
@@ -2657,7 +2781,11 @@ final class GameController
      */
     private void nextPuzzle() {
         cancelNextPuzzleTimer();
-        puzzleFlow.abandon(); // a puzzle left unsolved counts as lost
+        puzzleFlow.abandon(); // a puzzle left unsolved counts as lost (never while practising)
+        if (practice != null) {
+            nextMistake();
+            return;
+        }
         PuzzleRepository repository = puzzleRepository();
         Puzzle puzzle =
                 repository == null
@@ -2672,6 +2800,11 @@ final class GameController
         }
         recentPuzzles.add(puzzle.id());
         Settings.setRecentPuzzles(recentPuzzles);
+        setUpPuzzle(puzzle);
+    }
+
+    /** Puts {@code puzzle} on the board and lets its flow begin. */
+    private void setUpPuzzle(Puzzle puzzle) {
         searchFlow.abandonPendingSearches();
         puzzleRatingDelta = null;
         puzzleHintSquare = null;
@@ -2686,13 +2819,81 @@ final class GameController
 
     /**
      * Leaves puzzles for another mode, a PGN import or the trainer; a puzzle left unsolved counts
-     * as lost (see {@link PuzzleFlow#abandon()}).
+     * as lost (see {@link PuzzleFlow#abandon()}). Leaving practice this way drops the game it came
+     * from: something else was chosen.
      */
     private void stopPuzzles() {
         cancelNextPuzzleTimer();
         puzzleFlow.abandon();
+        practice = null;
         puzzleRatingDelta = null;
         puzzleHintSquare = null;
+    }
+
+    // ---- practising the mistakes of a game ----------------------------------------------------
+
+    /**
+     * Practises {@code mistakes} of the game just analysed, one after the other, as puzzles (see
+     * {@link MistakePractice}); afterwards {@link #returnToGame} puts the game back as it was.
+     */
+    private void startMistakePractice(List<MistakePractice.Mistake> mistakes) {
+        practice =
+                new MistakeSession(
+                        mistakes, game.snapshot(), mode, humanSide, boardFlipped, newGameStarted);
+        searchFlow.abandonPendingSearches();
+        trainingFlow.stop();
+        trainingSession = null;
+        mode = Mode.PUZZLE;
+        strengthSlider.setDisable(true);
+        updateStrengthControlsVisibility();
+        if (pegasusBridge != null) {
+            pegasusBridge.resetForNewGame(); // puzzles leave the board alone
+        }
+        nextPuzzle();
+    }
+
+    /** The next mistake, or back to the game after the last one. */
+    private void nextMistake() {
+        if (practice.isLast()) {
+            returnToGame();
+            return;
+        }
+        practice.index++;
+        setUpPuzzle(practice.current().puzzle());
+    }
+
+    /** Ends practice and puts the game it came from back, with its opponent and colours. */
+    private void returnToGame() {
+        MistakeSession session = practice;
+        cancelNextPuzzleTimer();
+        puzzleFlow.stop();
+        practice = null;
+        puzzleHintSquare = null;
+        puzzleRatingDelta = null;
+        game.restore(session.game);
+        mode = session.mode;
+        humanSide = session.humanSide;
+        boardFlipped = session.flipped;
+        boardCanvas.setFlipped(boardFlipped);
+        boardCanvas.setTrainingHint(null, null);
+        boardCanvas.clearSelection();
+        String lastMove = game.lastMoveUci();
+        if (lastMove == null) {
+            boardCanvas.setLastMove(null, null);
+        } else {
+            boardCanvas.setLastMove(UciMoves.from(lastMove), UciMoves.to(lastMove));
+        }
+        newGameStarted = session.newGameStarted;
+        strengthSlider.setDisable(mode != Mode.HUMAN_VS_STOCKFISH);
+        updateStrengthControlsVisibility();
+        if (pegasusBridge != null) {
+            pegasusBridge.resetForNewGame(game.startFen());
+        }
+        scrollMoveHistoryToEnd = true;
+        suppressGameOverAlert = true;
+        refresh();
+        syncPegasusPosition();
+        maybeStartEngineMove();
     }
 
     private void cancelNextPuzzleTimer() {
@@ -2755,10 +2956,12 @@ final class GameController
             case WRONG_MOVE_SHOWN -> Messages.get("status_puzzle_wrong");
             case SHOWING_SOLUTION -> Messages.get("status_puzzle_solution");
             case COMPLETE ->
-                    Messages.get(
-                            puzzleFlow.isFailed()
-                                    ? "status_puzzle_finished"
-                                    : "status_puzzle_solved");
+                    practice != null && practice.isLast()
+                            ? Messages.get("status_practice_done")
+                            : Messages.get(
+                                    puzzleFlow.isFailed()
+                                            ? "status_puzzle_finished"
+                                            : "status_puzzle_solved");
             default ->
                     Messages.get(
                             game.sideToMove() == Side.WHITE
@@ -2769,6 +2972,15 @@ final class GameController
 
     /** The puzzle's rating and the trainee's, with the change once the puzzle is rated. */
     private String puzzleInfoText(Puzzle puzzle) {
+        if (practice != null) {
+            MistakePractice.Mistake mistake = practice.current();
+            return Messages.get(
+                    "practice_info_format",
+                    practice.index + 1,
+                    practice.mistakes.size(),
+                    mistake.moveLabel(),
+                    mistake.playedSan());
+        }
         if (puzzleRatingDelta == null) {
             return Messages.get("puzzle_info_format", puzzle.rating(), puzzleRating.rating());
         }
@@ -2792,7 +3004,16 @@ final class GameController
                 state != PuzzleFlow.State.HUMAN_TO_MOVE
                         && state != PuzzleFlow.State.OPPONENT_TO_MOVE
                         && state != PuzzleFlow.State.WRONG_MOVE_SHOWN);
-        nextPuzzleButton.setDisable(state != PuzzleFlow.State.COMPLETE);
+        // While practising nothing is rated, so moving on early is fine - also the way back to
+        // the game before the last mistake.
+        nextPuzzleButton.setDisable(practice == null && state != PuzzleFlow.State.COMPLETE);
+        nextPuzzleButton.setText(
+                Messages.get(
+                        practice == null
+                                ? "action_next_puzzle"
+                                : practice.isLast()
+                                        ? "action_back_to_game"
+                                        : "action_next_mistake"));
     }
 
     // ---- PGN ----------------------------------------------------------------
@@ -2872,6 +3093,12 @@ final class GameController
     }
 
     private void finishPgnImport(String pgnText) {
+        if (practice != null) {
+            // Practice ends for an import, back on the game it came from, which the import then
+            // replaces - or, if it fails, keeps.
+            returnToGame();
+            searchFlow.abandonPendingSearches();
+        }
         if (!game.loadPgn(pgnText)) {
             // A failed load resets the game, so a puzzle cannot go on on it: a new one instead.
             if (mode == Mode.PUZZLE) {
@@ -3305,6 +3532,9 @@ final class GameController
 
         @Override
         public void puzzleRated(Puzzle puzzle, boolean solved) {
+            if (practice != null) {
+                return; // one's own mistakes do not count for the puzzle rating
+            }
             puzzleRatingDelta = puzzleRating.delta(puzzle.rating(), solved);
             puzzleRating = puzzleRating.after(puzzle.rating(), solved);
             Settings.setPuzzleRating(puzzleRating);
@@ -3312,8 +3542,10 @@ final class GameController
 
         @Override
         public void puzzleComplete(Puzzle puzzle, boolean solved) {
-            if (!solved) {
-                return; // leave the line on the board to look at; "Next puzzle" moves on
+            if (!solved || (practice != null && practice.isLast())) {
+                // Leave the position on the board to look at; the button moves on (after the last
+                // practised mistake, back to the game - not by itself).
+                return;
             }
             cancelNextPuzzleTimer();
             nextPuzzleTimer = new PauseTransition(NEXT_PUZZLE_DELAY);

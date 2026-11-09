@@ -33,6 +33,20 @@ successiva.
   È disattivata per impostazione predefinita.
 - **Analizza partita** nel menu (i tre puntini) esamina una partita mossa
   per mossa ed elenca gli errori di entrambe le parti.
+- **Esercitarsi sugli errori** in quel rapporto propone ogni tuo errore e
+  svista come un problema: la posizione prima dell'ultima mossa
+  dell'avversario, quella mossa, poi trovi una mossa migliore della tua.
+  Conta anche una delle tre migliori mosse del motore se è a meno di
+  mezzo pedone dalla migliore, così come qualsiasi mossa che dà matto.
+  Contro Stockfish o Maia si esercitano solo i tuoi errori; in una
+  partita giocata in due o importata, quelli di entrambe le parti.
+  **Suggerimento** e **Mostra soluzione** funzionano come nei problemi, e
+  nulla conta per il punteggio problemi. Dopo una soluzione pulita
+  l'errore successivo arriva da solo; **Errore successivo** va avanti in
+  qualsiasi momento, e sull'ultimo **Torna alla partita** rimette la
+  partita com'era. Nuova partita e Importa PGN terminano l'esercizio.
+  Anche chiudere l'app lo termina; una partita ancora in corso viene
+  conservata.
 
 ## Aperture
 
@@ -60,8 +74,8 @@ successiva.
 - Il tuo **punteggio problemi** parte da 1200 e compare accanto al
   punteggio del problema. Risolvere un problema senza mosse sbagliate,
   suggerimenti o soluzione lo fa salire; altrimenti scende, e i problemi
-  più difficili contano di più. I primi problemi contano di più, così il
-  punteggio di solito trova il tuo livello in pochi problemi. Il
+  più difficili contano di più. I primi problemi contano più di tutti,
+  così il punteggio di solito trova il tuo livello in pochi problemi. Il
   problema successivo viene scelto vicino al tuo punteggio; i problemi
   giocati di recente non tornano presto. Lasciare un problema irrisolto,
   per una nuova partita o un altro problema, conta come non risolto.
@@ -75,8 +89,9 @@ successiva.
   **Problema successivo**.
 - Annulla mossa, la valutazione e i suggerimenti del motore sono
   disattivati durante i problemi. Le scacchiere elettroniche non sono
-  ancora usate per i problemi; giocali sullo schermo. Il pulsante NEW
-  GAME di una Chessnut avvia il problema successivo.
+  ancora usate per i problemi; risolvili sullo schermo. Il pulsante NEW
+  GAME di una Chessnut avvia il problema successivo; finché un problema
+  non è risolto, premilo due volte.
 - Quando l'app viene chiusa, un problema iniziato viene conservato; dopo
   un problema concluso, l'avvio successivo prosegue con un problema
   nuovo. I circa 4.600 problemi provengono dal database libero di

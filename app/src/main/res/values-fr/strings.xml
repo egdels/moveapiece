@@ -164,4 +164,11 @@
     <string name="puzzle_info_format">Problème %1$d · Votre classement %2$d</string>
     <string name="puzzle_info_rated_format">Problème %1$d · Votre classement %2$d (%3$s)</string>
     <string name="error_puzzles_unavailable">Impossible de charger les problèmes.</string>
+
+    <!-- Practising mistakes -->
+    <string name="action_practice_mistakes">S\'entraîner sur les erreurs</string>
+    <string name="action_next_mistake">Erreur suivante</string>
+    <string name="action_back_to_game">Retour à la partie</string>
+    <string name="status_practice_done">Toutes les erreurs ont été travaillées</string>
+    <string name="practice_info_format">Erreur %1$d sur %2$d · joué : %3$s %4$s</string>
 </resources>

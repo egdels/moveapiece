@@ -27,12 +27,27 @@ candidates (`-rc`) and test tags are not listed.
   - After a clean solve the next puzzle follows by itself. A puzzle in
     progress is kept when the app is closed.
   - Electronic boards are not used for puzzles yet; the Chessnut's NEW
-    GAME button starts the next puzzle.
+    GAME button starts the next puzzle (twice while a puzzle is unsolved).
+- Practise your mistakes, in both apps: after Analyze Game, "Practise
+  mistakes" sets each mistake and blunder of the game as a puzzle - the
+  position before the opponent's last move, that move, then you find a
+  better move than the one played. One of the engine's three best moves
+  counts too if it is within half a pawn of the best, and any move that
+  mates. Against Stockfish or Maia only your own mistakes, in a game
+  between two players or an imported one both sides'. Nothing counts for
+  the puzzle rating; "Next mistake" moves on at any time, and "Back to the
+  game" puts the game back as it was.
 
 ### Changed
 
 - The privacy policy names the puzzle data the app keeps on the device:
-  the puzzle rating and the recently played puzzles.
+  the puzzle difficulty, rating and count, the recently played puzzles and
+  a puzzle in progress.
+- Analyze Game looks at the engine's three best moves in every position
+  (for practising mistakes), in the same time per position as before, so
+  its grades can differ slightly from earlier versions.
+- Export PGN is not offered during puzzles, where the board holds a
+  puzzle's position rather than a game.
 
 ## [1.9.0] - 2026-10-26
 

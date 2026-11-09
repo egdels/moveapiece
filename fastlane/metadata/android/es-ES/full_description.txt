@@ -15,6 +15,7 @@ RESOLVER EJERCICIOS TÁCTICOS
 • Unos 4.600 ejercicios de partidas reales, de la base de datos libre de ejercicios de Lichess
 • Elegidos según tu nivel: tu puntuación de ejercicios se ajusta tras cada ejercicio, y puedes hacerlos más fáciles o más difíciles
 • Una pista o la solución completa cuando te atascas
+• Practica los errores de tus propias partidas: tras el análisis, cada uno vuelve como ejercicio
 
 MEJORAR TU JUEGO
 • Botón de pista, evaluación en vivo opcional, aviso tras un error grave

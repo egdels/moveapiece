@@ -23,8 +23,8 @@ app never opens a network connection either.
 
 - **Settings**: the last game setup (opponent, colour, strength, opening,
   puzzle difficulty), whether the evaluation is shown and which type of
-  board was connected last. On Android they are in the app's private storage, on the desktop
-  in the operating system's user preferences.
+  board was connected last. On Android they are in the app's private
+  storage, on the desktop in the operating system's user preferences.
 - **Puzzles**: your puzzle rating, how many puzzles you have played and
   which ones you played recently, so the next puzzles fit your level and
   do not repeat soon. Stored next to the settings.

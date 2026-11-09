@@ -34,6 +34,20 @@ souvient pour la prochaine fois.
   Blancs. Elle est désactivée par défaut.
 - **Analyser la partie** dans le menu (les trois points) examine une
   partie coup par coup et liste les erreurs des deux camps.
+- **S'entraîner sur les erreurs** dans ce rapport présente chacune de vos
+  erreurs et gaffes comme un problème : la position avant le dernier coup
+  de l'adversaire, ce coup, puis vous trouvez un meilleur coup que le
+  vôtre. L'un des trois meilleurs coups du moteur compte aussi s'il est à
+  moins d'un demi-pion du meilleur, de même que tout coup qui fait mat.
+  Contre Stockfish ou Maia, seules vos propres erreurs sont travaillées ;
+  dans une partie à deux ou une partie importée, celles des deux camps.
+  **Indice** et **Voir la solution** fonctionnent comme pour les
+  problèmes, et rien ne compte pour le classement de problèmes. Après une
+  résolution sans faute, l'erreur suivante arrive toute seule ; **Erreur
+  suivante** passe à la suite à tout moment, et sur la dernière, **Retour
+  à la partie** remet la partie telle qu'elle était. Nouvelle partie et
+  Importer un PGN mettent fin à l'entraînement. Fermer l'application y
+  met fin aussi ; une partie encore en cours est conservée.
 
 ## Ouvertures
 
@@ -78,8 +92,9 @@ souvient pour la prochaine fois.
   **Problème suivant**.
 - Annuler le coup, l'évaluation et les indices du moteur sont désactivés
   pendant les problèmes. Les échiquiers électroniques ne sont pas encore
-  utilisés pour les problèmes ; jouez-les à l'écran. Le bouton NEW GAME
-  d'un Chessnut lance le problème suivant.
+  utilisés pour les problèmes ; résolvez-les à l'écran. Le bouton NEW
+  GAME d'un Chessnut lance le problème suivant ; tant qu'un problème
+  n'est pas résolu, appuyez deux fois.
 - Quand l'application est fermée, un problème en cours est conservé ;
   après un problème terminé, le prochain démarrage continue avec un
   nouveau problème. Les quelque 4 600 problèmes proviennent de la base

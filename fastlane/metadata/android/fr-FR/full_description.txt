@@ -15,6 +15,7 @@ RÉSOUDRE DES PROBLÈMES TACTIQUES
 • Environ 4 600 problèmes tirés de vraies parties, issus de la base de problèmes libre de Lichess
 • Adaptés à votre niveau : votre classement de problèmes s'ajuste après chaque problème, et vous pouvez les rendre plus faciles ou plus difficiles
 • Un indice ou toute la solution quand vous êtes bloqué
+• Travaillez les erreurs de vos propres parties : après l'analyse, chacune revient sous forme de problème
 
 PROGRESSER
 • Bouton d'indice, évaluation en direct optionnelle, avertissement après une gaffe

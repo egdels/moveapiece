@@ -72,6 +72,7 @@ import de.schliweb.moveapiece.logic.GameSetup;
 import de.schliweb.moveapiece.logic.Opponent;
 import de.schliweb.moveapiece.logic.PgnGames;
 import de.schliweb.moveapiece.logic.UciMoves;
+import de.schliweb.moveapiece.puzzle.MistakePractice;
 import de.schliweb.moveapiece.puzzle.Puzzle;
 import de.schliweb.moveapiece.puzzle.PuzzleDifficulty;
 import de.schliweb.moveapiece.puzzle.PuzzleFlow;
@@ -321,6 +322,54 @@ public class MainActivity extends AppCompatActivity
     /** The next puzzle, due a moment after a clean solve; null while none is due. */
     private Runnable nextPuzzleRunnable;
 
+    /** A PGN import's background thread is reading or loading the game; see onPgnFileSelected. */
+    private boolean pgnImportRunning;
+
+    /**
+     * Practising the mistakes of an analysed game (see {@link #startMistakePractice}): puzzle mode,
+     * but the puzzles are those mistakes, nothing is rated, and the game they come from is kept to
+     * return to. Null otherwise; not kept across a restart, which returns to the game itself.
+     */
+    private MistakeSession practice;
+
+    /** The mistakes being practised and the game to return to afterwards. */
+    private static final class MistakeSession {
+        final List<MistakePractice.Mistake> mistakes;
+        final ChessGame.Snapshot game;
+        final GameMode mode;
+        final Side engineSide;
+        final boolean flipped;
+
+        /** Whether the game began with New Game, for Maia's opening variety on return. */
+        final boolean newGameStarted;
+
+        /** The mistake on the board; -1 before the first. */
+        int index = -1;
+
+        MistakeSession(
+                List<MistakePractice.Mistake> mistakes,
+                ChessGame.Snapshot game,
+                GameMode mode,
+                Side engineSide,
+                boolean flipped,
+                boolean newGameStarted) {
+            this.mistakes = mistakes;
+            this.game = game;
+            this.mode = mode;
+            this.engineSide = engineSide;
+            this.flipped = flipped;
+            this.newGameStarted = newGameStarted;
+        }
+
+        MistakePractice.Mistake current() {
+            return mistakes.get(index);
+        }
+
+        boolean isLast() {
+            return index >= mistakes.size() - 1;
+        }
+    }
+
     // Mirrors state that otherwise lives only inside the (portrait- or
     // landscape-specific) BoardView instance, so it survives that instance
     // being torn down and recreated in bindViews() below.
@@ -383,6 +432,23 @@ public class MainActivity extends AppCompatActivity
      * pick the game up by themselves, the board is reconnected by the player and synced on connect.
      */
     private void saveGame() {
+        if (practice != null) {
+            // Practising a game's mistakes is not kept; the game itself is, as it was.
+            storeSavedGame(
+                    new Settings.SavedGame(
+                            practice.mode.name(),
+                            practice.engineSide.name(),
+                            practice.flipped,
+                            currentMaiaRating,
+                            practice.game,
+                            null,
+                            true,
+                            0,
+                            null,
+                            0,
+                            false));
+            return;
+        }
         if (mode == GameMode.PUZZLE) {
             // A finished puzzle is kept as puzzle mode without a puzzle: the next start goes on
             // with a new one (see restorePuzzles).
@@ -857,7 +923,12 @@ public class MainActivity extends AppCompatActivity
         boolean training = mode == GameMode.TRAINING;
         boolean hasMoves = game.moveCount() > 0;
         popup.getMenu().findItem(R.id.menuImportPgn).setVisible(!training);
-        popup.getMenu().findItem(R.id.menuExportPgn).setVisible(!training).setEnabled(hasMoves);
+        // In puzzle mode the game is the puzzle's position (or a practised mistake's), not one to
+        // pass on.
+        popup.getMenu()
+                .findItem(R.id.menuExportPgn)
+                .setVisible(!isDrillMode())
+                .setEnabled(hasMoves);
         popup.getMenu()
                 .findItem(R.id.menuAnalyzeGame)
                 .setVisible(!isDrillMode())
@@ -1399,6 +1470,9 @@ public class MainActivity extends AppCompatActivity
      */
     @Override
     public void onNewGameButton() {
+        if (pgnImportRunning) {
+            return; // the import thread is writing the game; NEW GAME must not race it
+        }
         if (newGameGate.onPress(isGameInProgress()) == NewGamePressGate.Decision.ARMED) {
             board.playNewGameArmedSound();
             Toast.makeText(this, R.string.board_new_game_confirm, Toast.LENGTH_SHORT).show();
@@ -1412,6 +1486,9 @@ public class MainActivity extends AppCompatActivity
 
     /** Moves were played and nothing has ended yet: neither the game nor a training line. */
     private boolean isGameInProgress() {
+        if (practice != null) {
+            return true; // leaving practice drops the game it came from: always two presses
+        }
         if (game.moveCount() == 0 || game.isGameOver()) {
             return false;
         }
@@ -2267,6 +2344,11 @@ public class MainActivity extends AppCompatActivity
         if (uri == null) {
             return;
         }
+        if (practice != null) {
+            // Practice ends for an import, back on the game it came from, which the import then
+            // replaces - or, if it fails, resets as for any game.
+            returnToGame();
+        }
         searchFlow.abandonPendingSearches();
         if (mode == GameMode.PUZZLE) {
             // The import replaces the game on another thread, so no puzzle may move on it
@@ -2280,6 +2362,7 @@ public class MainActivity extends AppCompatActivity
                         .setCancelable(false)
                         .show();
         currentDialog = progress;
+        pgnImportRunning = true;
         new Thread(
                         () -> {
                             String text;
@@ -2297,6 +2380,10 @@ public class MainActivity extends AppCompatActivity
                             } catch (IOException e) {
                                 runOnUiThread(
                                         () -> {
+                                            pgnImportRunning = false;
+                                            if (isDestroyed()) {
+                                                return; // rebuilt meanwhile; see below
+                                            }
                                             progress.dismiss();
                                             onPgnImportFailed();
                                         });
@@ -2307,6 +2394,13 @@ public class MainActivity extends AppCompatActivity
                                 boolean loaded = game.loadPgn(text);
                                 runOnUiThread(
                                         () -> {
+                                            pgnImportRunning = false;
+                                            // An Activity rebuilt meanwhile (dark mode, font size)
+                                            // has restored the game from what was saved; this one
+                                            // must not write over it any more.
+                                            if (isDestroyed()) {
+                                                return;
+                                            }
                                             progress.dismiss();
                                             if (!loaded) {
                                                 onPgnImportFailed();
@@ -2317,6 +2411,10 @@ public class MainActivity extends AppCompatActivity
                             } else {
                                 runOnUiThread(
                                         () -> {
+                                            pgnImportRunning = false;
+                                            if (isDestroyed()) {
+                                                return;
+                                            }
                                             progress.dismiss();
                                             showPgnGameSelectionDialog(games);
                                         });
@@ -2361,6 +2459,13 @@ public class MainActivity extends AppCompatActivity
         Toast.makeText(this, R.string.pgn_import_failed, Toast.LENGTH_SHORT).show();
         if (mode == GameMode.PUZZLE && !puzzleFlow.isActive()) {
             nextPuzzle();
+            return;
+        }
+        // A failed load may have reset the game (ChessGame.loadPgn): show what is there now, and
+        // let the opponent take up its turn again.
+        refreshBoard();
+        if (isPairedEngineMode()) {
+            maybeTriggerEngineMove();
         }
     }
 
@@ -2517,12 +2622,28 @@ public class MainActivity extends AppCompatActivity
                 flaggedMoves.length() > 0
                         ? getString(R.string.analysis_flagged_moves_header) + "\n" + flaggedMoves
                         : getString(R.string.analysis_no_flagged_moves));
-        currentDialog =
+        List<MistakePractice.Mistake> mistakes =
+                MistakePractice.find(
+                        game.startFen(),
+                        game.isChess960(),
+                        uciMoves,
+                        evals,
+                        searchFlow.postGameCandidates(),
+                        PostGameReport.sanMoveList(game.toSan()),
+                        isPairedEngineMode()
+                                ? java.util.Set.of(engineSide.flip())
+                                : java.util.Set.of(Side.WHITE, Side.BLACK));
+        MaterialAlertDialogBuilder builder =
                 new MaterialAlertDialogBuilder(this)
                         .setTitle(R.string.analysis_dialog_title)
                         .setMessage(report.toString())
-                        .setPositiveButton(R.string.action_ok, null)
-                        .show();
+                        .setPositiveButton(R.string.action_ok, null);
+        if (!mistakes.isEmpty()) {
+            // Against Stockfish or Maia the player's own mistakes; with two players, both sides'.
+            builder.setNeutralButton(
+                    R.string.action_practice_mistakes, (d, w) -> startMistakePractice(mistakes));
+        }
+        currentDialog = builder.show();
     }
 
     private String postGameSideSummary(int colorRes, PostGameReport.SideSummary side) {
@@ -2575,6 +2696,10 @@ public class MainActivity extends AppCompatActivity
             Toast.makeText(this, R.string.error_puzzles_unavailable, Toast.LENGTH_LONG).show();
             return;
         }
+        if (practice != null) {
+            puzzleFlow.stop(); // a practised mistake is never rated
+            practice = null;
+        }
         searchFlow.abandonPendingSearches();
         trainingFlow.stop();
         trainingSession = null;
@@ -2593,7 +2718,11 @@ public class MainActivity extends AppCompatActivity
      */
     private void nextPuzzle() {
         cancelNextPuzzle();
-        puzzleFlow.abandon(); // a puzzle left unsolved counts as lost
+        puzzleFlow.abandon(); // a puzzle left unsolved counts as lost (never while practising)
+        if (practice != null) {
+            nextMistake();
+            return;
+        }
         PuzzleRepository repository = puzzleRepository();
         Puzzle puzzle =
                 repository == null
@@ -2608,6 +2737,11 @@ public class MainActivity extends AppCompatActivity
         }
         recentPuzzles.add(puzzle.id());
         settings.setRecentPuzzles(recentPuzzles);
+        setUpPuzzle(puzzle);
+    }
+
+    /** Puts {@code puzzle} on the board and lets its flow begin; safe before bindViews. */
+    private void setUpPuzzle(Puzzle puzzle) {
         searchFlow.abandonPendingSearches();
         puzzleRatingDelta = null;
         puzzleHintSquare = null;
@@ -2627,8 +2761,78 @@ public class MainActivity extends AppCompatActivity
     private void stopPuzzles() {
         cancelNextPuzzle();
         puzzleFlow.abandon();
+        practice = null; // leaving practice this way drops its game: something else was chosen
         puzzleRatingDelta = null;
         puzzleHintSquare = null;
+    }
+
+    // ---- Practising the mistakes of a game ----------------------------------------------------
+
+    /**
+     * Practises {@code mistakes} of the game just analysed, one after the other, as puzzles (see
+     * {@link MistakePractice}); afterwards {@link #returnToGame} puts the game back as it was.
+     */
+    private void startMistakePractice(List<MistakePractice.Mistake> mistakes) {
+        practice =
+                new MistakeSession(
+                        mistakes, game.snapshot(), mode, engineSide, boardFlipped, newGameStarted);
+        searchFlow.abandonPendingSearches();
+        trainingFlow.stop();
+        trainingSession = null;
+        mode = GameMode.PUZZLE;
+        board.resetForNewGame(); // puzzles leave the board alone
+        nextPuzzle();
+    }
+
+    /** The next mistake, or back to the game after the last one. */
+    private void nextMistake() {
+        if (practice.isLast()) {
+            returnToGame();
+            return;
+        }
+        practice.index++;
+        setUpPuzzle(practice.current().puzzle());
+    }
+
+    /** Ends practice and puts the game it came from back, with its opponent and colours. */
+    private void returnToGame() {
+        MistakeSession session = practice;
+        cancelNextPuzzle();
+        puzzleFlow.stop();
+        practice = null;
+        puzzleHintSquare = null;
+        puzzleRatingDelta = null;
+        game.restore(session.game);
+        mode = session.mode;
+        engineSide = session.engineSide;
+        setBoardFlipped(session.flipped);
+        String lastMove = game.lastMoveUci();
+        if (lastMove == null) {
+            setLastMove(null, null);
+        } else {
+            setLastMove(UciMoves.from(lastMove), UciMoves.to(lastMove));
+        }
+        binding.boardView.setTrainingHint(null, null);
+        binding.boardView.clearSelection();
+        newGameStarted = session.newGameStarted;
+        if (game.isChess960()) {
+            board.resetForNewGame(game.startFen());
+        } else {
+            board.resetForNewGame();
+        }
+        if (engineReady) {
+            if (mode == GameMode.ENGINE) {
+                engine.setStrength(engineElo);
+            } else {
+                engine.setFullStrength();
+            }
+        }
+        scrollMoveHistoryToEnd = true;
+        refreshBoard();
+        syncPegasusPosition();
+        if (isPairedEngineMode()) {
+            maybeTriggerEngineMove();
+        }
     }
 
     private void cancelNextPuzzle() {
@@ -2685,6 +2889,9 @@ public class MainActivity extends AppCompatActivity
             case SHOWING_SOLUTION:
                 return R.string.status_puzzle_solution;
             case COMPLETE:
+                if (practice != null && practice.isLast()) {
+                    return R.string.status_practice_done;
+                }
                 return puzzleFlow.isFailed()
                         ? R.string.status_puzzle_finished
                         : R.string.status_puzzle_solved;
@@ -2697,6 +2904,15 @@ public class MainActivity extends AppCompatActivity
 
     /** The puzzle's rating and the trainee's, with the change once the puzzle is rated. */
     private String puzzleInfoText(Puzzle puzzle) {
+        if (practice != null) {
+            MistakePractice.Mistake mistake = practice.current();
+            return getString(
+                    R.string.practice_info_format,
+                    practice.index + 1,
+                    practice.mistakes.size(),
+                    mistake.moveLabel(),
+                    mistake.playedSan());
+        }
         if (puzzleRatingDelta == null) {
             return getString(R.string.puzzle_info_format, puzzle.rating(), puzzleRating.rating());
         }
@@ -2720,7 +2936,15 @@ public class MainActivity extends AppCompatActivity
                 state == PuzzleFlow.State.HUMAN_TO_MOVE
                         || state == PuzzleFlow.State.OPPONENT_TO_MOVE
                         || state == PuzzleFlow.State.WRONG_MOVE_SHOWN);
-        binding.nextPuzzleButton.setEnabled(state == PuzzleFlow.State.COMPLETE);
+        // While practising nothing is rated, so moving on early is fine - also the way back to
+        // the game before the last mistake.
+        binding.nextPuzzleButton.setEnabled(practice != null || state == PuzzleFlow.State.COMPLETE);
+        binding.nextPuzzleButton.setText(
+                practice == null
+                        ? R.string.action_next_puzzle
+                        : practice.isLast()
+                                ? R.string.action_back_to_game
+                                : R.string.action_next_mistake);
     }
 
     // ---- Training mode ------------------------------------------------------
@@ -3517,6 +3741,9 @@ public class MainActivity extends AppCompatActivity
 
         @Override
         public void puzzleRated(Puzzle puzzle, boolean solved) {
+            if (practice != null) {
+                return; // one's own mistakes do not count for the puzzle rating
+            }
             puzzleRatingDelta = puzzleRating.delta(puzzle.rating(), solved);
             puzzleRating = puzzleRating.after(puzzle.rating(), solved);
             settings.setPuzzleRating(puzzleRating);
@@ -3524,8 +3751,10 @@ public class MainActivity extends AppCompatActivity
 
         @Override
         public void puzzleComplete(Puzzle puzzle, boolean solved) {
-            if (!solved) {
-                return; // leave the line on the board to look at; "Next puzzle" moves on
+            if (!solved || (practice != null && practice.isLast())) {
+                // Leave the position on the board to look at; the button moves on (after the last
+                // practised mistake, back to the game - not by itself).
+                return;
             }
             cancelNextPuzzle();
             nextPuzzleRunnable =

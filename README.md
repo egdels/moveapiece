@@ -31,6 +31,8 @@ JDK's own `jpackage`.
   puzzle database, CC0), picked close to a puzzle rating that adapts after
   every puzzle, with an Easier/Normal/Harder choice, hints and the full
   solution on request
+- Practise your own mistakes: after the game analysis, every mistake and
+  blunder can be replayed as a puzzle
 - Ask for a hint, see a live evaluation if you switch it on, get a blunder
   warning, analyse the finished game
 - Undo, redo, flip the board, import and export PGN (multi-game files

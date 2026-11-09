@@ -31,6 +31,18 @@ the New Game dialog, and the app remembers it for next time.
   default.
 - **Analyze Game** in the menu (the three dots) checks a game move by
   move and lists the mistakes of both sides.
+- **Practise mistakes** in that report sets each of your mistakes and
+  blunders as a puzzle: the position before the opponent's last move,
+  that move, then you find a better move than the one you played. One of
+  the engine's three best moves counts too if it is within half a pawn of
+  the best, and so does any move that mates. Against Stockfish or Maia
+  only your own mistakes are practised; in a game between two players or
+  an imported one, both sides'. **Hint** and **Show solution** work as in
+  puzzles, and nothing counts for the puzzle rating. After a clean solve
+  the next mistake follows by itself; **Next mistake** moves on at any
+  time, and on the last one **Back to the game** puts the game back as it
+  was. New Game and Import PGN end the practice. Closing the app ends it
+  too; a game still in progress is kept.
 
 ## Openings
 
@@ -68,7 +80,8 @@ the New Game dialog, and the app remembers it for next time.
   position stays on the board until you press **Next puzzle**.
 - Undo, the evaluation and the engine's hints are off during puzzles.
   Electronic boards are not used for puzzles yet; play them on the
-  screen. The NEW GAME button of a Chessnut starts the next puzzle.
+  screen. The NEW GAME button of a Chessnut starts the next puzzle;
+  while a puzzle is unsolved, press it twice.
 - When the app is closed, a puzzle in progress is kept; after a finished
   one, the next start goes on with a new puzzle. The roughly 4,600
   puzzles come from the free Lichess puzzle database.

@@ -34,6 +34,19 @@ nächste Mal.
   Standardmäßig ist sie aus.
 - **Partie analysieren** im Menü (die drei Punkte) prüft eine Partie Zug
   für Zug und listet die Fehler beider Seiten auf.
+- **Fehler üben** in diesem Bericht stellt jeden deiner Fehler und Patzer
+  als Puzzle: die Stellung vor dem letzten Zug des Gegners, dieser Zug,
+  dann findest du einen besseren als deinen. Einer der drei besten Züge
+  der Engine zählt auch, wenn er höchstens einen halben Bauern schlechter
+  ist als der beste, ebenso jeder Zug, der mattsetzt. Gegen Stockfish oder
+  Maia werden nur deine eigenen Fehler geübt, in einer Partie zu zweit
+  oder einer importierten die beider Seiten. **Tipp** und **Lösung
+  zeigen** funktionieren wie bei den Puzzles; für die Puzzle-Wertung
+  zählt nichts davon. Nach einer sauberen Lösung folgt der nächste Fehler
+  von selbst; **Nächster Fehler** geht jederzeit weiter, und beim letzten
+  stellt **Zurück zur Partie** die Partie wieder her, wie sie war. Neues
+  Spiel und PGN importieren beenden das Üben. Auch das Schließen der App
+  beendet es; eine noch laufende Partie bleibt erhalten.
 
 ## Eröffnungen
 
@@ -75,8 +88,9 @@ nächste Mal.
   bleibt die Stellung stehen, bis du **Nächstes Puzzle** drückst.
 - Zug zurücknehmen, die Bewertung und die Tipps der Engine sind bei
   Puzzles aus. Elektronische Bretter werden für Puzzles noch nicht
-  genutzt; spiele sie auf dem Bildschirm. Der NEW-GAME-Knopf eines
-  Chessnut startet das nächste Puzzle.
+  genutzt; löse sie auf dem Bildschirm. Der NEW-GAME-Knopf eines
+  Chessnut startet das nächste Puzzle; solange ein Puzzle ungelöst ist,
+  drückst du ihn zweimal.
 - Wird die App geschlossen, bleibt ein angefangenes Puzzle erhalten;
   nach einem beendeten geht es beim nächsten Start mit einem neuen
   Puzzle weiter. Die rund 4.600 Puzzles stammen aus der freien

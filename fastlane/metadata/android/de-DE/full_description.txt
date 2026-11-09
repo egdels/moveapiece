@@ -15,6 +15,7 @@ TAKTIK-PUZZLES LÖSEN
 • Rund 4.600 Puzzles aus echten Partien, aus der freien Puzzle-Datenbank von Lichess
 • Passend zu deinem Niveau: Deine Puzzle-Wertung passt sich nach jedem Puzzle an, und du kannst sie leichter oder schwerer stellen
 • Ein Tipp oder die ganze Lösung, wenn du nicht weiterkommst
+• Fehler aus deinen eigenen Partien üben: Nach der Analyse kommt jeder als Puzzle wieder
 
 BESSER WERDEN
 • Hinweis-Taste, optionale Live-Bewertung, Warnung nach einem groben Fehler

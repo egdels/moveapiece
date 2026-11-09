@@ -5,6 +5,10 @@
 
 package de.schliweb.moveapiece.puzzle;
 
+import com.github.bhlangonijr.chesslib.Piece;
+import com.github.bhlangonijr.chesslib.PieceType;
+import com.github.bhlangonijr.chesslib.Side;
+import com.github.bhlangonijr.chesslib.Square;
 import de.schliweb.moveapiece.logic.ChessGame;
 import de.schliweb.moveapiece.logic.UciMoves;
 import java.util.Locale;
@@ -133,7 +137,7 @@ public final class PuzzleFlow {
         ply = 0;
         failed = false;
         rated = false;
-        game.loadFen(puzzle.fen());
+        game.loadFen(puzzle.fen(), puzzle.chess960());
         state = State.OPPONENT_TO_MOVE;
         host.historyRewritten();
         host.refresh();
@@ -154,7 +158,7 @@ public final class PuzzleFlow {
             return false;
         }
         this.puzzle = puzzle;
-        game.loadFen(puzzle.fen());
+        game.loadFen(puzzle.fen(), puzzle.chess960());
         for (int i = 0; i < ply; i++) {
             if (!game.applyUciMove(puzzle.moves().get(i))) {
                 stop();
@@ -249,17 +253,27 @@ public final class PuzzleFlow {
         if (!move.matches("[a-h][1-8][a-h][1-8][qrbn]?")) {
             return MoveResult.IGNORED;
         }
-        // applyUciMove() alone is not enough: chesslib only checks that the resulting position is
-        // valid, not that the piece may move that way (a pawn from e4 to e6 passes).
-        if (!game.legalDestinationsFrom(UciMoves.from(move)).contains(UciMoves.to(move))) {
+        Square from = UciMoves.from(move);
+        Square to = UciMoves.to(move);
+        // The board's legal destinations, not applyUciMove's check alone: chesslib only checks
+        // that the resulting position is valid, not that the piece may move that way (a pawn from
+        // e4 to e6 passes).
+        if (!game.legalDestinationsFrom(from).contains(to)) {
             return MoveResult.IGNORED;
         }
-        boolean wasCapture = isCapture(move);
-        if (!game.applyUciMove(move)) {
+        boolean wasCapture = game.isCapture(from, to);
+        // Played as a move on the board is, not as engine notation: in Chess960 the king put on
+        // its castling square castles, which the engine writes as the king onto its rook.
+        Piece promotion =
+                move.length() == 5 ? promotionPiece(move.charAt(4), game.sideToMove()) : null;
+        if (!game.applyMove(from, to, promotion)) {
             return MoveResult.IGNORED;
         }
+        String played = game.lastMoveUci();
+        // Highlighted where the trainee put the piece: for a Chess960 castle the king's square,
+        // not the rook it is written onto.
         host.moveApplied(move, wasCapture);
-        if (move.equals(puzzle.moves().get(ply)) || game.isCheckmate()) {
+        if (puzzle.accepts(ply, played) || game.isCheckmate()) {
             ply++;
             if (ply >= puzzle.moves().size() || game.isCheckmate()) {
                 complete();
@@ -276,6 +290,17 @@ public final class PuzzleFlow {
         host.refresh();
         schedule(this::takeBackWrongMove, WRONG_MOVE_MS);
         return MoveResult.WRONG;
+    }
+
+    private static Piece promotionPiece(char letter, Side side) {
+        PieceType type =
+                switch (letter) {
+                    case 'r' -> PieceType.ROOK;
+                    case 'b' -> PieceType.BISHOP;
+                    case 'n' -> PieceType.KNIGHT;
+                    default -> PieceType.QUEEN;
+                };
+        return Piece.make(side, type);
     }
 
     /**
@@ -356,11 +381,14 @@ public final class PuzzleFlow {
     private boolean applyLineMove() {
         String uci = puzzle.moves().get(ply);
         boolean wasCapture = isCapture(uci);
+        // Shown as a player makes it: a Chess960 castle highlights the king's castling square,
+        // not the rook it is written onto (the same as for the trainee's own moves).
+        String shown = game.playerUci(uci);
         if (!game.applyUciMove(uci)) {
             return false;
         }
         ply++;
-        host.moveApplied(uci, wasCapture);
+        host.moveApplied(shown, wasCapture);
         return true;
     }
 

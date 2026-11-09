@@ -597,6 +597,61 @@ public class EngineSearchFlowTest {
     }
 
     @Test
+    public void postGameAnalysis_recordsTheBestMovesAndTakesTheEvalFromTheBestLine() {
+        game.applyUciMove("e2e4");
+
+        flow.startPostGameAnalysis();
+        assertTrue(engine.commands.contains("multipv 3"));
+        // Position 0: three lines, best first; the position's eval must be the first line's.
+        flow.onInfo("info depth 8 multipv 1 score cp 30 pv e2e4 e7e5");
+        flow.onInfo("info depth 8 multipv 2 score cp 25 pv d2d4 d7d5");
+        flow.onInfo("info depth 8 multipv 3 score cp -10 pv g1f3 g8f6");
+        flow.onBestMove("e2e4");
+        // Position 1: only one line came in.
+        flow.onInfo("info depth 8 multipv 1 score mate 3 pv e7e5");
+        flow.onBestMove("e7e5");
+
+        assertEquals(Arrays.asList(30, MoveQuality.mateToCp(3)), host.reportEvals);
+        List<List<MoveCandidate>> candidates = flow.postGameCandidates();
+        assertEquals(2, candidates.size());
+        assertEquals(
+                List.of(
+                        new MoveCandidate("e2e4", 30),
+                        new MoveCandidate("d2d4", 25),
+                        new MoveCandidate("g1f3", -10)),
+                candidates.get(0));
+        assertEquals(
+                List.of(new MoveCandidate("e7e5", MoveQuality.mateToCp(3))), candidates.get(1));
+        assertEquals("multipv 1", engine.commands.get(engine.commands.size() - 1));
+    }
+
+    @Test
+    public void postGameAnalysis_lineWithoutRankCountsAsTheBest() {
+        game.applyUciMove("e2e4");
+
+        flow.startPostGameAnalysis();
+        flow.onInfo("info depth 8 score cp 20 pv e2e4");
+        flow.onBestMove("e2e4");
+        flow.onInfo("info depth 8 score cp -20 pv e7e5");
+        flow.onBestMove("e7e5");
+
+        assertEquals(Arrays.asList(20, -20), host.reportEvals);
+        assertEquals(List.of(new MoveCandidate("e2e4", 20)), flow.postGameCandidates().get(0));
+    }
+
+    @Test
+    public void abandoningAPostGameAnalysisRestoresMultiPv() {
+        game.applyUciMove("e2e4");
+        flow.startPostGameAnalysis();
+
+        flow.abandonPendingSearches();
+
+        assertFalse(flow.isPostGameAnalysisRunning());
+        assertEquals("multipv 1", engine.commands.get(engine.commands.size() - 1));
+        assertTrue(flow.postGameCandidates().isEmpty());
+    }
+
+    @Test
     public void postGameAnalysis_replaysAChess960GameUnderChess960Rules() {
         game.loadFen("r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R w HAha - 0 1", true);
         game.applyUciMove("e1h1"); // O-O

@@ -13,6 +13,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.OptionalInt;
 
 /**
@@ -30,6 +31,14 @@ public final class EngineSearchFlow {
     private static final int HINT_MOVETIME_MS = 1500;
     private static final int HINT_MULTI_PV_LINES = 3;
     private static final int POST_GAME_MOVETIME_MS = 400;
+
+    /**
+     * Lines per position in the post-game analysis: the best move and its two runners-up, so that
+     * practising a mistake can accept a move nearly as good as the best (see {@link
+     * #postGameCandidates()}). The position's own eval stays the best line's.
+     */
+    static final int POST_GAME_MULTI_PV_LINES = 3;
+
     private static final String NO_MOVE = "(none)";
 
     /** What the flow needs to know from the app, and what it reports back. */
@@ -194,6 +203,16 @@ public final class EngineSearchFlow {
     /** Latest raw score seen for the position the post-game analysis is searching right now. */
     private int postGameLiveScoreCp;
 
+    /** The current post-game position's best moves by rank (index 0 = best), as they arrive. */
+    private final MoveCandidate[] postGameLineCandidates =
+            new MoveCandidate[POST_GAME_MULTI_PV_LINES];
+
+    /** Per replayed position so far, its best moves; null while no analysis runs. */
+    private List<List<MoveCandidate>> postGameCandidates;
+
+    /** {@link #postGameCandidates} of the last analysis that finished; empty before. */
+    private List<List<MoveCandidate>> lastPostGameCandidates = List.of();
+
     public EngineSearchFlow(ChessGame game, Host host) {
         this.game = game;
         this.host = host;
@@ -229,6 +248,16 @@ public final class EngineSearchFlow {
     /** Positions the running post-game analysis evaluates in total. */
     public int postGamePositionsTotal() {
         return postGameUciMoves.size() + 1;
+    }
+
+    /**
+     * The best moves the last finished post-game analysis found in each position, best first, one
+     * list per position (the same positions as its evals); a position that was not searched (a
+     * final checkmate or stalemate) has an empty list. Up to {@link #POST_GAME_MULTI_PV_LINES}
+     * moves each. Valid from {@link Host#onPostGameReport} on, until the next analysis finishes.
+     */
+    public List<List<MoveCandidate>> postGameCandidates() {
+        return lastPostGameCandidates;
     }
 
     /**
@@ -382,8 +411,12 @@ public final class EngineSearchFlow {
         }
         lastPositionEvalMoveCount = -1;
         moveQualityBaselineMoveCount = -1;
+        if (postGameUciMoves != null && engine != null) {
+            engine.setMultiPv(1); // an analysis was interrupted; see POST_GAME_MULTI_PV_LINES
+        }
         postGameUciMoves = null;
         postGamePositionEvals = null;
+        postGameCandidates = null;
         host.onSearchesAbandoned();
     }
 
@@ -457,9 +490,11 @@ public final class EngineSearchFlow {
         abandonPendingSearches();
         postGameUciMoves = Arrays.asList(game.toUciMoveList().split(" "));
         postGamePositionEvals = new ArrayList<>(postGameUciMoves.size() + 1);
+        postGameCandidates = new ArrayList<>(postGameUciMoves.size() + 1);
         host.onHintAvailabilityChanged();
         host.onPostGameProgress();
         setStrengthFor(SearchPurpose.POST_GAME);
+        engine.setMultiPv(POST_GAME_MULTI_PV_LINES);
         requestPostGameEvalFor(0);
     }
 
@@ -471,6 +506,7 @@ public final class EngineSearchFlow {
      * is mated, neutral for a stalemate.
      */
     private void requestPostGameEvalFor(int positionIndex) {
+        Arrays.fill(postGameLineCandidates, null);
         if (positionIndex == postGameUciMoves.size()
                 && (game.isCheckmate() || game.isStalemate())) {
             recordPostGameEval(game.isCheckmate() ? -MoveQuality.mateToCp(0) : 0);
@@ -485,6 +521,13 @@ public final class EngineSearchFlow {
 
     private void recordPostGameEval(int cp) {
         postGamePositionEvals.add(cp);
+        List<MoveCandidate> candidates = new ArrayList<>();
+        for (MoveCandidate candidate : postGameLineCandidates) {
+            if (candidate != null) {
+                candidates.add(candidate);
+            }
+        }
+        postGameCandidates.add(List.copyOf(candidates));
         int nextPositionIndex = postGamePositionEvals.size();
         host.onPostGameProgress();
         if (nextPositionIndex <= postGameUciMoves.size()) {
@@ -493,8 +536,11 @@ public final class EngineSearchFlow {
         }
         List<String> uciMoves = postGameUciMoves;
         List<Integer> evals = postGamePositionEvals;
+        lastPostGameCandidates = List.copyOf(postGameCandidates);
         postGameUciMoves = null;
         postGamePositionEvals = null;
+        postGameCandidates = null;
+        engine.setMultiPv(1);
         host.onHintAvailabilityChanged();
         host.onPostGameProgress();
         host.onPostGameReport(uciMoves, evals);
@@ -563,7 +609,17 @@ public final class EngineSearchFlow {
         int rawCp = mate.isPresent() ? MoveQuality.mateToCp(mate.getAsInt()) : cp.getAsInt();
         if (search.purpose == SearchPurpose.POST_GAME) {
             // Post-game analysis replays past positions - never the live eval/move-quality state.
-            postGameLiveScoreCp = rawCp;
+            // With several lines per position, only the best one is the position's eval; a line
+            // without a rank is the only one.
+            OptionalInt multiPv = UciInfoParser.parseMultiPv(infoLine);
+            int rank = multiPv.isPresent() ? multiPv.getAsInt() : 1;
+            if (rank == 1) {
+                postGameLiveScoreCp = rawCp;
+            }
+            Optional<String> pvMove = UciInfoParser.parsePvFirstMove(infoLine);
+            if (rank >= 1 && rank <= POST_GAME_MULTI_PV_LINES && pvMove.isPresent()) {
+                postGameLineCandidates[rank - 1] = new MoveCandidate(pvMove.get(), rawCp);
+            }
             return;
         }
         // engine.stop() is fire-and-forget - Stockfish can still emit a few more "info" lines for
@@ -592,5 +648,6 @@ public final class EngineSearchFlow {
         hintSearch = null;
         postGameUciMoves = null;
         postGamePositionEvals = null;
+        postGameCandidates = null;
     }
 }

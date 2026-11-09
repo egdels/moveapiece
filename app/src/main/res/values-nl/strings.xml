@@ -164,4 +164,11 @@
     <string name="puzzle_info_format">Puzzel %1$d · Jouw rating %2$d</string>
     <string name="puzzle_info_rated_format">Puzzel %1$d · Jouw rating %2$d (%3$s)</string>
     <string name="error_puzzles_unavailable">De puzzels konden niet worden geladen.</string>
+
+    <!-- Practising mistakes -->
+    <string name="action_practice_mistakes">Fouten oefenen</string>
+    <string name="action_next_mistake">Volgende fout</string>
+    <string name="action_back_to_game">Terug naar de partij</string>
+    <string name="status_practice_done">Alle fouten geoefend</string>
+    <string name="practice_info_format">Fout %1$d van %2$d · gespeeld: %3$s %4$s</string>
 </resources>
