@@ -33,11 +33,18 @@ public final class EngineSearchFlow {
     private static final int POST_GAME_MOVETIME_MS = 400;
 
     /**
-     * Lines per position in the post-game analysis: the best move and its two runners-up, so that
-     * practising a mistake can accept a move nearly as good as the best (see {@link
-     * #postGameCandidates()}). The position's own eval stays the best line's.
+     * Lines searched again, after the evals, in each position where a {@link MoveQuality#MISTAKE}
+     * or {@link MoveQuality#BLUNDER} was played: the best move and its two runners-up, so that
+     * practising the mistake can accept a move nearly as good as the best (see {@link
+     * #postGameCandidates()}). The evals themselves - and so every grade in the report - come from
+     * one line per position, which a search of several lines in the same time would make shallower
+     * and noisier.
      */
     static final int POST_GAME_MULTI_PV_LINES = 3;
+
+    /** Time for such a second search: as long per line as the first search had for its one. */
+    static final int POST_GAME_REFINE_MOVETIME_MS =
+            POST_GAME_MOVETIME_MS * POST_GAME_MULTI_PV_LINES;
 
     private static final String NO_MOVE = "(none)";
 
@@ -213,6 +220,15 @@ public final class EngineSearchFlow {
     /** {@link #postGameCandidates} of the last analysis that finished; empty before. */
     private List<List<MoveCandidate>> lastPostGameCandidates = List.of();
 
+    /**
+     * Once every position has its eval: the positions searched again for several lines (see {@link
+     * #POST_GAME_MULTI_PV_LINES}), in order; null before.
+     */
+    private List<Integer> postGameRefinePositions;
+
+    /** How many of {@link #postGameRefinePositions} are done. */
+    private int postGameRefinedCount;
+
     public EngineSearchFlow(ChessGame game, Host host) {
         this.game = game;
         this.host = host;
@@ -240,21 +256,30 @@ public final class EngineSearchFlow {
         return postGameUciMoves != null;
     }
 
-    /** Positions evaluated so far by the running post-game analysis. */
+    /**
+     * Searches done so far by the running post-game analysis: one per position, then one more per
+     * mistake (see {@link #POST_GAME_MULTI_PV_LINES}).
+     */
     public int postGamePositionsDone() {
-        return postGamePositionEvals.size();
+        return postGamePositionEvals.size() + postGameRefinedCount;
     }
 
-    /** Positions the running post-game analysis evaluates in total. */
+    /**
+     * Searches the running post-game analysis makes in total; grows by the mistakes found once
+     * every position has its eval.
+     */
     public int postGamePositionsTotal() {
-        return postGameUciMoves.size() + 1;
+        return postGameUciMoves.size()
+                + 1
+                + (postGameRefinePositions == null ? 0 : postGameRefinePositions.size());
     }
 
     /**
      * The best moves the last finished post-game analysis found in each position, best first, one
      * list per position (the same positions as its evals); a position that was not searched (a
      * final checkmate or stalemate) has an empty list. Up to {@link #POST_GAME_MULTI_PV_LINES}
-     * moves each. Valid from {@link Host#onPostGameReport} on, until the next analysis finishes.
+     * moves where a mistake or blunder was played, only the best move elsewhere. Valid from {@link
+     * Host#onPostGameReport} on, until the next analysis finishes.
      */
     public List<List<MoveCandidate>> postGameCandidates() {
         return lastPostGameCandidates;
@@ -411,12 +436,10 @@ public final class EngineSearchFlow {
         }
         lastPositionEvalMoveCount = -1;
         moveQualityBaselineMoveCount = -1;
-        if (postGameUciMoves != null && engine != null) {
+        if (postGameRefinePositions != null && engine != null) {
             engine.setMultiPv(1); // an analysis was interrupted; see POST_GAME_MULTI_PV_LINES
         }
-        postGameUciMoves = null;
-        postGamePositionEvals = null;
-        postGameCandidates = null;
+        clearPostGameState();
         host.onSearchesAbandoned();
     }
 
@@ -494,7 +517,6 @@ public final class EngineSearchFlow {
         host.onHintAvailabilityChanged();
         host.onPostGameProgress();
         setStrengthFor(SearchPurpose.POST_GAME);
-        engine.setMultiPv(POST_GAME_MULTI_PV_LINES);
         requestPostGameEvalFor(0);
     }
 
@@ -512,38 +534,102 @@ public final class EngineSearchFlow {
             recordPostGameEval(game.isCheckmate() ? -MoveQuality.mateToCp(0) : 0);
             return;
         }
+        searchPostGamePosition(positionIndex, POST_GAME_MOVETIME_MS);
+    }
+
+    private void searchPostGamePosition(int positionIndex, int movetimeMs) {
         pendingSearches.add(newSearch(SearchPurpose.POST_GAME));
         engine.setChess960(game.isChess960());
         engine.setPosition(
                 game.startFen(), String.join(" ", postGameUciMoves.subList(0, positionIndex)));
-        engine.go(POST_GAME_MOVETIME_MS);
+        engine.go(movetimeMs);
     }
 
     private void recordPostGameEval(int cp) {
         postGamePositionEvals.add(cp);
-        List<MoveCandidate> candidates = new ArrayList<>();
-        for (MoveCandidate candidate : postGameLineCandidates) {
-            if (candidate != null) {
-                candidates.add(candidate);
-            }
-        }
-        postGameCandidates.add(List.copyOf(candidates));
+        postGameCandidates.add(List.copyOf(collectLineCandidates()));
         int nextPositionIndex = postGamePositionEvals.size();
         host.onPostGameProgress();
         if (nextPositionIndex <= postGameUciMoves.size()) {
             requestPostGameEvalFor(nextPositionIndex);
             return;
         }
+        postGameRefinePositions = mistakePositions(postGamePositionEvals);
+        postGameRefinedCount = 0;
+        if (postGameRefinePositions.isEmpty()) {
+            finishPostGameAnalysis();
+            return;
+        }
+        host.onPostGameProgress();
+        engine.setMultiPv(POST_GAME_MULTI_PV_LINES);
+        refineNextPostGamePosition();
+    }
+
+    /**
+     * The positions in which a {@link MoveQuality#MISTAKE} or {@link MoveQuality#BLUNDER} was
+     * played, graded as the report grades it. The game's first move is left out: practice needs the
+     * move before it (see MistakePractice).
+     */
+    static List<Integer> mistakePositions(List<Integer> evals) {
+        List<Integer> positions = new ArrayList<>();
+        for (int ply = 1; ply + 1 < evals.size(); ply++) {
+            MoveQuality quality = MoveQuality.of(Math.max(0, evals.get(ply) + evals.get(ply + 1)));
+            if (quality == MoveQuality.MISTAKE || quality == MoveQuality.BLUNDER) {
+                positions.add(ply);
+            }
+        }
+        return positions;
+    }
+
+    private void refineNextPostGamePosition() {
+        Arrays.fill(postGameLineCandidates, null);
+        searchPostGamePosition(
+                postGameRefinePositions.get(postGameRefinedCount), POST_GAME_REFINE_MOVETIME_MS);
+    }
+
+    /** A second search came in: its lines replace the position's best move alone. */
+    private void recordPostGameRefinement() {
+        List<MoveCandidate> candidates = collectLineCandidates();
+        if (!candidates.isEmpty()) {
+            postGameCandidates.set(
+                    postGameRefinePositions.get(postGameRefinedCount), List.copyOf(candidates));
+        }
+        postGameRefinedCount++;
+        host.onPostGameProgress();
+        if (postGameRefinedCount < postGameRefinePositions.size()) {
+            refineNextPostGamePosition();
+            return;
+        }
+        engine.setMultiPv(1);
+        finishPostGameAnalysis();
+    }
+
+    private List<MoveCandidate> collectLineCandidates() {
+        List<MoveCandidate> candidates = new ArrayList<>();
+        for (MoveCandidate candidate : postGameLineCandidates) {
+            if (candidate != null) {
+                candidates.add(candidate);
+            }
+        }
+        return candidates;
+    }
+
+    private void finishPostGameAnalysis() {
         List<String> uciMoves = postGameUciMoves;
         List<Integer> evals = postGamePositionEvals;
         lastPostGameCandidates = List.copyOf(postGameCandidates);
-        postGameUciMoves = null;
-        postGamePositionEvals = null;
-        postGameCandidates = null;
-        engine.setMultiPv(1);
+        clearPostGameState();
         host.onHintAvailabilityChanged();
         host.onPostGameProgress();
         host.onPostGameReport(uciMoves, evals);
+    }
+
+    private void clearPostGameState() {
+        postGameUciMoves = null;
+        postGamePositionEvals = null;
+        postGameCandidates = null;
+        postGameRefinePositions = null;
+        postGameRefinedCount = 0;
     }
 
     // ------------------------------------------------------------ engine callbacks
@@ -575,7 +661,11 @@ public final class EngineSearchFlow {
                 host.onHint(move);
                 return;
             case POST_GAME:
-                recordPostGameEval(postGameLiveScoreCp);
+                if (postGameRefinePositions != null) {
+                    recordPostGameRefinement();
+                } else {
+                    recordPostGameEval(postGameLiveScoreCp);
+                }
                 return;
             default:
                 host.onEngineMove(move);
@@ -609,8 +699,8 @@ public final class EngineSearchFlow {
         int rawCp = mate.isPresent() ? MoveQuality.mateToCp(mate.getAsInt()) : cp.getAsInt();
         if (search.purpose == SearchPurpose.POST_GAME) {
             // Post-game analysis replays past positions - never the live eval/move-quality state.
-            // With several lines per position, only the best one is the position's eval; a line
-            // without a rank is the only one.
+            // Of several lines (a mistake's second search), only the best one would be the
+            // position's eval; a line without a rank is the only one.
             OptionalInt multiPv = UciInfoParser.parseMultiPv(infoLine);
             int rank = multiPv.isPresent() ? multiPv.getAsInt() : 1;
             if (rank == 1) {
@@ -646,8 +736,6 @@ public final class EngineSearchFlow {
     public void onEngineError() {
         pendingSearches.clear();
         hintSearch = null;
-        postGameUciMoves = null;
-        postGamePositionEvals = null;
-        postGameCandidates = null;
+        clearPostGameState();
     }
 }

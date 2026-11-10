@@ -89,7 +89,7 @@ public class PuzzleRepositoryTest {
                     fail("puzzle " + puzzle.id() + ": illegal move " + moves.get(i));
                 }
             }
-            if (puzzle.endsInMate()) {
+            if (puzzle.themes().contains("mate")) {
                 assertTrue("puzzle " + puzzle.id() + ": no checkmate", game.isCheckmate());
             }
         }
@@ -115,9 +115,7 @@ public class PuzzleRepositoryTest {
         assertEquals(List.of("g8f8", "a1a8"), puzzle.moves());
         assertEquals(600, puzzle.rating());
         assertEquals(Side.WHITE, puzzle.humanSide());
-        assertEquals("g8f8", puzzle.openingMove());
-        assertEquals(1, puzzle.solutionLength());
-        assertTrue(puzzle.endsInMate());
+        assertEquals(List.of("mate", "mateIn1"), puzzle.themes());
     }
 
     @Test

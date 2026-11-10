@@ -70,22 +70,4 @@ public record Puzzle(
         boolean whiteToMove = fields.length < 2 || "w".equals(fields[1]);
         return whiteToMove ? Side.BLACK : Side.WHITE;
     }
-
-    /** The app's move that sets the puzzle up. */
-    public String openingMove() {
-        return moves.get(0);
-    }
-
-    /** How many moves the trainee has to find. */
-    public int solutionLength() {
-        return moves.size() / 2;
-    }
-
-    /**
-     * Whether the line ends in checkmate. Lichess then accepts any mating move as the last move,
-     * not only the one stored, and so should the app.
-     */
-    public boolean endsInMate() {
-        return themes.contains("mate");
-    }
 }

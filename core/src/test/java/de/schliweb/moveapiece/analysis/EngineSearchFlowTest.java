@@ -597,31 +597,96 @@ public class EngineSearchFlowTest {
     }
 
     @Test
-    public void postGameAnalysis_recordsTheBestMovesAndTakesTheEvalFromTheBestLine() {
+    public void postGameAnalysis_gradesFromOneLineAndSearchesOnlyMistakesForThree() {
+        game.applyUciMove("e2e4");
+        game.applyUciMove("e7e5");
+        game.applyUciMove("g1f3");
+
+        flow.startPostGameAnalysis();
+        // First pass: one line per position, as for any eval.
+        assertFalse(engine.commands.contains("multipv 3"));
+        int[] scores = {20, -20, 280, -30};
+        String[] best = {"e2e4", "e7e5", "d2d4", "b8c6"};
+        for (int i = 0; i < scores.length; i++) {
+            flow.onInfo("info depth 8 score cp " + scores[i] + " pv " + best[i]);
+            flow.onBestMove(best[i]);
+        }
+        // 1...e5 lost 260 cp (a mistake), 2.Nf3 lost 250 (a mistake too): both searched again.
+        assertTrue(flow.isPostGameAnalysisRunning());
+        assertEquals(4, flow.postGamePositionsDone());
+        assertEquals(6, flow.postGamePositionsTotal());
+        assertEquals(
+                Arrays.asList(
+                        "multipv 3",
+                        "position e2e4",
+                        "go " + EngineSearchFlow.POST_GAME_REFINE_MOVETIME_MS),
+                engine.commands.subList(engine.commands.size() - 3, engine.commands.size()));
+        flow.onInfo("info depth 12 multipv 1 score cp -15 pv d7d5 e4d5");
+        flow.onInfo("info depth 12 multipv 2 score cp -25 pv c7c5 g1f3");
+        flow.onInfo("info depth 12 multipv 3 score cp -60 pv e7e6 d2d4");
+        flow.onBestMove("d7d5");
+        assertEquals(5, flow.postGamePositionsDone());
+        assertEquals("position e2e4 e7e5", engine.commands.get(engine.commands.size() - 2));
+        flow.onInfo("info depth 12 multipv 1 score mate 3 pv d2d4");
+        flow.onBestMove("d2d4");
+
+        assertFalse(flow.isPostGameAnalysisRunning());
+        // The grades' evals are the first pass's, untouched by the second searches.
+        assertEquals(Arrays.asList(20, -20, 280, -30), host.reportEvals);
+        List<List<MoveCandidate>> candidates = flow.postGameCandidates();
+        assertEquals(4, candidates.size());
+        assertEquals(List.of(new MoveCandidate("e2e4", 20)), candidates.get(0));
+        assertEquals(
+                List.of(
+                        new MoveCandidate("d7d5", -15),
+                        new MoveCandidate("c7c5", -25),
+                        new MoveCandidate("e7e6", -60)),
+                candidates.get(1));
+        assertEquals(
+                List.of(new MoveCandidate("d2d4", MoveQuality.mateToCp(3))), candidates.get(2));
+        assertEquals(List.of(new MoveCandidate("b8c6", -30)), candidates.get(3));
+        assertEquals("multipv 1", engine.commands.get(engine.commands.size() - 1));
+        assertEquals(4, engine.count("go 400"));
+    }
+
+    @Test
+    public void postGameAnalysis_withoutMistakes_searchesEachPositionOnce() {
         game.applyUciMove("e2e4");
 
         flow.startPostGameAnalysis();
-        assertTrue(engine.commands.contains("multipv 3"));
-        // Position 0: three lines, best first; the position's eval must be the first line's.
-        flow.onInfo("info depth 8 multipv 1 score cp 30 pv e2e4 e7e5");
-        flow.onInfo("info depth 8 multipv 2 score cp 25 pv d2d4 d7d5");
-        flow.onInfo("info depth 8 multipv 3 score cp -10 pv g1f3 g8f6");
+        flow.onInfo("info depth 8 score cp 30 pv e2e4");
         flow.onBestMove("e2e4");
-        // Position 1: only one line came in.
-        flow.onInfo("info depth 8 multipv 1 score mate 3 pv e7e5");
+        flow.onInfo("info depth 8 score cp -25 pv e7e5");
         flow.onBestMove("e7e5");
 
-        assertEquals(Arrays.asList(30, MoveQuality.mateToCp(3)), host.reportEvals);
-        List<List<MoveCandidate>> candidates = flow.postGameCandidates();
-        assertEquals(2, candidates.size());
+        assertFalse(flow.isPostGameAnalysisRunning());
+        assertEquals(Arrays.asList(30, -25), host.reportEvals);
+        assertFalse(engine.commands.contains("multipv 3"));
+    }
+
+    @Test
+    public void mistakePositions_skipsTheFirstMoveAndInaccuracies() {
+        // ply 0 loses 400 (first move, skipped), ply 1 loses 100 (inaccuracy), ply 2 loses 150.
         assertEquals(
-                List.of(
-                        new MoveCandidate("e2e4", 30),
-                        new MoveCandidate("d2d4", 25),
-                        new MoveCandidate("g1f3", -10)),
-                candidates.get(0));
-        assertEquals(
-                List.of(new MoveCandidate("e7e5", MoveQuality.mateToCp(3))), candidates.get(1));
+                List.of(2), EngineSearchFlow.mistakePositions(Arrays.asList(0, 400, -300, 450)));
+        assertEquals(List.of(), EngineSearchFlow.mistakePositions(List.of(20)));
+    }
+
+    @Test
+    public void abandoningASecondPostGameSearchRestoresMultiPv() {
+        game.applyUciMove("e2e4");
+        game.applyUciMove("e7e5");
+        flow.startPostGameAnalysis();
+        int[] scores = {20, -20, 300};
+        for (int score : scores) {
+            flow.onInfo("info depth 8 score cp " + score + " pv a2a3");
+            flow.onBestMove("a2a3");
+        }
+        assertTrue(engine.commands.contains("multipv 3"));
+
+        flow.abandonPendingSearches();
+
+        assertFalse(flow.isPostGameAnalysisRunning());
         assertEquals("multipv 1", engine.commands.get(engine.commands.size() - 1));
     }
 
@@ -640,14 +705,14 @@ public class EngineSearchFlowTest {
     }
 
     @Test
-    public void abandoningAPostGameAnalysisRestoresMultiPv() {
+    public void abandoningAPostGameAnalysis_dropsIt() {
         game.applyUciMove("e2e4");
         flow.startPostGameAnalysis();
 
         flow.abandonPendingSearches();
 
         assertFalse(flow.isPostGameAnalysisRunning());
-        assertEquals("multipv 1", engine.commands.get(engine.commands.size() - 1));
+        assertFalse(engine.commands.contains("multipv 3"));
         assertTrue(flow.postGameCandidates().isEmpty());
     }
 

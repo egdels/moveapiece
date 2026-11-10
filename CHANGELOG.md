@@ -45,9 +45,9 @@ candidates (`-rc`) and test tags are not listed.
 - The privacy policy names the puzzle data the app keeps on the device:
   the puzzle difficulty, rating and count, the recently played puzzles and
   a puzzle in progress.
-- Analyze Game looks at the engine's three best moves in every position
-  (for practising mistakes), in the same time per position as before, so
-  its grades can differ slightly from earlier versions.
+- Analyze Game searches the positions of mistakes and blunders a second
+  time for the engine's three best moves (for practising mistakes), which
+  takes a few seconds longer; the grades are unchanged.
 - Export PGN is not offered during puzzles, where the board holds a
   puzzle's position rather than a game.
 

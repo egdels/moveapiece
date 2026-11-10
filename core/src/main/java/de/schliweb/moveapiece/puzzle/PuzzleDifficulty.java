@@ -7,10 +7,10 @@ package de.schliweb.moveapiece.puzzle;
 
 /**
  * The "Easier / Normal / Harder" choice for puzzles in the New Game dialog: it shifts which puzzles
- * {@link PuzzleSelector} picks by {@link #offset()} points from the trainee's rating. The rating
- * itself is not touched - a harder puzzle solved simply counts for more - so the choice only lets a
- * trainee reach their level sooner than the rating alone would (see {@link PuzzleRating}). {@link
- * #key()} is the persisted form.
+ * {@link PuzzleSelector} picks by a fixed number of points from the trainee's rating (see {@link
+ * #target}). The rating itself is not touched - a harder puzzle solved simply counts for more - so
+ * the choice only lets a trainee reach their level sooner than the rating alone would (see {@link
+ * PuzzleRating}). {@link #key()} is the persisted form.
  */
 public enum PuzzleDifficulty {
     EASIER("easier", -300),
@@ -27,11 +27,6 @@ public enum PuzzleDifficulty {
 
     public String key() {
         return key;
-    }
-
-    /** Points added to the trainee's rating to aim the next puzzle. */
-    public int offset() {
-        return offset;
     }
 
     /** The puzzle rating to aim at for a trainee rated {@code rating}. */
