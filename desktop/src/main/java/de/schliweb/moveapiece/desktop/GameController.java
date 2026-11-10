@@ -2927,6 +2927,7 @@ final class GameController
                     case SHOWING_SOLUTION -> "status_puzzle_solution";
                     case SOLVED -> "status_puzzle_solved";
                     case FINISHED -> "status_puzzle_finished";
+                    case MISTAKE_PRACTISED -> "status_mistake_practised";
                     case PRACTICE_DONE -> "status_practice_done";
                     case WHITE_TO_MOVE -> "status_white_to_move";
                     case BLACK_TO_MOVE -> "status_black_to_move";

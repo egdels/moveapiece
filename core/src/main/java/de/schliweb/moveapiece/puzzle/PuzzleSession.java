@@ -35,6 +35,9 @@ public final class PuzzleSession<M> {
         SHOWING_SOLUTION,
         SOLVED,
         FINISHED,
+        /** A practised mistake completed, but not solved cleanly; more are to come. */
+        MISTAKE_PRACTISED,
+        /** The last practised mistake completed, solved or not. */
         PRACTICE_DONE,
         WHITE_TO_MOVE,
         BLACK_TO_MOVE
@@ -260,7 +263,12 @@ public final class PuzzleSession<M> {
                 if (practice != null && practice.isLast()) {
                     yield Status.PRACTICE_DONE;
                 }
-                yield flow.isFailed() ? Status.FINISHED : Status.SOLVED;
+                if (!flow.isFailed()) {
+                    yield Status.SOLVED;
+                }
+                // A practised mistake is no puzzle of its own, and "finished" would sound like
+                // practice were over.
+                yield practice != null ? Status.MISTAKE_PRACTISED : Status.FINISHED;
             }
             default -> sideToMove == Side.WHITE ? Status.WHITE_TO_MOVE : Status.BLACK_TO_MOVE;
         };

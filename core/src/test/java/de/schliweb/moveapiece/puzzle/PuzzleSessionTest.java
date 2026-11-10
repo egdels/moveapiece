@@ -195,6 +195,26 @@ public class PuzzleSessionTest {
     }
 
     @Test
+    public void status_aPractisedMistakeNotSolvedCleanlyIsPractisedNotFinished() {
+        RecordingHost host = new RecordingHost();
+        PuzzleFlow flow = new PuzzleFlow(new ChessGame(), host);
+        session.startPractice(practice(2));
+        flow.start(session.nextMistake());
+        host.scheduled.run();
+        flow.onUserMove("g1f3"); // wrong
+        host.scheduled.run(); // taken back
+        flow.onUserMove("e4d5");
+
+        assertEquals(Status.MISTAKE_PRACTISED, session.status(flow, Side.BLACK));
+        flow.start(session.nextMistake());
+        host.scheduled.run();
+        flow.onUserMove("g1f3");
+        host.scheduled.run();
+        flow.onUserMove("e4d5");
+        assertEquals(Status.PRACTICE_DONE, session.status(flow, Side.BLACK));
+    }
+
+    @Test
     public void status_solvedCleanly() {
         RecordingHost host = new RecordingHost();
         PuzzleFlow flow = new PuzzleFlow(new ChessGame(), host);

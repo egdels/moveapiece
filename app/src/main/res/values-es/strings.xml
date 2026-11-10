@@ -170,5 +170,6 @@
     <string name="action_next_mistake">Siguiente error</string>
     <string name="action_back_to_game">Volver a la partida</string>
     <string name="status_practice_done">Todos los errores practicados</string>
+    <string name="status_mistake_practised">Error practicado</string>
     <string name="practice_info_format">Error %1$d de %2$d · jugado: %3$s %4$s</string>
 </resources>

@@ -174,5 +174,6 @@
     <string name="action_next_mistake">Next mistake</string>
     <string name="action_back_to_game">Back to the game</string>
     <string name="status_practice_done">All mistakes practised</string>
+    <string name="status_mistake_practised">Mistake practised</string>
     <string name="practice_info_format">Mistake %1$d of %2$d · played: %3$s %4$s</string>
 </resources>

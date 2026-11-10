@@ -10,6 +10,11 @@ candidates (`-rc`) and test tags are not listed.
 
 ## [Unreleased]
 
+### Changed
+
+- Practising mistakes: a mistake completed without a clean solution now
+  says "Mistake practised" instead of "Puzzle finished".
+
 ## [1.10.0] - 2026-11-10
 
 ### Added

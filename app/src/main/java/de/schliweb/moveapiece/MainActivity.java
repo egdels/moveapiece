@@ -2851,6 +2851,8 @@ public class MainActivity extends AppCompatActivity
                 return R.string.status_puzzle_solved;
             case FINISHED:
                 return R.string.status_puzzle_finished;
+            case MISTAKE_PRACTISED:
+                return R.string.status_mistake_practised;
             case PRACTICE_DONE:
                 return R.string.status_practice_done;
             case WHITE_TO_MOVE:
