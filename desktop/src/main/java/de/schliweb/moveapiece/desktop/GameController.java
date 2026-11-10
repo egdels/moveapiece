@@ -338,6 +338,10 @@ final class GameController
     private static final class MistakeSession {
         final List<MistakePractice.Mistake> mistakes;
         final ChessGame.Snapshot game;
+
+        /** Whether that game was already over, so the next launch starts afresh (see saveGame). */
+        final boolean gameOver;
+
         final Mode mode;
         final Side humanSide;
         final boolean flipped;
@@ -351,12 +355,14 @@ final class GameController
         MistakeSession(
                 List<MistakePractice.Mistake> mistakes,
                 ChessGame.Snapshot game,
+                boolean gameOver,
                 Mode mode,
                 Side humanSide,
                 boolean flipped,
                 boolean newGameStarted) {
             this.mistakes = mistakes;
             this.game = game;
+            this.gameOver = gameOver;
             this.mode = mode;
             this.humanSide = humanSide;
             this.flipped = flipped;
@@ -566,7 +572,12 @@ final class GameController
      */
     private void saveGame() {
         if (practice != null) {
-            // Practising a game's mistakes is not kept; the game itself is, as it was.
+            // Practising a game's mistakes is not kept; the game itself is, as it was - unless it
+            // was over, which, like any finished game, is not kept either.
+            if (practice.gameOver) {
+                forgetSavedGame();
+                return;
+            }
             storeSavedGame(
                     new Settings.SavedGame(
                             practice.mode.name(),
@@ -2839,7 +2850,13 @@ final class GameController
     private void startMistakePractice(List<MistakePractice.Mistake> mistakes) {
         practice =
                 new MistakeSession(
-                        mistakes, game.snapshot(), mode, humanSide, boardFlipped, newGameStarted);
+                        mistakes,
+                        game.snapshot(),
+                        game.isGameOver(),
+                        mode,
+                        humanSide,
+                        boardFlipped,
+                        newGameStarted);
         searchFlow.abandonPendingSearches();
         trainingFlow.stop();
         trainingSession = null;
@@ -3000,10 +3017,7 @@ final class GameController
             return;
         }
         PuzzleFlow.State state = puzzleFlow.state();
-        showSolutionButton.setDisable(
-                state != PuzzleFlow.State.HUMAN_TO_MOVE
-                        && state != PuzzleFlow.State.OPPONENT_TO_MOVE
-                        && state != PuzzleFlow.State.WRONG_MOVE_SHOWN);
+        showSolutionButton.setDisable(!puzzleFlow.canShowSolution());
         // While practising nothing is rated, so moving on early is fine - also the way back to
         // the game before the last mistake.
         nextPuzzleButton.setDisable(practice == null && state != PuzzleFlow.State.COMPLETE);
@@ -3042,7 +3056,6 @@ final class GameController
             showError(Messages.get("error_read_file_format", file, e.getMessage()));
             return;
         }
-        searchFlow.abandonPendingSearches();
         List<String> games = PgnGames.splitGames(text);
         if (games.size() <= 1) {
             finishPgnImport(text);
@@ -3093,20 +3106,20 @@ final class GameController
     }
 
     private void finishPgnImport(String pgnText) {
-        if (practice != null) {
-            // Practice ends for an import, back on the game it came from, which the import then
-            // replaces - or, if it fails, keeps.
-            returnToGame();
-            searchFlow.abandonPendingSearches();
-        }
-        if (!game.loadPgn(pgnText)) {
-            // A failed load resets the game, so a puzzle cannot go on on it: a new one instead.
-            if (mode == Mode.PUZZLE) {
-                nextPuzzle();
-            }
+        // Loaded aside first: a file that does not load leaves everything as it was - the game,
+        // a puzzle (not rated for it) or the practice of a game's mistakes.
+        ChessGame imported = new ChessGame();
+        if (!imported.loadPgn(pgnText)) {
             showError(Messages.get("pgn_import_failed"));
             return;
         }
+        if (practice != null) {
+            // Practice ends for an import, back on the game it came from, which the import then
+            // replaces.
+            returnToGame();
+        }
+        searchFlow.abandonPendingSearches();
+        game.restore(imported.snapshot());
         trainingFlow.stop();
         stopPuzzles();
         trainingSession = null;

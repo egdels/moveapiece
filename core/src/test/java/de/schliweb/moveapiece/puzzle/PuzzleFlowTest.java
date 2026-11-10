@@ -44,9 +44,6 @@ public class PuzzleFlowTest {
         final List<String> wrong = new ArrayList<>();
         final List<String> rated = new ArrayList<>(); // "id/solved"
         final List<String> completed = new ArrayList<>(); // "id/solved"
-        int rewrites;
-        int refreshes;
-        int cancels;
         Runnable scheduled;
         long scheduledDelayMs;
 
@@ -56,14 +53,10 @@ public class PuzzleFlowTest {
         }
 
         @Override
-        public void historyRewritten() {
-            rewrites++;
-        }
+        public void historyRewritten() {}
 
         @Override
-        public void refresh() {
-            refreshes++;
-        }
+        public void refresh() {}
 
         @Override
         public void schedule(Runnable action, long delayMs) {
@@ -73,7 +66,6 @@ public class PuzzleFlowTest {
 
         @Override
         public void cancelScheduled() {
-            cancels++;
             scheduled = null;
         }
 
@@ -245,16 +237,34 @@ public class PuzzleFlowTest {
     }
 
     @Test
-    public void showSolution_beforeOpeningMove_playsWholeLine() {
+    public void showSolution_beforeOpeningMove_isRefusedAndNotRated() {
         flow.start(SCANDINAVIAN);
 
-        flow.showSolution();
-        host.runScheduled();
-        host.runScheduled();
-        host.runScheduled();
+        assertFalse(flow.canShowSolution());
+        assertFalse(flow.showSolution());
 
-        assertEquals(4, host.applied.size());
+        assertEquals(State.OPPONENT_TO_MOVE, flow.state());
+        assertTrue(host.rated.isEmpty());
+        host.runScheduled();
+        assertEquals(List.of("d7d5/false"), host.applied);
+        assertTrue(flow.canShowSolution());
+    }
+
+    @Test
+    public void showSolution_whileOpponentReplies_isAllowed() {
+        startAndPlayOpening(SCANDINAVIAN);
+        assertEquals(MoveResult.CORRECT, flow.onUserMove("e4d5"));
+        assertEquals(State.OPPONENT_TO_MOVE, flow.state());
+
+        assertTrue(flow.canShowSolution());
+        assertTrue(flow.showSolution());
+
+        while (flow.state() == State.SHOWING_SOLUTION) {
+            host.runScheduled();
+        }
+        assertEquals(List.of("d7d5/false", "e4d5/true", "d8d5/true", "b1c3/false"), host.applied);
         assertEquals(State.COMPLETE, flow.state());
+        assertEquals(List.of("scand/false"), host.rated);
     }
 
     @Test

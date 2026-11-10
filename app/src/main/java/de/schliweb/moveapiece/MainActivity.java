@@ -336,6 +336,10 @@ public class MainActivity extends AppCompatActivity
     private static final class MistakeSession {
         final List<MistakePractice.Mistake> mistakes;
         final ChessGame.Snapshot game;
+
+        /** Whether that game was already over, so the next launch starts afresh (see saveGame). */
+        final boolean gameOver;
+
         final GameMode mode;
         final Side engineSide;
         final boolean flipped;
@@ -349,12 +353,14 @@ public class MainActivity extends AppCompatActivity
         MistakeSession(
                 List<MistakePractice.Mistake> mistakes,
                 ChessGame.Snapshot game,
+                boolean gameOver,
                 GameMode mode,
                 Side engineSide,
                 boolean flipped,
                 boolean newGameStarted) {
             this.mistakes = mistakes;
             this.game = game;
+            this.gameOver = gameOver;
             this.mode = mode;
             this.engineSide = engineSide;
             this.flipped = flipped;
@@ -433,7 +439,12 @@ public class MainActivity extends AppCompatActivity
      */
     private void saveGame() {
         if (practice != null) {
-            // Practising a game's mistakes is not kept; the game itself is, as it was.
+            // Practising a game's mistakes is not kept; the game itself is, as it was - unless it
+            // was over, which, like any finished game, is not kept either.
+            if (practice.gameOver) {
+                forgetSavedGame();
+                return;
+            }
             storeSavedGame(
                     new Settings.SavedGame(
                             practice.mode.name(),
@@ -474,10 +485,7 @@ public class MainActivity extends AppCompatActivity
         TrainingSession session = trainingFlow.session();
         boolean training = mode == GameMode.TRAINING && session != null;
         if (game.isGameOver() || (training && session.isComplete())) {
-            if (lastSavedGame != null || settings.getSavedGame() != null) {
-                settings.clearSavedGame();
-                lastSavedGame = null;
-            }
+            forgetSavedGame();
             return;
         }
         Settings.SavedGame saved =
@@ -515,6 +523,13 @@ public class MainActivity extends AppCompatActivity
         if (!saved.equals(lastSavedGame)) {
             settings.setSavedGame(saved);
             lastSavedGame = saved;
+        }
+    }
+
+    private void forgetSavedGame() {
+        if (lastSavedGame != null || settings.getSavedGame() != null) {
+            settings.clearSavedGame();
+            lastSavedGame = null;
         }
     }
 
@@ -1471,7 +1486,7 @@ public class MainActivity extends AppCompatActivity
     @Override
     public void onNewGameButton() {
         if (pgnImportRunning) {
-            return; // the import thread is writing the game; NEW GAME must not race it
+            return; // a game is being imported and replaces whatever NEW GAME would start
         }
         if (newGameGate.onPress(isGameInProgress()) == NewGamePressGate.Decision.ARMED) {
             board.playNewGameArmedSound();
@@ -2331,9 +2346,10 @@ public class MainActivity extends AppCompatActivity
      * Reading the picked URI can block on network I/O for cloud-backed providers (e.g. WebDAV), and
      * {@link ChessGame#loadPgn} itself can take a while for a pathologically large single game -
      * both would otherwise freeze the UI thread, so both run off it, with a progress dialog so the
-     * app doesn't look hung meanwhile. {@link EngineSearchFlow#abandonPendingSearches} runs first
-     * (on the UI thread) so a stray engine reply can't mutate {@link #game} concurrently with the
-     * background thread's own mutation of it via {@code loadPgn}.
+     * app doesn't look hung meanwhile. The background thread loads into a game of its own, never
+     * {@link #game}: a file that does not load leaves everything as it was - the game, a puzzle
+     * (not rated for it) or the practice of a game's mistakes - and only {@link #finishPgnImport}
+     * replaces {@link #game}, on the UI thread.
      *
      * <p>A multi-game file (tournament/opening database) is offered as a pick list instead of
      * silently importing whatever chesslib happens to parse first - see {@link
@@ -2343,18 +2359,6 @@ public class MainActivity extends AppCompatActivity
     private void onPgnFileSelected(Uri uri) {
         if (uri == null) {
             return;
-        }
-        if (practice != null) {
-            // Practice ends for an import, back on the game it came from, which the import then
-            // replaces - or, if it fails, resets as for any game.
-            returnToGame();
-        }
-        searchFlow.abandonPendingSearches();
-        if (mode == GameMode.PUZZLE) {
-            // The import replaces the game on another thread, so no puzzle may move on it
-            // meanwhile; leaving it unsolved counts as lost. A failed import goes on with a new
-            // one (see onPgnImportFailed).
-            stopPuzzles();
         }
         AlertDialog progress =
                 new MaterialAlertDialogBuilder(this)
@@ -2391,7 +2395,8 @@ public class MainActivity extends AppCompatActivity
                             }
                             List<String> games = PgnGames.splitGames(text);
                             if (games.size() <= 1) {
-                                boolean loaded = game.loadPgn(text);
+                                ChessGame imported = new ChessGame();
+                                boolean loaded = imported.loadPgn(text);
                                 runOnUiThread(
                                         () -> {
                                             pgnImportRunning = false;
@@ -2406,7 +2411,7 @@ public class MainActivity extends AppCompatActivity
                                                 onPgnImportFailed();
                                                 return;
                                             }
-                                            finishPgnImport();
+                                            finishPgnImport(imported);
                                         });
                             } else {
                                 runOnUiThread(
@@ -2435,41 +2440,30 @@ public class MainActivity extends AppCompatActivity
                         .setItems(
                                 labels,
                                 (dialog, which) -> {
-                                    if (!game.loadPgn(games.get(which))) {
+                                    ChessGame imported = new ChessGame();
+                                    if (!imported.loadPgn(games.get(which))) {
                                         onPgnImportFailed();
                                         return;
                                     }
-                                    finishPgnImport();
+                                    finishPgnImport(imported);
                                 })
                         .show();
-        // Closed without a pick (back, outside, rotation): puzzle mode goes on with a new puzzle.
-        currentDialog.setOnDismissListener(
-                d -> {
-                    if (mode == GameMode.PUZZLE && !puzzleFlow.isActive()) {
-                        nextPuzzle();
-                    }
-                });
     }
 
-    /**
-     * A PGN import failed: say so, and in puzzle mode - whose puzzle the import stopped - go on
-     * with a new puzzle rather than leave the board without one.
-     */
+    /** A PGN import failed: say so. Nothing else changed (see onPgnFileSelected). */
     private void onPgnImportFailed() {
         Toast.makeText(this, R.string.pgn_import_failed, Toast.LENGTH_SHORT).show();
-        if (mode == GameMode.PUZZLE && !puzzleFlow.isActive()) {
-            nextPuzzle();
-            return;
-        }
-        // A failed load may have reset the game (ChessGame.loadPgn): show what is there now, and
-        // let the opponent take up its turn again.
-        refreshBoard();
-        if (isPairedEngineMode()) {
-            maybeTriggerEngineMove();
-        }
     }
 
-    private void finishPgnImport() {
+    /** Replaces the game with {@code imported}, a successfully loaded PGN game. */
+    private void finishPgnImport(ChessGame imported) {
+        if (practice != null) {
+            // Practice ends for an import, back on the game it came from, which the import then
+            // replaces.
+            returnToGame();
+        }
+        searchFlow.abandonPendingSearches();
+        game.restore(imported.snapshot());
         trainingFlow.stop();
         stopPuzzles();
         mode = GameMode.HUMAN;
@@ -2775,7 +2769,13 @@ public class MainActivity extends AppCompatActivity
     private void startMistakePractice(List<MistakePractice.Mistake> mistakes) {
         practice =
                 new MistakeSession(
-                        mistakes, game.snapshot(), mode, engineSide, boardFlipped, newGameStarted);
+                        mistakes,
+                        game.snapshot(),
+                        game.isGameOver(),
+                        mode,
+                        engineSide,
+                        boardFlipped,
+                        newGameStarted);
         searchFlow.abandonPendingSearches();
         trainingFlow.stop();
         trainingSession = null;
@@ -2932,10 +2932,7 @@ public class MainActivity extends AppCompatActivity
             return;
         }
         PuzzleFlow.State state = puzzleFlow.state();
-        binding.showSolutionButton.setEnabled(
-                state == PuzzleFlow.State.HUMAN_TO_MOVE
-                        || state == PuzzleFlow.State.OPPONENT_TO_MOVE
-                        || state == PuzzleFlow.State.WRONG_MOVE_SHOWN);
+        binding.showSolutionButton.setEnabled(puzzleFlow.canShowSolution());
         // While practising nothing is rated, so moving on early is fine - also the way back to
         // the game before the last mistake.
         binding.nextPuzzleButton.setEnabled(practice != null || state == PuzzleFlow.State.COMPLETE);

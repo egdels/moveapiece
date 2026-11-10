@@ -317,13 +317,25 @@ public final class PuzzleFlow {
     }
 
     /**
+     * Whether {@link #showSolution} would do something: once the puzzle is posed (the opening move
+     * played) and until it is complete or its solution is already being shown. Before the opening
+     * move the trainee has not seen the position yet, so - as for {@link #abandon} - nothing is
+     * rated then and there is no solution to give away.
+     */
+    public boolean canShowSolution() {
+        return switch (state) {
+            case HUMAN_TO_MOVE, WRONG_MOVE_SHOWN -> true;
+            case OPPONENT_TO_MOVE -> ply >= 1;
+            default -> false;
+        };
+    }
+
+    /**
      * Plays the rest of the line, one move every {@link #SOLUTION_STEP_MS}, and rates the puzzle as
-     * lost. Returns false if there is nothing to show.
+     * lost. Returns false if there is nothing to show (see {@link #canShowSolution}).
      */
     public boolean showSolution() {
-        if (state != State.HUMAN_TO_MOVE
-                && state != State.OPPONENT_TO_MOVE
-                && state != State.WRONG_MOVE_SHOWN) {
+        if (!canShowSolution()) {
             return false;
         }
         cancelScheduled();

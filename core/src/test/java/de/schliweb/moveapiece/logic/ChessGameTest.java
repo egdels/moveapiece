@@ -829,6 +829,36 @@ public class ChessGameTest {
         assertEquals(Piece.BLACK_ROOK, game.pieceAt(Square.F8));
     }
 
+    /**
+     * The apps load a PGN into a game of their own and move it over with snapshot/restore, so a
+     * file that does not load leaves their game alone; the move must keep the whole game.
+     */
+    @Test
+    public void restoreFromSnapshotOfLoadedPgn_keepsTheGame() {
+        String[] pgns = {
+            "[Event \"?\"]\n\n1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Bxc6 dxc6 5. O-O *\n",
+            "[Event \"?\"]\n"
+                    + "[Variant \"Chess960\"]\n"
+                    + "[SetUp \"1\"]\n"
+                    + "[FEN \"nrbqkrnb/pppppppp/8/8/8/8/PPPPPPPP/NRBQKRNB w KQkq - 0 1\"]\n"
+                    + "\n"
+                    + "1. Nf3 Nf6 2. O-O O-O *\n"
+        };
+        for (String pgn : pgns) {
+            ChessGame imported = new ChessGame();
+            assertTrue(imported.loadPgn(pgn));
+            ChessGame game = new ChessGame();
+            assertTrue(game.applyUciMove("d2d4")); // something to replace
+
+            assertTrue(game.restore(imported.snapshot()));
+
+            assertEquals(imported.toFen(), game.toFen());
+            assertEquals(imported.isChess960(), game.isChess960());
+            assertEquals(imported.moveCount(), game.moveCount());
+            assertEquals(imported.toPgn("W", "B"), game.toPgn("W", "B"));
+        }
+    }
+
     @Test
     public void standardGame_pgnHasNoVariantTag() {
         ChessGame game = new ChessGame();
