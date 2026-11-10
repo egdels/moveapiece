@@ -78,7 +78,7 @@ import de.schliweb.moveapiece.puzzle.PuzzleDifficulty;
 import de.schliweb.moveapiece.puzzle.PuzzleFlow;
 import de.schliweb.moveapiece.puzzle.PuzzleRating;
 import de.schliweb.moveapiece.puzzle.PuzzleRepository;
-import de.schliweb.moveapiece.puzzle.PuzzleSelector;
+import de.schliweb.moveapiece.puzzle.PuzzleSession;
 import de.schliweb.moveapiece.puzzle.RecentPuzzles;
 import de.schliweb.moveapiece.training.OpeningLine;
 import de.schliweb.moveapiece.training.OpeningRepository;
@@ -310,11 +310,12 @@ public class MainActivity extends AppCompatActivity
     /** The bundled puzzle set, read on first use; see {@link #puzzleRepository}. */
     private PuzzleRepository puzzles;
 
-    private PuzzleRating puzzleRating;
-    private RecentPuzzles recentPuzzles;
-
-    /** How the current puzzle changed the rating, once it is rated; null before. */
-    private Integer puzzleRatingDelta;
+    /**
+     * Rating, recent puzzles, what comes next and practice (shared with desktop, see core); set up
+     * in onCreate, once the settings can be read. Practice is not kept across a restart, which
+     * returns to the game itself.
+     */
+    private PuzzleSession<GameMode> puzzleSession;
 
     /** The piece a puzzle hint points at, until the next move; null without a hint. */
     private Square puzzleHintSquare;
@@ -324,57 +325,6 @@ public class MainActivity extends AppCompatActivity
 
     /** A PGN import's background thread is reading or loading the game; see onPgnFileSelected. */
     private boolean pgnImportRunning;
-
-    /**
-     * Practising the mistakes of an analysed game (see {@link #startMistakePractice}): puzzle mode,
-     * but the puzzles are those mistakes, nothing is rated, and the game they come from is kept to
-     * return to. Null otherwise; not kept across a restart, which returns to the game itself.
-     */
-    private MistakeSession practice;
-
-    /** The mistakes being practised and the game to return to afterwards. */
-    private static final class MistakeSession {
-        final List<MistakePractice.Mistake> mistakes;
-        final ChessGame.Snapshot game;
-
-        /** Whether that game was already over, so the next launch starts afresh (see saveGame). */
-        final boolean gameOver;
-
-        final GameMode mode;
-        final Side engineSide;
-        final boolean flipped;
-
-        /** Whether the game began with New Game, for Maia's opening variety on return. */
-        final boolean newGameStarted;
-
-        /** The mistake on the board; -1 before the first. */
-        int index = -1;
-
-        MistakeSession(
-                List<MistakePractice.Mistake> mistakes,
-                ChessGame.Snapshot game,
-                boolean gameOver,
-                GameMode mode,
-                Side engineSide,
-                boolean flipped,
-                boolean newGameStarted) {
-            this.mistakes = mistakes;
-            this.game = game;
-            this.gameOver = gameOver;
-            this.mode = mode;
-            this.engineSide = engineSide;
-            this.flipped = flipped;
-            this.newGameStarted = newGameStarted;
-        }
-
-        MistakePractice.Mistake current() {
-            return mistakes.get(index);
-        }
-
-        boolean isLast() {
-            return index >= mistakes.size() - 1;
-        }
-    }
 
     // Mirrors state that otherwise lives only inside the (portrait- or
     // landscape-specific) BoardView instance, so it survives that instance
@@ -394,8 +344,21 @@ public class MainActivity extends AppCompatActivity
         evaluationEnabled = settings.isEvaluationDisplayEnabled(evaluationEnabled);
         boardType = settings.getBoardType();
         lastSetup = settings.getLastGameSetup();
-        puzzleRating = settings.getPuzzleRating();
-        recentPuzzles = settings.getRecentPuzzles();
+        puzzleSession =
+                new PuzzleSession<>(
+                        settings.getPuzzleRating(),
+                        settings.getRecentPuzzles(),
+                        new PuzzleSession.Store() {
+                            @Override
+                            public void savePuzzleRating(PuzzleRating rating) {
+                                settings.setPuzzleRating(rating);
+                            }
+
+                            @Override
+                            public void saveRecentPuzzles(RecentPuzzles recent) {
+                                settings.setRecentPuzzles(recent);
+                            }
+                        });
         board = createBoardBridge(boardType);
         maybeStartPegasusRecording();
         blePermissionLauncher =
@@ -438,20 +401,21 @@ public class MainActivity extends AppCompatActivity
      * pick the game up by themselves, the board is reconnected by the player and synced on connect.
      */
     private void saveGame() {
+        PuzzleSession.Practice<GameMode> practice = puzzleSession.practice();
         if (practice != null) {
             // Practising a game's mistakes is not kept; the game itself is, as it was - unless it
             // was over, which, like any finished game, is not kept either.
-            if (practice.gameOver) {
+            if (practice.gameOver()) {
                 forgetSavedGame();
                 return;
             }
             storeSavedGame(
                     new Settings.SavedGame(
-                            practice.mode.name(),
-                            practice.engineSide.name(),
-                            practice.flipped,
+                            practice.mode().name(),
+                            practice.side().name(),
+                            practice.flipped(),
                             currentMaiaRating,
-                            practice.game,
+                            practice.game(),
                             null,
                             true,
                             0,
@@ -1501,7 +1465,7 @@ public class MainActivity extends AppCompatActivity
 
     /** Moves were played and nothing has ended yet: neither the game nor a training line. */
     private boolean isGameInProgress() {
-        if (practice != null) {
+        if (puzzleSession.isPractising()) {
             return true; // leaving practice drops the game it came from: always two presses
         }
         if (game.moveCount() == 0 || game.isGameOver()) {
@@ -2457,7 +2421,7 @@ public class MainActivity extends AppCompatActivity
 
     /** Replaces the game with {@code imported}, a successfully loaded PGN game. */
     private void finishPgnImport(ChessGame imported) {
-        if (practice != null) {
+        if (puzzleSession.isPractising()) {
             // Practice ends for an import, back on the game it came from, which the import then
             // replaces.
             returnToGame();
@@ -2690,9 +2654,9 @@ public class MainActivity extends AppCompatActivity
             Toast.makeText(this, R.string.error_puzzles_unavailable, Toast.LENGTH_LONG).show();
             return;
         }
-        if (practice != null) {
+        if (puzzleSession.isPractising()) {
             puzzleFlow.stop(); // a practised mistake is never rated
-            practice = null;
+            puzzleSession.leave();
         }
         searchFlow.abandonPendingSearches();
         trainingFlow.stop();
@@ -2713,7 +2677,7 @@ public class MainActivity extends AppCompatActivity
     private void nextPuzzle() {
         cancelNextPuzzle();
         puzzleFlow.abandon(); // a puzzle left unsolved counts as lost (never while practising)
-        if (practice != null) {
+        if (puzzleSession.isPractising()) {
             nextMistake();
             return;
         }
@@ -2721,23 +2685,20 @@ public class MainActivity extends AppCompatActivity
         Puzzle puzzle =
                 repository == null
                         ? null
-                        : PuzzleSelector.next(
+                        : puzzleSession.pickPuzzle(
                                 repository.all(),
-                                lastSetup.puzzleDifficulty().target(puzzleRating.rating()),
-                                recentPuzzles,
+                                lastSetup.puzzleDifficulty(),
                                 ThreadLocalRandom.current());
         if (puzzle == null) {
             return;
         }
-        recentPuzzles.add(puzzle.id());
-        settings.setRecentPuzzles(recentPuzzles);
         setUpPuzzle(puzzle);
     }
 
     /** Puts {@code puzzle} on the board and lets its flow begin; safe before bindViews. */
     private void setUpPuzzle(Puzzle puzzle) {
         searchFlow.abandonPendingSearches();
-        puzzleRatingDelta = null;
+        puzzleSession.puzzleStarted();
         puzzleHintSquare = null;
         setBoardFlipped(puzzle.humanSide() == Side.BLACK);
         setLastMove(null, null);
@@ -2755,8 +2716,8 @@ public class MainActivity extends AppCompatActivity
     private void stopPuzzles() {
         cancelNextPuzzle();
         puzzleFlow.abandon();
-        practice = null; // leaving practice this way drops its game: something else was chosen
-        puzzleRatingDelta = null;
+        puzzleSession
+                .leave(); // leaving practice this way drops its game: something else was chosen
         puzzleHintSquare = null;
     }
 
@@ -2767,15 +2728,15 @@ public class MainActivity extends AppCompatActivity
      * {@link MistakePractice}); afterwards {@link #returnToGame} puts the game back as it was.
      */
     private void startMistakePractice(List<MistakePractice.Mistake> mistakes) {
-        practice =
-                new MistakeSession(
+        puzzleSession.startPractice(
+                new PuzzleSession.Practice<>(
                         mistakes,
                         game.snapshot(),
                         game.isGameOver(),
                         mode,
                         engineSide,
                         boardFlipped,
-                        newGameStarted);
+                        newGameStarted));
         searchFlow.abandonPendingSearches();
         trainingFlow.stop();
         trainingSession = null;
@@ -2786,26 +2747,24 @@ public class MainActivity extends AppCompatActivity
 
     /** The next mistake, or back to the game after the last one. */
     private void nextMistake() {
-        if (practice.isLast()) {
+        Puzzle puzzle = puzzleSession.nextMistake();
+        if (puzzle == null) {
             returnToGame();
             return;
         }
-        practice.index++;
-        setUpPuzzle(practice.current().puzzle());
+        setUpPuzzle(puzzle);
     }
 
     /** Ends practice and puts the game it came from back, with its opponent and colours. */
     private void returnToGame() {
-        MistakeSession session = practice;
         cancelNextPuzzle();
         puzzleFlow.stop();
-        practice = null;
+        PuzzleSession.Practice<GameMode> session = puzzleSession.endPractice();
         puzzleHintSquare = null;
-        puzzleRatingDelta = null;
-        game.restore(session.game);
-        mode = session.mode;
-        engineSide = session.engineSide;
-        setBoardFlipped(session.flipped);
+        game.restore(session.game());
+        mode = session.mode();
+        engineSide = session.side();
+        setBoardFlipped(session.flipped());
         String lastMove = game.lastMoveUci();
         if (lastMove == null) {
             setLastMove(null, null);
@@ -2814,7 +2773,7 @@ public class MainActivity extends AppCompatActivity
         }
         binding.boardView.setTrainingHint(null, null);
         binding.boardView.clearSelection();
-        newGameStarted = session.newGameStarted;
+        newGameStarted = session.newGameStarted();
         if (game.isChess960()) {
             board.resetForNewGame(game.startFen());
         } else {
@@ -2879,48 +2838,50 @@ public class MainActivity extends AppCompatActivity
     }
 
     private int puzzleStatusText() {
-        switch (puzzleFlow.state()) {
-            case HUMAN_TO_MOVE:
-                return puzzleFlow.puzzle().humanSide() == Side.WHITE
-                        ? R.string.status_puzzle_find_move_white
-                        : R.string.status_puzzle_find_move_black;
-            case WRONG_MOVE_SHOWN:
+        switch (puzzleSession.status(puzzleFlow, game.sideToMove())) {
+            case FIND_MOVE_WHITE:
+                return R.string.status_puzzle_find_move_white;
+            case FIND_MOVE_BLACK:
+                return R.string.status_puzzle_find_move_black;
+            case WRONG_MOVE:
                 return R.string.status_puzzle_wrong;
             case SHOWING_SOLUTION:
                 return R.string.status_puzzle_solution;
-            case COMPLETE:
-                if (practice != null && practice.isLast()) {
-                    return R.string.status_practice_done;
-                }
-                return puzzleFlow.isFailed()
-                        ? R.string.status_puzzle_finished
-                        : R.string.status_puzzle_solved;
+            case SOLVED:
+                return R.string.status_puzzle_solved;
+            case FINISHED:
+                return R.string.status_puzzle_finished;
+            case PRACTICE_DONE:
+                return R.string.status_practice_done;
+            case WHITE_TO_MOVE:
+                return R.string.status_white_to_move;
             default:
-                return game.sideToMove() == Side.WHITE
-                        ? R.string.status_white_to_move
-                        : R.string.status_black_to_move;
+                return R.string.status_black_to_move;
         }
     }
 
     /** The puzzle's rating and the trainee's, with the change once the puzzle is rated. */
     private String puzzleInfoText(Puzzle puzzle) {
+        PuzzleSession.Practice<GameMode> practice = puzzleSession.practice();
         if (practice != null) {
             MistakePractice.Mistake mistake = practice.current();
             return getString(
                     R.string.practice_info_format,
-                    practice.index + 1,
-                    practice.mistakes.size(),
+                    practice.number(),
+                    practice.count(),
                     mistake.moveLabel(),
                     mistake.playedSan());
         }
-        if (puzzleRatingDelta == null) {
-            return getString(R.string.puzzle_info_format, puzzle.rating(), puzzleRating.rating());
+        int rating = puzzleSession.rating().rating();
+        Integer delta = puzzleSession.ratingDelta();
+        if (delta == null) {
+            return getString(R.string.puzzle_info_format, puzzle.rating(), rating);
         }
         return getString(
                 R.string.puzzle_info_rated_format,
                 puzzle.rating(),
-                puzzleRating.rating(),
-                String.format(Locale.ROOT, "%+d", puzzleRatingDelta));
+                rating,
+                String.format(Locale.ROOT, "%+d", delta));
     }
 
     private void updatePuzzleControls() {
@@ -2931,17 +2892,18 @@ public class MainActivity extends AppCompatActivity
         if (!puzzleMode) {
             return;
         }
-        PuzzleFlow.State state = puzzleFlow.state();
         binding.showSolutionButton.setEnabled(puzzleFlow.canShowSolution());
-        // While practising nothing is rated, so moving on early is fine - also the way back to
-        // the game before the last mistake.
-        binding.nextPuzzleButton.setEnabled(practice != null || state == PuzzleFlow.State.COMPLETE);
-        binding.nextPuzzleButton.setText(
-                practice == null
-                        ? R.string.action_next_puzzle
-                        : practice.isLast()
-                                ? R.string.action_back_to_game
-                                : R.string.action_next_mistake);
+        binding.nextPuzzleButton.setEnabled(puzzleSession.canGoNext(puzzleFlow.state()));
+        switch (puzzleSession.nextAction()) {
+            case NEXT_MISTAKE:
+                binding.nextPuzzleButton.setText(R.string.action_next_mistake);
+                break;
+            case BACK_TO_GAME:
+                binding.nextPuzzleButton.setText(R.string.action_back_to_game);
+                break;
+            default:
+                binding.nextPuzzleButton.setText(R.string.action_next_puzzle);
+        }
     }
 
     // ---- Training mode ------------------------------------------------------
@@ -3738,17 +3700,12 @@ public class MainActivity extends AppCompatActivity
 
         @Override
         public void puzzleRated(Puzzle puzzle, boolean solved) {
-            if (practice != null) {
-                return; // one's own mistakes do not count for the puzzle rating
-            }
-            puzzleRatingDelta = puzzleRating.delta(puzzle.rating(), solved);
-            puzzleRating = puzzleRating.after(puzzle.rating(), solved);
-            settings.setPuzzleRating(puzzleRating);
+            puzzleSession.puzzleRated(puzzle, solved); // not while practising one's own mistakes
         }
 
         @Override
         public void puzzleComplete(Puzzle puzzle, boolean solved) {
-            if (!solved || (practice != null && practice.isLast())) {
+            if (!puzzleSession.advancesByItself(solved)) {
                 // Leave the position on the board to look at; the button moves on (after the last
                 // practised mistake, back to the game - not by itself).
                 return;
