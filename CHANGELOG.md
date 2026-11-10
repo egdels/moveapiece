@@ -10,7 +10,7 @@ candidates (`-rc`) and test tags are not listed.
 
 ## [Unreleased]
 
-## [1.10.0] - 2026-11-09
+## [1.10.0] - 2026-11-10
 
 ### Added
 
