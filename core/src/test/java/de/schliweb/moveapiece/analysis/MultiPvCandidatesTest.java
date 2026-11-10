@@ -8,6 +8,7 @@ package de.schliweb.moveapiece.analysis;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
+import java.util.List;
 import org.junit.Test;
 
 public class MultiPvCandidatesTest {
@@ -36,8 +37,28 @@ public class MultiPvCandidatesTest {
     }
 
     @Test
-    public void capture_skipsLinesWithoutRankMoveOrScoreAndRanksOutOfRange() {
+    public void capture_takesALineWithoutRankAsTheOnlyOne() {
         candidates.capture("info depth 10 score cp 35 pv e2e4");
+
+        assertEquals("e2e4", candidates.move(0));
+        assertEquals(35, candidates.cp(0));
+        assertEquals(List.of(new MoveCandidate("e2e4", 35)), candidates.candidates());
+    }
+
+    @Test
+    public void candidates_listsReportedLinesBestFirst() {
+        candidates.capture("info depth 10 multipv 3 score cp -10 pv g1f3");
+        candidates.capture("info depth 10 multipv 1 score cp 30 pv e2e4");
+
+        assertEquals(
+                List.of(new MoveCandidate("e2e4", 30), new MoveCandidate("g1f3", -10)),
+                candidates.candidates());
+        candidates.clear();
+        assertEquals(List.of(), candidates.candidates());
+    }
+
+    @Test
+    public void capture_skipsLinesWithoutMoveOrScoreAndRanksOutOfRange() {
         candidates.capture("info depth 10 multipv 1 score cp 35");
         candidates.capture("info depth 10 multipv 1 pv e2e4");
         candidates.capture("info depth 10 multipv 4 score cp 35 pv e2e4");

@@ -6,7 +6,9 @@
 package de.schliweb.moveapiece.analysis;
 
 import de.schliweb.moveapiece.engine.UciInfoParser;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
 
@@ -31,11 +33,12 @@ public final class MultiPvCandidates {
     }
 
     /**
-     * Records one "info" line's move and score; lines without a rank, move or score are skipped.
+     * Records one "info" line's move and score; a line without a rank is the only line, rank 1.
+     * Lines without a move or score, or beyond {@link #lines()}, are skipped.
      */
     public void capture(String infoLine) {
-        OptionalInt multiPv = UciInfoParser.parseMultiPv(infoLine);
-        if (multiPv.isEmpty() || multiPv.getAsInt() < 1 || multiPv.getAsInt() > moveByRank.length) {
+        int multiPv = UciInfoParser.parseMultiPv(infoLine).orElse(1);
+        if (multiPv < 1 || multiPv > moveByRank.length) {
             return;
         }
         Optional<String> pvMove = UciInfoParser.parsePvFirstMove(infoLine);
@@ -48,7 +51,7 @@ public final class MultiPvCandidates {
         if (mate.isEmpty() && cp.isEmpty()) {
             return;
         }
-        int rank = multiPv.getAsInt() - 1;
+        int rank = multiPv - 1;
         moveByRank[rank] = pvMove.get();
         cpByRank[rank] = mate.isPresent() ? MoveQuality.mateToCp(mate.getAsInt()) : cp.getAsInt();
     }
@@ -66,5 +69,16 @@ public final class MultiPvCandidates {
     /** Score of that line in centipawns, from the mover's perspective. */
     public int cp(int rank) {
         return cpByRank[rank];
+    }
+
+    /** The lines reported so far, best first; a rank that was not reported is left out. */
+    public List<MoveCandidate> candidates() {
+        List<MoveCandidate> candidates = new ArrayList<>();
+        for (int rank = 0; rank < moveByRank.length; rank++) {
+            if (moveByRank[rank] != null) {
+                candidates.add(new MoveCandidate(moveByRank[rank], cpByRank[rank]));
+            }
+        }
+        return candidates;
     }
 }

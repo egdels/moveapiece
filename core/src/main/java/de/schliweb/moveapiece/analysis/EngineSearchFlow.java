@@ -13,7 +13,6 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Optional;
 import java.util.OptionalInt;
 
 /**
@@ -210,9 +209,8 @@ public final class EngineSearchFlow {
     /** Latest raw score seen for the position the post-game analysis is searching right now. */
     private int postGameLiveScoreCp;
 
-    /** The current post-game position's best moves by rank (index 0 = best), as they arrive. */
-    private final MoveCandidate[] postGameLineCandidates =
-            new MoveCandidate[POST_GAME_MULTI_PV_LINES];
+    /** The current post-game position's best moves, as they arrive. */
+    private final MultiPvCandidates postGameLines = new MultiPvCandidates(POST_GAME_MULTI_PV_LINES);
 
     /** Per replayed position so far, its best moves; null while no analysis runs. */
     private List<List<MoveCandidate>> postGameCandidates;
@@ -528,7 +526,7 @@ public final class EngineSearchFlow {
      * is mated, neutral for a stalemate.
      */
     private void requestPostGameEvalFor(int positionIndex) {
-        Arrays.fill(postGameLineCandidates, null);
+        postGameLines.clear();
         if (positionIndex == postGameUciMoves.size()
                 && (game.isCheckmate() || game.isStalemate())) {
             recordPostGameEval(game.isCheckmate() ? -MoveQuality.mateToCp(0) : 0);
@@ -547,7 +545,7 @@ public final class EngineSearchFlow {
 
     private void recordPostGameEval(int cp) {
         postGamePositionEvals.add(cp);
-        postGameCandidates.add(List.copyOf(collectLineCandidates()));
+        postGameCandidates.add(List.copyOf(postGameLines.candidates()));
         int nextPositionIndex = postGamePositionEvals.size();
         host.onPostGameProgress();
         if (nextPositionIndex <= postGameUciMoves.size()) {
@@ -582,14 +580,14 @@ public final class EngineSearchFlow {
     }
 
     private void refineNextPostGamePosition() {
-        Arrays.fill(postGameLineCandidates, null);
+        postGameLines.clear();
         searchPostGamePosition(
                 postGameRefinePositions.get(postGameRefinedCount), POST_GAME_REFINE_MOVETIME_MS);
     }
 
     /** A second search came in: its lines replace the position's best move alone. */
     private void recordPostGameRefinement() {
-        List<MoveCandidate> candidates = collectLineCandidates();
+        List<MoveCandidate> candidates = postGameLines.candidates();
         if (!candidates.isEmpty()) {
             postGameCandidates.set(
                     postGameRefinePositions.get(postGameRefinedCount), List.copyOf(candidates));
@@ -602,16 +600,6 @@ public final class EngineSearchFlow {
         }
         engine.setMultiPv(1);
         finishPostGameAnalysis();
-    }
-
-    private List<MoveCandidate> collectLineCandidates() {
-        List<MoveCandidate> candidates = new ArrayList<>();
-        for (MoveCandidate candidate : postGameLineCandidates) {
-            if (candidate != null) {
-                candidates.add(candidate);
-            }
-        }
-        return candidates;
     }
 
     private void finishPostGameAnalysis() {
@@ -701,15 +689,10 @@ public final class EngineSearchFlow {
             // Post-game analysis replays past positions - never the live eval/move-quality state.
             // Of several lines (a mistake's second search), only the best one would be the
             // position's eval; a line without a rank is the only one.
-            OptionalInt multiPv = UciInfoParser.parseMultiPv(infoLine);
-            int rank = multiPv.isPresent() ? multiPv.getAsInt() : 1;
-            if (rank == 1) {
+            if (UciInfoParser.parseMultiPv(infoLine).orElse(1) == 1) {
                 postGameLiveScoreCp = rawCp;
             }
-            Optional<String> pvMove = UciInfoParser.parsePvFirstMove(infoLine);
-            if (rank >= 1 && rank <= POST_GAME_MULTI_PV_LINES && pvMove.isPresent()) {
-                postGameLineCandidates[rank - 1] = new MoveCandidate(pvMove.get(), rawCp);
-            }
+            postGameLines.capture(infoLine);
             return;
         }
         // engine.stop() is fire-and-forget - Stockfish can still emit a few more "info" lines for
