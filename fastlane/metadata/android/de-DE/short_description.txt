@@ -1,1 +1,1 @@
-Schach offline gegen Stockfish oder Maia, Eröffnungstrainer, Pegasus & Chessnut
+Schach offline gegen Stockfish oder Maia, Puzzles, Eröffnungen, Pegasus/Chessnut

@@ -1,1 +1,1 @@
-Offline chess vs Stockfish or Maia, opening trainer, Pegasus & Chessnut boards
+Offline chess vs Stockfish or Maia, puzzles, openings, Pegasus & Chessnut boards

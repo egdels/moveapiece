@@ -1,1 +1,1 @@
-Scacchi offline contro Stockfish o Maia, aperture, scacchiere DGT e Chessnut
+Scacchi offline contro Stockfish o Maia, problemi, aperture, Pegasus e Chessnut
