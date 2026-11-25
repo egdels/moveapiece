@@ -41,6 +41,15 @@
         android:name="android.permission.ACCESS_NETWORK_STATE"
         tools:node="remove" />
 
+    <!-- For reading the position of a Pegasus from a photo of the board (BoardCameraActivity).
+         Asked for when the camera is first opened; the photo is read on the device and not kept. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
+
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
@@ -80,6 +89,12 @@
 
         <activity
             android:name=".ui.DocumentActivity"
+            android:exported="false"
+            android:parentActivityName=".MainActivity" />
+
+        <!-- The camera for reading a position from a photo of the board (see BoardPhotoFlow). -->
+        <activity
+            android:name=".vision.BoardCameraActivity"
             android:exported="false"
             android:parentActivityName=".MainActivity" />
 

@@ -10,6 +10,12 @@ candidates (`-rc`) and test tags are not listed.
 
 ## [Unreleased]
 
+### Added
+
+- Android, DGT Pegasus: a position set up on the board can be taken over by
+  photographing it. The app reads the pieces from the photo, shows the
+  position for checking and correcting, and keeps no photo.
+
 ### Changed
 
 - Practising mistakes: a mistake completed without a clean solution now

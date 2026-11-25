@@ -146,6 +146,12 @@ por Bluetooth.
 - **Pegasus**: el tablero solo detecta que una casilla está ocupada, no
   con qué pieza. Las promociones se eligen en la pantalla. Si una captura
   no está clara, levanta brevemente la pieza de la casilla de destino.
+  Una posición colocada en el tablero se puede adoptar en la aplicación de
+  Android con una foto: elige «Tomar la posición del tablero» en el menú o
+  toca la nota que aparece, y fotografía el tablero en ángulo, con todo el
+  tablero en la imagen. Compara cada pieza de la posición leída con el
+  tablero, toca una casilla para cambiarla y confirma. La foto se lee en
+  tu dispositivo y no se guarda.
 - **Chessnut**: el tablero reconoce cada pieza. Una posición colocada en
   el tablero se puede adoptar: toca o haz clic en la nota que aparece. El
   botón NEW GAME del tablero empieza una partida nueva; durante una

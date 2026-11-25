@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Whether the app keeps the photos of the board (BoardPhotoFlow) and the traffic with the
+         board (MainActivity.maybeStartPegasusRecording) in its files directory. Never in a
+         release; debug builds overwrite this in src/debug/res/values/developer.xml. -->
+    <bool name="developer_records">false</bool>
+</resources>

@@ -123,6 +123,17 @@ android {
             }
         }
         debug {
+            // -PsideBySide installs the debug build next to a release-signed MoveAPiece instead
+            // of having to replace it (and its data): the two differ in their application id.
+            if (project.hasProperty('sideBySide')) {
+                applicationIdSuffix '.dev'
+            }
+            // -PnotDebuggable: a debug build that runs as fast as a release build. A debuggable
+            // app's own code runs many times slower on the device (the frame search of the board
+            // camera: 4.6 s instead of 0.1 s on a mid-range phone), so speed can only be judged like this.
+            if (project.hasProperty('notDebuggable')) {
+                debuggable false
+            }
             signingConfig signingConfigs.debug
             vcsInfo {
                 include false
@@ -249,6 +260,13 @@ dependencies {
     // `onnxruntime` artifact that :desktop uses instead. Same MIT license, same version, same
     // ai.onnxruntime.* Java API - see THIRD-PARTY-NOTICES.md.
     implementation 'com.microsoft.onnxruntime:onnxruntime-android:1.29.0'
+    // Live camera picture for reading a position from a photo of the board (BoardCameraActivity).
+    // Apache 2.0. CameraX brings some 25
+    // further libraries along (Guava, Dagger, Media3 among them, and libyuv as native code); they
+    // are listed in THIRD-PARTY-NOTICES.md and OPEN-SOURCE-LICENSES.md.
+    implementation 'androidx.camera:camera-camera2:1.6.2'
+    implementation 'androidx.camera:camera-lifecycle:1.6.2'
+    implementation 'androidx.camera:camera-view:1.6.2'
 
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.3.0'

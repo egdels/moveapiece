@@ -17,6 +17,14 @@ dependency is added, removed or changes its license.
 | Apache Commons Lang3 3.18.0 (transitive dependency of chesslib above, both `app` and `desktop`) | Apache 2.0 | https://github.com/apache/commons-lang |
 | AndroidX (appcompat, constraintlayout) | Apache 2.0 | https://developer.android.com/jetpack/androidx |
 | Material Components for Android | Apache 2.0 | https://github.com/material-components/material-components-android |
+| CameraX 1.6.2 (`app`: camera-camera2, camera-lifecycle, camera-view and what they bring along - camera-core, camera-video, camera-camera2-pipe, featurecombinationquery, viewfinder-core 1.5.1; live camera picture for reading a position from a photo of the board) | Apache 2.0 | https://developer.android.com/jetpack/androidx/releases/camera |
+| libyuv (compiled into `libimage_processing_util_jni.so` of CameraX's camera-core) | BSD 3-Clause | https://chromium.googlesource.com/libyuv/libyuv |
+| AndroidX Media3 1.9.0 (media3-common, -container, -muxer; transitive dependency of CameraX's camera-video) | Apache 2.0 | https://github.com/androidx/media |
+| Guava 33.3.1-android with failureaccess 1.0.2 (transitive dependency of CameraX; before, only its ListenableFuture came with AndroidX) | Apache 2.0 | https://github.com/google/guava |
+| Dagger 2.59 (transitive dependency of CameraX's camera-camera2-pipe), with javax.inject 1 and jakarta.inject-api 2.0.1 | Apache 2.0 | https://github.com/google/dagger, https://github.com/javax-inject/javax-inject, https://github.com/eclipse-ee4j/injection-api |
+| Annotations that come with Guava and CameraX: AutoValue annotations 1.6.3, JSR 305 3.0.2, J2ObjC annotations 3.0.0, Error Prone annotations 2.28.0 | Apache 2.0 | https://github.com/google/auto, https://github.com/findbugsproject/findbugs, https://github.com/google/j2objc, https://github.com/google/error-prone |
+| Checker Framework qualifiers 3.43.0 (transitive dependency of Guava) | MIT | https://github.com/typetools/checker-framework |
+| AtomicFU 0.28.0 (transitive dependency of CameraX, with kotlinx.coroutines 1.9.0) | Apache 2.0 | https://github.com/Kotlin/kotlinx-atomicfu |
 | JavaFX (OpenJFX) 24.0.2 (`desktop` UI toolkit: javafx-controls/-graphics/-base/-media) | GPLv2 + Classpath Exception | https://github.com/openjdk/jfx |
 | bluez-dbus 0.3.5 (`desktop`, Linux Pegasus BLE transport) | MIT | https://github.com/hypfvieh/bluez-dbus |
 | dbus-java-core / dbus-java-transport-native-unixsocket 5.2.0 (`desktop`, transitive/direct deps of bluez-dbus above) | MIT | https://github.com/hypfvieh/dbus-java |
@@ -88,6 +96,21 @@ duplicated into each of the three ABI binaries; instead it ships once as an APK
 asset (`app/build/generated/nnueAssets`, populated by the `installNnueAssets`
 Gradle task) and is extracted to app-private storage at first launch by
 `NnueAssets.java`, then pointed to via the standard UCI `EvalFile` option.
+
+## Piece recogniser (reading a position from a photo, Android)
+
+`app/src/main/assets/vision/piece_recogniser.onnx`, run via ONNX Runtime (see
+above): says which piece stands on a square in a photo of a DGT Pegasus - see
+`BoardPhotoFlow` (Android) and `BoardPhotoRecognizer` (`core`).
+
+- Source: trained for MoveAPiece on our own photos and videos of the board and
+  its pieces; pipeline in `training/`, everything that went into the file with
+  checksums in `BOARD_VISION_PROVENANCE.md`.
+- License: GPLv3, like the rest of the project.
+- Start weights: the network was initialised from torchvision's
+  MobileNetV3-Small weights `IMAGENET1K_V1`
+  (https://github.com/pytorch/vision, BSD 3-Clause, Copyright (c) Soumith
+  Chintala 2016), which were trained on ImageNet-1k.
 
 ## Maia neural network (human-like opponent, desktop and Android)
 

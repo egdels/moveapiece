@@ -155,6 +155,13 @@ et Go via Bluetooth.
   pas par quelle pièce. Les promotions se choisissent à l'écran. Si une
   prise n'est pas claire, soulevez brièvement la pièce sur la case
   d'arrivée.
+  Une position mise en place sur l'échiquier peut être reprise dans
+  l'application Android par une photo : choisissez « Reprendre la
+  position de l'échiquier » dans le menu ou touchez la note qui apparaît,
+  et photographiez l'échiquier de biais, en entier dans l'image. Comparez
+  chaque pièce de la position lue avec l'échiquier, touchez une case pour
+  la changer, puis confirmez. La
+  photo est lue sur votre appareil et n'est pas conservée.
 - **Chessnut** : l'échiquier reconnaît chaque pièce. Une position mise en
   place sur l'échiquier peut être reprise : touchez ou cliquez la note
   qui apparaît. Le bouton NEW GAME de l'échiquier lance une nouvelle

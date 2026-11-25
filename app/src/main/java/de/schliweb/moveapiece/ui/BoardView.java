@@ -147,6 +147,23 @@ public class BoardView extends View {
         this.onMoveListener = listener;
     }
 
+    /**
+     * Receives taps on squares instead of the move handling, see {@link #setOnSquareTapListener}.
+     */
+    public interface OnSquareTapListener {
+        void onSquareTapped(Square square);
+    }
+
+    private OnSquareTapListener onSquareTapListener;
+
+    /**
+     * With a listener set, a tap on a square is reported to it and nothing else happens - for
+     * boards that are edited rather than played on. {@code null} restores the move handling.
+     */
+    public void setOnSquareTapListener(OnSquareTapListener listener) {
+        this.onSquareTapListener = listener;
+    }
+
     public void setInteractive(boolean interactive) {
         this.interactive = interactive;
         if (!interactive) {
@@ -332,7 +349,11 @@ public class BoardView extends View {
             return true;
         }
         Square tapped = squareAt(row, col);
-        handleTap(tapped);
+        if (onSquareTapListener != null) {
+            onSquareTapListener.onSquareTapped(tapped);
+        } else {
+            handleTap(tapped);
+        }
         performClick();
         return true;
     }

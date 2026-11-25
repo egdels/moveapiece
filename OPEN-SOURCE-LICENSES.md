@@ -44,18 +44,42 @@ is. The full license texts and notices follow at the end.
   Source Project. Apache License 2.0.
   https://developer.android.com/jetpack/androidx and
   https://github.com/material-components/material-components-android
-- **Kotlin standard library**, **kotlinx.coroutines** and **JetBrains Java
-  Annotations**, used by AndroidX. Copyright 2010-2024 JetBrains s.r.o. and
+- **Kotlin standard library**, **kotlinx.coroutines**, **AtomicFU** and
+  **JetBrains Java Annotations**, used by AndroidX. Copyright 2010-2024 JetBrains s.r.o. and
   Kotlin Programming Language contributors, Copyright 2016-2021 JetBrains
   s.r.o and respective authors and developers, Copyright 2000-2012 JetBrains
   s.r.o. Apache License 2.0, with the attribution notices of their
   NOTICE files below.
   https://github.com/JetBrains/kotlin and
   https://github.com/Kotlin/kotlinx.coroutines
-- **Guava ListenableFuture**, **Error Prone annotations** and **JSpecify**,
-  also used by AndroidX. Copyright The Guava Authors, The Error Prone Authors
-  and The JSpecify Authors. Apache License 2.0. https://github.com/google/guava,
-  https://github.com/google/error-prone and https://github.com/jspecify/jspecify
+- **CameraX** and **Media3**, AndroidX libraries for the camera, with the
+  AndroidX libraries they use. Copyright The Android Open Source Project.
+  Apache License 2.0. https://developer.android.com/jetpack/androidx
+- **libyuv**, contained in CameraX. Copyright 2011 The LibYuv Project
+  Authors. BSD 3-Clause License. https://chromium.googlesource.com/libyuv/libyuv
+- **Piece recogniser**, the network that reads the position of a DGT
+  Pegasus from a photo of the board, trained for MoveAPiece. Copyright (C)
+  2026 Christian Kierdorf. GNU General Public License, version 3. It was
+  initialised from the MobileNetV3-Small weights of **torchvision**.
+  Copyright (c) Soumith Chintala 2016. BSD 3-Clause License.
+  https://github.com/pytorch/vision
+- **Guava**, **Error Prone annotations**, **J2ObjC annotations**,
+  **AutoValue annotations**, **Dagger**, **JSR 305 annotations** and
+  **JSpecify**, also used by AndroidX. Copyright The Guava Authors, The Error
+  Prone Authors, Google Inc., The Dagger Authors, the JSR 305 expert group and
+  The JSpecify Authors. Apache License 2.0. https://github.com/google/guava,
+  https://github.com/google/error-prone, https://github.com/google/j2objc,
+  https://github.com/google/auto, https://github.com/google/dagger,
+  https://github.com/findbugsproject/findbugs and
+  https://github.com/jspecify/jspecify
+- **javax.inject** and **Jakarta Dependency Injection**, used by Dagger.
+  Copyright The JSR-330 Expert Group and the Eclipse Foundation's
+  contributors. Apache License 2.0, with the notice below.
+  https://github.com/javax-inject/javax-inject and
+  https://github.com/eclipse-ee4j/injection-api
+- **Checker Framework qualifiers**, used by Guava. Copyright 2004-present by
+  the Checker Framework developers. MIT License.
+  https://github.com/typetools/checker-framework
 
 ## In the desktop app
 
@@ -96,6 +120,25 @@ Copyright 2010-2024 JetBrains s.r.o and respective authors and developers
 ```
 kotlinx.coroutines library.
 Copyright 2016-2021 JetBrains s.r.o and respective authors and developers
+```
+
+## Notice: Jakarta Dependency Injection
+
+```
+This content is produced and maintained by the Eclipse Jakarta Dependency
+Injection project.
+
+Jakarta Dependency Injection is a trademark of the Eclipse Foundation.
+
+All content is the property of the respective authors or their employers. For
+more information regarding authorship of content, please consult the listed
+source code repository logs.
+
+This program and the accompanying materials are made available under the terms
+of the Apache License, Version 2.0 which is available at
+https://www.apache.org/licenses/LICENSE-2.0.
+
+https://github.com/eclipse-ee4j/injection-api
 ```
 
 ## GNU General Public License, version 3
@@ -2104,4 +2147,97 @@ NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
 LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE,  ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+```
+
+## MIT License: Checker Framework qualifiers
+
+```
+Checker Framework qualifiers
+Copyright 2004-present by the Checker Framework developers
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+```
+
+## BSD 3-Clause License: libyuv
+
+```
+Copyright 2011 The LibYuv Project Authors. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+  * Redistributions of source code must retain the above copyright
+    notice, this list of conditions and the following disclaimer.
+
+  * Redistributions in binary form must reproduce the above copyright
+    notice, this list of conditions and the following disclaimer in
+    the documentation and/or other materials provided with the
+    distribution.
+
+  * Neither the name of Google nor the names of its contributors may
+    be used to endorse or promote products derived from this software
+    without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```
+
+## BSD 3-Clause License: torchvision
+
+```
+BSD 3-Clause License
+
+Copyright (c) Soumith Chintala 2016,
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+* Redistributions of source code must retain the above copyright notice, this
+  list of conditions and the following disclaimer.
+
+* Redistributions in binary form must reproduce the above copyright notice,
+  this list of conditions and the following disclaimer in the documentation
+  and/or other materials provided with the distribution.
+
+* Neither the name of the copyright holder nor the names of its
+  contributors may be used to endorse or promote products derived from
+  this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```

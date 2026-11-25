@@ -108,6 +108,27 @@
     <string name="board_load_position_hint">Tik om de stelling van het bord over te nemen</string>
     <string name="dialog_load_position_title">Stelling van het bord overnemen</string>
     <string name="dialog_load_position_side">Wie is aan zet?</string>
+    <string name="board_photo_reading">Stelling wordt gelezen…</string>
+    <string name="board_photo_not_found">Geen bord gevonden op de foto. Maak hem opnieuw, schuin, met het hele bord in beeld.</string>
+    <string name="board_photo_check_title">Stelling controleren</string>
+    <string name="board_photo_check_hint">Vergelijk elk stuk met het bord. Tik op een veld om het stuk te wijzigen of het veld leeg te maken. Een extra foto van een andere kant maakt het lezen zekerder.</string>
+    <string name="board_photo_changed">De stukken op het bord zijn sinds de foto verplaatst. Maak een nieuwe foto.</string>
+    <string name="board_photo_empty">Veld leegmaken</string>
+    <string name="board_photo_add">Foto toevoegen</string>
+    <plurals name="board_photo_count">
+        <item quantity="one">Uit %d foto gelezen</item>
+        <item quantity="other">Uit %d foto\'s gelezen</item>
+    </plurals>
+    <string name="board_photo_retake">Nieuwe foto</string>
+    <string name="board_photo_piece_title">Welk stuk?</string>
+    <string name="board_camera_searching">Richt de camera op het hele bord</string>
+    <string name="board_camera_steeper">Houd de telefoon hoger en kijk steiler naar beneden</string>
+    <string name="board_camera_flatter">Niet recht van boven – houd de telefoon iets lager</string>
+    <string name="board_camera_closer">Kom dichterbij</string>
+    <string name="board_camera_farther">Ga iets verder weg – bord en stukken moeten helemaal in beeld zijn</string>
+    <string name="board_camera_hold">Goed – houd stil…</string>
+    <string name="board_camera_shutter">Foto maken</string>
+    <string name="board_camera_denied">Zonder camera kan er geen foto worden gemaakt</string>
     <string name="board_position_invalid_kings">Elke kant heeft precies één koning nodig</string>
     <string name="board_position_invalid_pawns">Pionnen mogen niet op de eerste of laatste rij staan</string>
     <string name="board_position_invalid_check">De kant die niet aan zet is staat schaak</string>

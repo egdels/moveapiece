@@ -132,6 +132,11 @@ Go over Bluetooth.
 - **Pegasus**: the board only senses that a square is occupied, not by
   which piece. Promotions are chosen on the screen. If a capture is
   unclear, briefly lift the piece on the target square.
+  A position set up on the board can be taken over in the Android app by
+  photographing it: choose "Take position from board" in the menu or tap
+  the note that appears, and photograph the board at an angle with all of
+  it in the picture. Compare every piece of the position that was read with the board,
+  tap a square to change it, and confirm. The photo is read on your device and not kept.
 - **Chessnut**: the board recognises every piece. A position set up on
   the board can be taken over: tap or click the note that appears. The
   NEW GAME button on the board starts a new game; during a game, press it

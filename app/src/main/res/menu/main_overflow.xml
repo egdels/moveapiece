@@ -16,6 +16,11 @@
     <item
         android:id="@+id/menuAnalyzeGame"
         android:title="@string/action_analyze_game" />
+    <!-- Only where a position can be read from a photo of the board (a connected Pegasus, a
+         camera) or from the board itself, see MainActivity.canLoadPositionFromBoard. -->
+    <item
+        android:id="@+id/menuLoadPositionFromBoard"
+        android:title="@string/dialog_load_position_title" />
     <item
         android:id="@+id/menuHelp"
         android:title="@string/menu_help" />

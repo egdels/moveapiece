@@ -145,6 +145,13 @@ Pro und Go über Bluetooth.
 - **Pegasus**: Das Brett erkennt nur, dass ein Feld besetzt ist, nicht
   mit welcher Figur. Umwandlungen wählst du auf dem Bildschirm. Ist ein
   Schlagzug unklar, hebe die Figur auf dem Zielfeld kurz an.
+  Eine auf dem Brett aufgebaute Stellung lässt sich in der Android-App
+  per Foto übernehmen: Wähle im Menü „Stellung vom Brett übernehmen“ oder
+  tippe auf den Hinweis, der erscheint, und fotografiere das Brett schräg
+  von oben, sodass es ganz im Bild ist. Vergleiche jede Figur der gelesenen
+  Stellung mit dem Brett, tippe ein Feld an, um es zu ändern, und
+  bestätige. Das Foto wird auf deinem
+  Gerät gelesen und nicht gespeichert.
 - **Chessnut**: Das Brett erkennt jede Figur. Eine auf dem Brett
   aufgebaute Stellung lässt sich übernehmen: Tippe oder klicke auf den
   Hinweis, der dann erscheint. Der NEW-GAME-Knopf am Brett startet ein

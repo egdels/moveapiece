@@ -147,6 +147,12 @@ tramite Bluetooth.
 - **Pegasus**: la scacchiera rileva solo che una casa è occupata, non da
   quale pezzo. Le promozioni si scelgono sullo schermo. Se una cattura non
   è chiara, solleva brevemente il pezzo sulla casa di arrivo.
+  Una posizione disposta sulla scacchiera può essere ripresa nell'app
+  Android con una foto: scegli «Riprendi la posizione dalla scacchiera»
+  nel menu o tocca la nota che compare, e fotografa la scacchiera di
+  sbieco, tutta nell'immagine. Confronta ogni pezzo della posizione letta
+  con la scacchiera, tocca una casa per cambiarlo e conferma. La foto viene letta sul tuo dispositivo e
+  non viene conservata.
 - **Chessnut**: la scacchiera riconosce ogni pezzo. Una posizione
   disposta sulla scacchiera può essere ripresa: tocca o fai clic sulla
   nota che compare. Il pulsante NEW GAME della scacchiera avvia una nuova

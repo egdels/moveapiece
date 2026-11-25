@@ -1,7 +1,7 @@
 # Privacy Policy
 
 *MoveAPiece for Android and desktop (Windows, macOS, Linux). Effective
-2026-11-09. Both apps show this text in their menu.*
+2026-11-30. Both apps show this text in their menu.*
 
 ## Who is responsible
 
@@ -53,12 +53,16 @@ Google, under the terms of that backup service, not of MoveAPiece.
 - **Your electronic chess board**, if you connect one: the positions of
   the pieces, the board's buttons and its battery level, over Bluetooth.
   This is used only to play the game on screen.
+- **A photo of your board**, on Android and only when you take one to
+  take a position over from a DGT Pegasus. It is read on the device and
+  not kept.
 
 ## Android permissions
 
-MoveAPiece declares these permissions and nothing else. They are requested
-only when you connect a board; if you never do, no permission is
-requested at all.
+MoveAPiece declares these permissions and nothing else. The Bluetooth
+permissions are requested only when you connect a board, the camera only
+when you photograph a board; if you never do, no permission is requested
+at all.
 
 - `BLUETOOTH_SCAN` and `BLUETOOTH_CONNECT` (Android 12 and later): to find
   and talk to a DGT Pegasus or Chessnut electronic chess board. The scan is
@@ -69,14 +73,21 @@ requested at all.
   requires this permission before an app may see Bluetooth scan results.
   MoveAPiece does not determine, store or use your location.
 
-There is no Internet, storage, camera, microphone, contacts or phone
+- `CAMERA`: to take a position over from a DGT Pegasus by photographing
+  the board, since that board cannot tell which piece stands on a square.
+  The photo is read on your device by a network that is part of the app,
+  held in memory until you have confirmed the position, and not stored or
+  sent anywhere.
+
+There is no Internet, storage, microphone, contacts or phone
 permission. On macOS the system asks once for Bluetooth access, for the
 same purpose.
 
 ## Third parties
 
-The chess engines Stockfish and Maia are part of the app and run entirely
-on your device. The ONNX Runtime library that runs Maia comes with
+The chess engines Stockfish and Maia and the network that reads a photo of
+a board are part of the app and run entirely on your device. The ONNX
+Runtime library that runs the two networks comes with
 telemetry of its own; MoveAPiece switches it off on every platform, and on
 Android the permissions it would need are removed. The app contains no
 third-party SDKs for advertising, analytics or crash reporting, and no

@@ -140,6 +140,12 @@ via Bluetooth.
 - **Pegasus**: het bord merkt alleen dat een veld bezet is, niet door
   welk stuk. Promoties kies je op het scherm. Is een slagzet onduidelijk,
   til dan het stuk op het doelveld kort op.
+  Een stelling die op het bord is opgezet kan in de Android-app met een
+  foto worden overgenomen: kies 'Stelling van het bord overnemen' in het
+  menu of tik op de melding die verschijnt, en fotografeer het bord schuin
+  van boven, met het hele bord in beeld. Vergelijk elk stuk van de gelezen
+  stelling met het bord, tik op een veld om het te wijzigen en bevestig. De foto wordt op je
+  toestel gelezen en niet bewaard.
 - **Chessnut**: het bord herkent elk stuk. Een stelling die op het bord
   is opgezet kan worden overgenomen: tik of klik op de melding die
   verschijnt. De NEW GAME-knop op het bord start een nieuw spel; tijdens

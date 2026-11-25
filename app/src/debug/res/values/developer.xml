@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Debug builds keep what a developer needs to find mistakes: the photos of the board with
+         what was read from them, and the traffic with the board. See res/values/developer.xml. -->
+    <bool name="developer_records">true</bool>
+</resources>

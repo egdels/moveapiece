@@ -112,6 +112,27 @@
     <string name="board_load_position_hint">Tap to take the position from the board</string>
     <string name="dialog_load_position_title">Take position from board</string>
     <string name="dialog_load_position_side">Who is to move?</string>
+    <string name="board_photo_reading">Reading the position…</string>
+    <string name="board_photo_not_found">No board found in the photo. Take it again at an angle, with the whole board in the picture.</string>
+    <string name="board_photo_check_title">Check the position</string>
+    <string name="board_photo_check_hint">Compare every piece with the board. Tap a square to change or empty it. A further photo from another side makes the reading surer.</string>
+    <string name="board_photo_changed">The pieces on the board have been moved since the photo. Take a new photo.</string>
+    <string name="board_photo_empty">Empty square</string>
+    <string name="board_photo_add">Add a photo</string>
+    <plurals name="board_photo_count">
+        <item quantity="one">Read from %d photo</item>
+        <item quantity="other">Read from %d photos</item>
+    </plurals>
+    <string name="board_photo_retake">New photo</string>
+    <string name="board_photo_piece_title">Which piece?</string>
+    <string name="board_camera_searching">Point the camera at the whole board</string>
+    <string name="board_camera_steeper">Hold the phone higher and look down more steeply</string>
+    <string name="board_camera_flatter">Do not look straight down – hold the phone a little lower</string>
+    <string name="board_camera_closer">Move closer</string>
+    <string name="board_camera_farther">Move back a little – the board and its pieces must be in the picture</string>
+    <string name="board_camera_hold">Good – hold still…</string>
+    <string name="board_camera_shutter">Take photo</string>
+    <string name="board_camera_denied">Without the camera no photo can be taken</string>
     <string name="board_position_invalid_kings">Each side needs exactly one king</string>
     <string name="board_position_invalid_pawns">Pawns cannot stand on the first or last rank</string>
     <string name="board_position_invalid_check">The side not to move is in check</string>

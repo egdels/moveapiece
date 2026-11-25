@@ -108,6 +108,27 @@
     <string name="board_load_position_hint">Tippen, um die Stellung vom Brett zu übernehmen</string>
     <string name="dialog_load_position_title">Stellung vom Brett übernehmen</string>
     <string name="dialog_load_position_side">Wer ist am Zug?</string>
+    <string name="board_photo_reading">Stellung wird gelesen…</string>
+    <string name="board_photo_not_found">Im Foto wurde kein Brett gefunden. Bitte noch einmal schräg aufnehmen, mit dem ganzen Brett im Bild.</string>
+    <string name="board_photo_check_title">Stellung prüfen</string>
+    <string name="board_photo_check_hint">Vergleiche jede Figur mit dem Brett. Feld antippen, um die Figur zu ändern oder das Feld zu leeren. Ein weiteres Foto von einer anderen Seite macht das Lesen sicherer.</string>
+    <string name="board_photo_changed">Die Figuren auf dem Brett wurden seit dem Foto bewegt. Bitte neu fotografieren.</string>
+    <string name="board_photo_empty">Feld leeren</string>
+    <string name="board_photo_add">Weiteres Foto dazu</string>
+    <plurals name="board_photo_count">
+        <item quantity="one">Aus %d Foto gelesen</item>
+        <item quantity="other">Aus %d Fotos gelesen</item>
+    </plurals>
+    <string name="board_photo_retake">Neues Foto</string>
+    <string name="board_photo_piece_title">Welche Figur?</string>
+    <string name="board_camera_searching">Kamera auf das ganze Brett richten</string>
+    <string name="board_camera_steeper">Handy höher halten und steiler von oben aufnehmen</string>
+    <string name="board_camera_flatter">Nicht senkrecht von oben – Handy etwas tiefer halten</string>
+    <string name="board_camera_closer">Näher heran</string>
+    <string name="board_camera_farther">Etwas weiter weg – Brett und Figuren müssen ganz im Bild sein</string>
+    <string name="board_camera_hold">Gut so – ruhig halten …</string>
+    <string name="board_camera_shutter">Foto aufnehmen</string>
+    <string name="board_camera_denied">Ohne Kamera kann kein Foto aufgenommen werden</string>
     <string name="board_position_invalid_kings">Jede Seite braucht genau einen König</string>
     <string name="board_position_invalid_pawns">Bauern dürfen nicht auf der ersten oder letzten Reihe stehen</string>
     <string name="board_position_invalid_check">Die Seite, die nicht am Zug ist, steht im Schach</string>

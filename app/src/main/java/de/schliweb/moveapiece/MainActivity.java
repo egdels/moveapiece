@@ -90,6 +90,7 @@ import de.schliweb.moveapiece.ui.MoveSoundPlayer;
 import de.schliweb.moveapiece.ui.OpeningLibraryActivity;
 import de.schliweb.moveapiece.ui.OpeningNames;
 import de.schliweb.moveapiece.ui.SystemBars;
+import de.schliweb.moveapiece.vision.BoardPhotoFlow;
 import de.schliweb.pegasus.bluetooth.AndroidPegasusBleTransport;
 import de.schliweb.pegasus.bluetooth.BlePermissions;
 import de.schliweb.pegasus.core.protocol.BoardState;
@@ -210,6 +211,9 @@ public class MainActivity extends AppCompatActivity
 
     private ActivityResultLauncher<String[]> blePermissionLauncher;
     private ActivityResultLauncher<String> pgnImportLauncher;
+
+    /** Reads a position from a photo of a board that senses occupancy only. */
+    private BoardPhotoFlow boardPhotoFlow;
 
     private GameMode mode = GameMode.ENGINE;
     private Side engineSide = Side.BLACK;
@@ -378,6 +382,31 @@ public class MainActivity extends AppCompatActivity
         pgnImportLauncher =
                 registerForActivityResult(
                         new ActivityResultContracts.GetContent(), this::onPgnFileSelected);
+        boardPhotoFlow =
+                new BoardPhotoFlow(
+                        this,
+                        new BoardPhotoFlow.Host() {
+                            @Override
+                            public void onPositionRead(String fen) {
+                                loadPosition(fen);
+                            }
+
+                            @Override
+                            public void onInvalidPosition(
+                                    de.schliweb.chessnut.core.game.InvalidPositionException e) {
+                                showInvalidPosition(e);
+                            }
+
+                            @Override
+                            public void onCamera(boolean open) {
+                                board.setLedsDark(open);
+                            }
+
+                            @Override
+                            public boolean[][] currentOccupancy() {
+                                return board.physicalOccupancy();
+                            }
+                        });
         boolean restored = restoreSavedGame();
         bindViews();
         startEngine();
@@ -608,14 +637,17 @@ public class MainActivity extends AppCompatActivity
     }
 
     /**
-     * Raw BLE traffic recording for hardware-verification sessions. Debug builds only, written to
-     * app-specific external storage so it can be pulled without root: {@code adb pull
+     * Raw BLE traffic recording for hardware-verification sessions. Developer builds only, written
+     * to app-specific external storage so it can be pulled without root: {@code adb pull
      * /sdcard/Android/data/de.schliweb.moveapiece/files/pegasus-sessions/}. Non-critical if it
      * fails to start - recording is a debugging aid, not core functionality.
      */
     private void maybeStartPegasusRecording() {
-        if ((getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE)
-                == 0) {
+        // Every debug build, also the one that is not debuggable (-PnotDebuggable, which reads
+        // photos at full speed): the board has reported a square as occupied that a pawn had
+        // left, and without the traffic it cannot be told whether the board or this app was
+        // wrong. Never a release (res/values/developer.xml).
+        if (!getResources().getBoolean(R.bool.developer_records)) {
             return;
         }
         File dir = new File(getExternalFilesDir(null), "pegasus-sessions");
@@ -710,6 +742,9 @@ public class MainActivity extends AppCompatActivity
             currentPopup = null;
         }
         bindViews();
+        if (boardPhotoFlow != null) {
+            boardPhotoFlow.onRotated();
+        }
     }
 
     /** Safe before {@link #bindViews} (a restored puzzle): bindViews applies it then. */
@@ -912,10 +947,17 @@ public class MainActivity extends AppCompatActivity
                 .findItem(R.id.menuAnalyzeGame)
                 .setVisible(!isDrillMode())
                 .setEnabled(!searchFlow.isPostGameAnalysisRunning() && engineReady && hasMoves);
+        // The banner offers this only while board and screen disagree; for trying the photo
+        // recognition it is here as well, whatever stands on the board.
+        popup.getMenu()
+                .findItem(R.id.menuLoadPositionFromBoard)
+                .setVisible(canPhotographBoard() && canLoadPositionFromBoard());
         popup.setOnMenuItemClickListener(
                 item -> {
                     int id = item.getItemId();
-                    if (id == R.id.menuOpeningLibrary) {
+                    if (id == R.id.menuLoadPositionFromBoard) {
+                        askSideAndLoadPositionFromBoard();
+                    } else if (id == R.id.menuOpeningLibrary) {
                         startActivity(new Intent(this, OpeningLibraryActivity.class));
                     } else if (id == R.id.menuImportPgn) {
                         pgnImportLauncher.launch("*/*");
@@ -1271,19 +1313,28 @@ public class MainActivity extends AppCompatActivity
     }
 
     /**
-     * Taking the board's position over is offered while a piece-identifying board (Chessnut) is
-     * connected and disagrees with the screen, outside the opening trainer (its lines always start
-     * from the initial position).
+     * Taking the board's position over is offered while a board is connected and disagrees with the
+     * screen, outside the opening trainer (its lines always start from the initial position): for a
+     * piece-identifying board (Chessnut) directly, for one that senses occupancy only (the Pegasus)
+     * through a photo, where that is available (see {@link BoardPhotoFlow}).
      */
     private boolean canLoadPositionFromBoard() {
-        return board.canLoadPhysicalPosition()
+        return (board.canLoadPhysicalPosition() || canPhotographBoard())
                 && board.getConnectionState() == ConnectionState.CONNECTED
                 && mode != GameMode.TRAINING
                 && mode != GameMode.PUZZLE;
     }
 
+    private boolean canPhotographBoard() {
+        return BoardPhotoFlow.isAvailable(this) && board.physicalOccupancy() != null;
+    }
+
     /** Tap on the mismatch banner: ask who is to move, then load the board's position. */
     private void onMismatchBannerClicked() {
+        askSideAndLoadPositionFromBoard();
+    }
+
+    private void askSideAndLoadPositionFromBoard() {
         if (!canLoadPositionFromBoard()) {
             return;
         }
@@ -1306,28 +1357,45 @@ public class MainActivity extends AppCompatActivity
      * opponent moves right away if it is its turn. Mirrors {@link #startNewGame}'s resets.
      */
     private void loadPositionFromBoard(boolean whiteToMove) {
+        if (!board.canLoadPhysicalPosition()) {
+            // The board does not know its pieces: photograph it and let the user check the result.
+            boolean[][] occupancy = board.physicalOccupancy();
+            if (occupancy != null) {
+                boardPhotoFlow.start(occupancy, whiteToMove, boardFlipped);
+            }
+            return;
+        }
         String fen;
         try {
             fen = board.physicalPositionFen(whiteToMove);
         } catch (de.schliweb.chessnut.core.game.InvalidPositionException e) {
-            int messageRes;
-            switch (e.reason()) {
-                case KINGS:
-                    messageRes = R.string.board_position_invalid_kings;
-                    break;
-                case PAWN_ON_BACK_RANK:
-                    messageRes = R.string.board_position_invalid_pawns;
-                    break;
-                case OPPONENT_IN_CHECK:
-                    messageRes = R.string.board_position_invalid_check;
-                    break;
-                default:
-                    messageRes = R.string.board_position_invalid;
-                    break;
-            }
-            Toast.makeText(this, messageRes, Toast.LENGTH_LONG).show();
+            showInvalidPosition(e);
             return;
         }
+        loadPosition(fen);
+    }
+
+    private void showInvalidPosition(de.schliweb.chessnut.core.game.InvalidPositionException e) {
+        int messageRes;
+        switch (e.reason()) {
+            case KINGS:
+                messageRes = R.string.board_position_invalid_kings;
+                break;
+            case PAWN_ON_BACK_RANK:
+                messageRes = R.string.board_position_invalid_pawns;
+                break;
+            case OPPONENT_IN_CHECK:
+                messageRes = R.string.board_position_invalid_check;
+                break;
+            default:
+                messageRes = R.string.board_position_invalid;
+                break;
+        }
+        Toast.makeText(this, messageRes, Toast.LENGTH_LONG).show();
+    }
+
+    /** Makes {@code fen} the game position, as {@link #loadPositionFromBoard} describes. */
+    private void loadPosition(String fen) {
         searchFlow.abandonPendingSearches();
         game.loadFen(fen);
         newGameStarted = false;
@@ -3547,6 +3615,9 @@ public class MainActivity extends AppCompatActivity
         }
         if (maiaEngine != null) {
             maiaEngine.shutdown();
+        }
+        if (boardPhotoFlow != null) {
+            boardPhotoFlow.shutdown();
         }
         if (soundPlayer != null) {
             soundPlayer.release();
