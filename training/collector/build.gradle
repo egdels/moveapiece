@@ -1,0 +1,82 @@
+// Collects training photos for the board vision on a phone: single pieces at a known tilt of the
+// camera, and boards in known positions, found and judged in the live picture like in the app.
+// Part of the build only with -Pcollector (see settings.gradle):
+//
+//   ./gradlew -Pcollector :board-photo-collector:assembleRelease
+//   adb install -r training/collector/build/outputs/apk/release/board-photo-collector-release.apk
+//
+// The photos end up in Android/data/de.schliweb.moveapiece.collector/files/collection on the
+// phone; copy them off with adb pull.
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'de.schliweb.moveapiece.collector'
+    compileSdk 36
+    buildToolsVersion "36.1.0"
+
+    defaultConfig {
+        applicationId "de.schliweb.moveapiece.collector"
+        minSdk 26
+        targetSdk 36
+        versionCode 1
+        versionName "1"
+    }
+
+    buildTypes {
+        // Not debuggable, because a debuggable app searches the live picture some fifty times
+        // slower; signed with the debug key, since it is only ever installed by hand.
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.debug
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    // The piece recogniser of the last training, copied below, if there is one; without it the
+    // app works the same, only without the check of the position.
+    sourceSets {
+        main {
+            assets.srcDirs = [layout.buildDirectory.dir('model-assets')]
+        }
+    }
+
+    buildFeatures {
+        viewBinding true
+    }
+
+    lint {
+        abortOnError = false
+    }
+}
+
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.8.0'
+    implementation 'com.google.android.material:material:1.14.0'
+    implementation 'androidx.camera:camera-camera2:1.6.2'
+    implementation 'androidx.camera:camera-lifecycle:1.6.2'
+    implementation 'androidx.camera:camera-view:1.6.2'
+    // The search for the playing area and the judgement of the camera angle, as in the app.
+    implementation project(':core')
+    implementation project(':chesslib')
+    // Runs the piece recogniser on each board photo, to notice a board that does not show the
+    // position it is photographed as. Same artifact as in the app.
+    implementation 'com.microsoft.onnxruntime:onnxruntime-android:1.29.0'
+}
+
+def copyModel = tasks.register('copyModel', Copy) {
+    // The recogniser of the app, as it lies in the repository.
+    from(rootProject.file('app/src/main/assets/vision')) {
+        include 'piece_recogniser.onnx'
+        rename { 'piece_recogniser.fp16.onnx' }
+    }
+    into layout.buildDirectory.dir('model-assets')
+}
+tasks.named('preBuild') {
+    dependsOn copyModel
+}

@@ -33,3 +33,12 @@ if (providers.gradleProperty('maia960eval').isPresent()) {
     include ':maia960-eval'
     project(':maia960-eval').projectDir = file('tools/maia960-eval')
 }
+
+// Small Android app that collects training photos for reading a position from a photo of the board
+// (pieces at a known tilt, boards in known positions), never part of a release; see
+// training/README.md. Only included with -Pcollector, so that no other build configures or
+// resolves anything for it.
+if (providers.gradleProperty('collector').isPresent()) {
+    include ':board-photo-collector'
+    project(':board-photo-collector').projectDir = file('training/collector')
+}

@@ -1,0 +1,21 @@
+# Python 3.12. Tooling only - nothing here is part of the Gradle build.
+#
+# onnxruntime is pinned to the version the apps ship (app/build.gradle,
+# desktop/build.gradle), so models are checked against the runtime they will
+# run on.
+onnxruntime==1.29.0
+numpy>=2.2
+Pillow>=12.0
+# With GUI support, for labelling corners by hand in a window (only needed to measure
+# find_board_frame.py against).
+opencv-python>=4.12
+
+# Training and export (pretrain_on_videos.py, finetune_on_boards.py, export_models.py)
+torch>=2.9
+torchvision>=0.24
+onnx>=1.20
+onnxscript>=0.5
+onnxconverter-common>=1.16
+
+# Legality check of recognised positions (evaluate.py); GPL-3.0-or-later
+chess>=1.11

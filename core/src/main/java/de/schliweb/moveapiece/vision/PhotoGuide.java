@@ -9,9 +9,9 @@ package de.schliweb.moveapiece.vision;
  * Tells from the playing area found in a picture how the camera is held, and what the user should
  * change before the photo is taken.
  *
- * <p>The limits come from photos of a real Pegasus (see {@code training/README.md}): seen from less
- * than about 45 degrees above the table the pieces hide each other and the recogniser gets whole
- * rows wrong; from 48 degrees on it was right. From about 70 degrees on, looking down on the
+ * <p>The limits come from photos of a real Pegasus (see {@code training/EVALUATION.md}): seen from
+ * less than about 45 degrees above the table the pieces hide each other and the recogniser gets
+ * whole rows wrong; from 48 degrees on it was right. From about 70 degrees on, looking down on the
  * pieces, it becomes unsure of many squares and now and then swaps a rook and a bishop. With the
  * board on less than a quarter of the picture results were poor (7 of 8 photos wrong, though taken
  * against the light); good photos shrunk on the computer stay right down to about a sixth of the

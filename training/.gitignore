@@ -1,0 +1,14 @@
+# Local Python environment
+/.venv
+__pycache__/
+
+# Photos, datasets, generated crops, model weights and run outputs stay local:
+# only scripts, configuration and documentation are committed (see README.md).
+/samples
+/data
+/out
+/runs
+*.onnx
+*.ort
+*.pt
+*.pth
