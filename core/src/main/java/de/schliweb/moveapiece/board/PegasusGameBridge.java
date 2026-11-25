@@ -1088,6 +1088,30 @@ public class PegasusGameBridge {
     }
 
     /**
+     * Which squares the board last reported as occupied, {@code [rank][file]} with rank 0 the first
+     * rank and file 0 the a-file, or {@code null} before the first report.
+     */
+    public boolean[][] physicalOccupancy() {
+        // What the board itself last reported, not what the move detector last saw: while a move
+        // is being guided the detector is not fed, and its picture of the board goes stale
+        // (seen on hardware: a position set up anew while the app waited for a guided move was
+        // photographed and read with the squares of the position before).
+        BoardState physical =
+                physicalBoard != null
+                        ? OccupancyProjection.normalize(physicalBoard)
+                        : moveDetector.lastPhysical();
+        if (physical == null) {
+            return null;
+        }
+        boolean[][] occupied = new boolean[8][8];
+        for (int square = 0; square < BoardState.SQUARE_COUNT; square++) {
+            String name = BoardState.squareName(square);
+            occupied[name.charAt(1) - '1'][name.charAt(0) - 'a'] = physical.isOccupied(square);
+        }
+        return occupied;
+    }
+
+    /**
      * The squares the board currently disagrees on while {@link #isBoardMismatched()}: those that
      * should be occupied but are empty, followed by those occupied although they should be empty -
      * the same set the LEDs show, as DGT square indices ({@link BoardState#squareName}). Empty when
@@ -1189,6 +1213,11 @@ public class PegasusGameBridge {
     /** Equivalent to {@link #guideEngineMove(String, boolean)} with LEDs enabled. */
     public void guideEngineMove(String uciMove) {
         guideEngineMove(uciMove, true);
+    }
+
+    /** Keeps the LEDs dark while a photo of the board is taken; see the LED controller. */
+    public void setLedsDark(boolean dark) {
+        ledController.setDark(dark);
     }
 
     /**

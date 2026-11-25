@@ -139,4 +139,34 @@ public class PegasusLedControllerTest {
                 PegasusCommands.encodeLeds(7, PegasusLedController.MODE_STEADY, 3, 10),
                 written.get(0));
     }
+
+    @Test
+    public void darkSwitchesOffAndBringsThePatternBack() {
+        controller.showSquares(4);
+        controller.setDark(true);
+        assertEquals(2, written.size());
+        assertArrayEquals(PegasusCommands.encodeLedsOff(), written.get(1));
+
+        // What is to be shown changes in the dark: nothing is sent, the newest pattern comes back.
+        controller.showSquares(12, 28);
+        controller.resend();
+        assertEquals(2, written.size());
+        controller.setDark(false);
+        assertEquals(3, written.size());
+        assertArrayEquals(
+                PegasusCommands.encodeLeds(
+                        PegasusLedController.DEFAULT_SPEED,
+                        PegasusLedController.MODE_STEADY,
+                        PegasusLedController.DEFAULT_INTENSITY,
+                        12,
+                        28),
+                written.get(2));
+    }
+
+    @Test
+    public void darkWithNothingLitSendsNothing() {
+        controller.setDark(true);
+        controller.setDark(false);
+        assertTrue(written.isEmpty());
+    }
 }

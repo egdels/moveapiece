@@ -159,6 +159,16 @@ public final class PegasusBoardAdapter implements PhysicalBoardBridge {
     }
 
     @Override
+    public void setLedsDark(boolean dark) {
+        bridge.setLedsDark(dark);
+    }
+
+    @Override
+    public boolean[][] physicalOccupancy() {
+        return bridge.physicalOccupancy();
+    }
+
+    @Override
     public String physicalPositionFen(boolean whiteToMove) throws InvalidPositionException {
         throw new InvalidPositionException(InvalidPositionException.Reason.NO_BOARD);
     }

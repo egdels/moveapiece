@@ -48,6 +48,7 @@ public final class PegasusLedController {
 
     private byte[] lastCommand;
     private boolean anyLit;
+    private boolean dark;
 
     public PegasusLedController(PegasusDevice.CommandSink sink) {
         this(sink, DEFAULT_SPEED, DEFAULT_INTENSITY);
@@ -97,6 +98,26 @@ public final class PegasusLedController {
         showSquares(indices);
     }
 
+    /**
+     * Keeps the LEDs dark for a while without forgetting what they should show: while dark, every
+     * pattern is noted but not sent, and it is sent when the dark ends. For taking a photo of the
+     * board - a lit ring under or beside a piece misleads the piece recognition (a pawn on a lit
+     * square read as a king).
+     */
+    public void setDark(boolean dark) {
+        if (this.dark == dark) {
+            return;
+        }
+        this.dark = dark;
+        if (dark) {
+            if (anyLit) {
+                sink.write(PegasusCommands.encodeLedsOff());
+            }
+        } else if (anyLit && lastCommand != null) {
+            sink.write(lastCommand);
+        }
+    }
+
     /** Switches all LEDs off (skipped when this controller lit nothing). */
     public void off() {
         if (!anyLit) {
@@ -128,7 +149,7 @@ public final class PegasusLedController {
      * after every relevant physical event.
      */
     public void resend() {
-        if (!anyLit || lastCommand == null) {
+        if (!anyLit || lastCommand == null || dark) {
             return;
         }
         sink.write(lastCommand);
@@ -145,7 +166,9 @@ public final class PegasusLedController {
         if (anyLit && Arrays.equals(command, lastCommand)) {
             return; // dedupe identical consecutive LED patterns
         }
-        sink.write(command);
+        if (!dark) {
+            sink.write(command);
+        }
         lastCommand = command;
         anyLit = true;
     }

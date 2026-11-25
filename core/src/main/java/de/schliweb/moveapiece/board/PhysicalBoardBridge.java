@@ -103,8 +103,24 @@ public interface PhysicalBoardBridge {
      */
     default void playNewGameArmedSound() {}
 
+    /**
+     * Keeps the board's lights dark while a photo of it is taken, and brings back afterwards what
+     * they should show by then. Boards whose lights do not get into the picture do nothing.
+     */
+    default void setLedsDark(boolean dark) {}
+
     /** Whether {@link #physicalPositionFen} can work at all: only boards that identify pieces. */
     boolean canLoadPhysicalPosition();
+
+    /**
+     * Which squares the board currently reports as occupied, {@code [rank][file]} with rank 0 the
+     * first rank and file 0 the a-file, or {@code null} if the board has not reported yet. For
+     * boards that sense occupancy only, this is what a photo of the board is combined with to read
+     * the position (see {@code BoardPhotoRecognizer}).
+     */
+    default boolean[][] physicalOccupancy() {
+        return null;
+    }
 
     /**
      * FEN of the pieces currently on the board with the given side to move, for taking a position
