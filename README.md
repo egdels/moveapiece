@@ -295,7 +295,52 @@ third_party/chesslib/    chesslib's source with the Chess960 castling fix, built
 tools/chessnut-sniffer/  Python/bleak capture tool used to verify the
                          Chessnut protocol on hardware, with the protocol
                          notes (CHESSNUT_PROTOCOL.md); not part of the build
+
+training/                Training of the piece recogniser for reading a position
+                         from a photo of a Pegasus (Python; README.md and
+                         EVALUATION.md there), and collector/, a small Android
+                         app that takes the training photos (only built with
+                         -Pcollector); not part of the app builds
 ```
+
+## Training data & models
+
+This project includes a machine-learning model of its own: the **piece
+recogniser**, which says which piece stands on a square in a photo of a DGT
+Pegasus. With it a position can be taken over from a board that senses only
+which squares are occupied, by photographing it (Android app). The photo is
+read on the device and not kept.
+
+Only the **exported ONNX model** is in the repository
+(`app/src/main/assets/vision/piece_recogniser.onnx`, 3 MB). No photos, videos,
+generated images or intermediate checkpoints are included or redistributed.
+
+### How the app uses the model
+
+- **Playing area**: found from the black frame of the board, without a model.
+- **Pieces**: one window per square, each read twice by the model - as it is
+  and with the neighbouring pieces hidden - and averaged. Several photos of one
+  position can be read together.
+- **Position**: empty squares come from the board; on the occupied ones each
+  side gets at most the pieces a game starts with. The result is shown on a
+  board where every square can be changed before it becomes the game position.
+- **Inference** runs on ONNX Runtime, which the apps already ship for Maia.
+  Everything stays on the device.
+
+### Training documentation
+
+Model, training pipeline, the data used, and how the chain is measured:
+
+- [training/README.md](training/README.md)
+- [training/EVALUATION.md](training/EVALUATION.md)
+- [BOARD_VISION_PROVENANCE.md](BOARD_VISION_PROVENANCE.md): everything that
+  went into the shipped model, with checksums
+
+### Data used during training (not redistributed)
+
+All training data are our own photos and videos of a DGT Pegasus and its
+pieces. No public dataset is used. The model is initialised from torchvision's
+ImageNet weights for MobileNetV3-Small, as recorded in the provenance file.
 
 ## License
 
