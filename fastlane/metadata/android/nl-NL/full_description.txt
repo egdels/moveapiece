@@ -26,6 +26,8 @@ BETER WORDEN
 ELEKTRONISCHE SCHAAKBORDEN
 Heb je een DGT Pegasus of een Chessnut Air, Air+, Pro of Go? Verbind het via Bluetooth en speel op het echte bord in plaats van op het scherm. Je zetten worden van de stukken afgelezen, de antwoorden van de tegenstander lichten op in de leds van het bord, en de app herkent zelf het bordtype. Het scherm blijft intussen bruikbaar, voor hints, evaluatie en de zettenlijst.
 
+Op de Pegasus kun je een stelling die al op het bord staat met een foto overnemen: de app leest de stukken uit de foto en toont je de stelling om te controleren en te verbeteren voordat je verder speelt. De foto wordt op je toestel gelezen en niet bewaard.
+
 OFFLINE EN PRIVÉ
 • Werkt volledig offline, niets verlaat je toestel
 • Geen account, geen advertenties, geen tracking, geen in-app-aankopen

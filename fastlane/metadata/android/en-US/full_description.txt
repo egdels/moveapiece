@@ -26,6 +26,8 @@ IMPROVE YOUR GAME
 ELECTRONIC CHESS BOARDS
 Own a DGT Pegasus or a Chessnut Air, Air+, Pro or Go? Connect it over Bluetooth and play on the real board instead of the screen. Your moves are picked up from the pieces, the opponent's replies light up on the board's LEDs, and the app detects the board type on its own. The screen stays usable at the same time, for hints, evaluation and the move list.
 
+On the Pegasus, a position already set up on the board can be taken over with a photo: the app reads the pieces from it and shows the position for you to check and correct before you play on. The photo is read on your device and not kept.
+
 OFFLINE AND PRIVATE
 • Works completely offline, nothing leaves your device
 • No account, no ads, no tracking, no in-app purchases

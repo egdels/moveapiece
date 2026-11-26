@@ -26,6 +26,8 @@ BESSER WERDEN
 ELEKTRONISCHE SCHACHBRETTER
 Du hast ein DGT Pegasus oder ein Chessnut Air, Air+, Pro oder Go? Verbinde es per Bluetooth und spiele auf dem echten Brett statt auf dem Bildschirm. Deine Züge werden von den Figuren erkannt, die Antworten des Gegners leuchten auf den LEDs des Bretts, und die App erkennt den Bretttyp von selbst. Der Bildschirm bleibt dabei nutzbar, für Hinweise, Bewertung und Zugliste.
 
+Am Pegasus lässt sich eine schon aufgebaute Stellung per Foto übernehmen: Die App liest die Figuren aus dem Foto und zeigt dir die Stellung zum Prüfen und Korrigieren, bevor du weiterspielst. Das Foto wird auf deinem Gerät gelesen und nicht gespeichert.
+
 OFFLINE UND PRIVAT
 • Funktioniert vollständig offline, nichts verlässt dein Gerät
 • Kein Konto, keine Werbung, kein Tracking, keine In-App-Käufe

@@ -26,6 +26,8 @@ MEJORAR TU JUEGO
 TABLEROS DE AJEDREZ ELECTRÓNICOS
 ¿Tienes un DGT Pegasus o un Chessnut Air, Air+, Pro o Go? Conéctalo por Bluetooth y juega en el tablero real en lugar de la pantalla. Tus jugadas se detectan a partir de las piezas, las respuestas del rival se iluminan en los LED del tablero, y la app reconoce el tipo de tablero por sí sola. La pantalla sigue disponible al mismo tiempo, para pistas, evaluación y lista de jugadas.
 
+En el Pegasus, una posición ya colocada en el tablero se puede tomar con una foto: la app lee las piezas de la foto y te muestra la posición para comprobarla y corregirla antes de seguir jugando. La foto se lee en tu dispositivo y no se guarda.
+
 SIN CONEXIÓN Y PRIVADO
 • Funciona completamente sin conexión, nada sale de tu dispositivo
 • Sin cuenta, sin anuncios, sin rastreo, sin compras dentro de la app

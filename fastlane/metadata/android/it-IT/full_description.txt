@@ -26,6 +26,8 @@ MIGLIORARE IL PROPRIO GIOCO
 SCACCHIERE ELETTRONICHE
 Hai una DGT Pegasus o una Chessnut Air, Air+, Pro o Go? Collegala via Bluetooth e gioca sulla scacchiera vera invece che sullo schermo. Le tue mosse vengono rilevate dai pezzi, le risposte dell'avversario si accendono sui LED della scacchiera, e l'app riconosce da sola il tipo di scacchiera. Lo schermo resta utilizzabile nel frattempo, per suggerimenti, valutazione ed elenco delle mosse.
 
+Sulla Pegasus, una posizione già disposta sulla scacchiera si può acquisire con una foto: l'app legge i pezzi dalla foto e ti mostra la posizione da controllare e correggere prima di continuare a giocare. La foto viene letta sul tuo dispositivo e non viene salvata.
+
 OFFLINE E PRIVATA
 • Funziona completamente offline, nulla lascia il tuo dispositivo
 • Nessun account, nessuna pubblicità, nessun tracciamento, nessun acquisto in-app

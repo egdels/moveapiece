@@ -26,6 +26,8 @@ PROGRESSER
 ÉCHIQUIERS ÉLECTRONIQUES
 Vous possédez un DGT Pegasus ou un Chessnut Air, Air+, Pro ou Go ? Connectez-le en Bluetooth et jouez sur le vrai échiquier plutôt qu'à l'écran. Vos coups sont détectés à partir des pièces, les réponses de l'adversaire s'allument sur les LED de l'échiquier, et l'application reconnaît le type d'échiquier d'elle-même. L'écran reste utilisable en parallèle, pour les indices, l'évaluation et la liste des coups.
 
+Sur le Pegasus, une position déjà installée sur l'échiquier peut être reprise par une photo : l'application lit les pièces sur la photo et vous montre la position à vérifier et à corriger avant de continuer à jouer. La photo est lue sur votre appareil et n'est pas conservée.
+
 HORS LIGNE ET PRIVÉ
 • Fonctionne entièrement hors ligne, rien ne quitte votre appareil
 • Pas de compte, pas de publicité, pas de pistage, pas d'achats intégrés
