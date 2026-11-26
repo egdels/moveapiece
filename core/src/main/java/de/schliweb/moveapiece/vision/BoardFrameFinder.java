@@ -478,13 +478,13 @@ public final class BoardFrameFinder {
     }
 
     private static double[] intersect(Line l1, Line l2) {
-        double det = l1.dx * -l2.dy - (-l2.dx) * l1.dy;
+        double det = l2.dx * l1.dy - l1.dx * l2.dy;
         if (Math.abs(det) < 1e-9) {
             return null;
         }
         double qx = l2.x - l1.x;
         double qy = l2.y - l1.y;
-        double t = (qx * -l2.dy - (-l2.dx) * qy) / det;
+        double t = (l2.dx * qy - qx * l2.dy) / det;
         return new double[] {l1.x + t * l1.dx, l1.y + t * l1.dy};
     }
 

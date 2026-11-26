@@ -226,9 +226,9 @@ final class Regions {
     }
 
     /**
-     * The hull simplified to four corners, or {@code null} if it does not come down to four. The
-     * tolerance is raised step by step from 1 % to 8 % of the perimeter; the first one that leaves
-     * four corners is taken.
+     * The hull simplified to four corners, or no result (a null reference) if it does not come down
+     * to four. The tolerance is raised step by step from 1 % to 8 % of the perimeter; the first one
+     * that leaves four corners is taken.
      */
     static double[][] quadOf(double[][] hull) {
         if (hull.length < 4) {
