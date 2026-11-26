@@ -10,6 +10,8 @@ candidates (`-rc`) and test tags are not listed.
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-11-26
+
 ### Added
 
 - Android, DGT Pegasus: a position set up on the board can be taken over by
@@ -508,6 +510,7 @@ Linux .deb).
 - Windows: move sounds were silent because of a malformed ID3 tag in the
   mp3 files.
 
+[1.11.0]: https://github.com/egdels/moveapiece/compare/v1.10.0...v1.11.0
 [1.10.0]: https://github.com/egdels/moveapiece/compare/v1.9.0...v1.10.0
 [1.9.0]: https://github.com/egdels/moveapiece/compare/v1.8.1-rc1...v1.9.0
 [1.8.1]: https://github.com/egdels/moveapiece/compare/v1.8.0...v1.8.1-rc1

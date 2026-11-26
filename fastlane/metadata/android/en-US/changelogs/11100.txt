@@ -1,0 +1,2 @@
+* DGT Pegasus: take over a position set up on the board by photographing it. The app reads the pieces from the photo and shows the position for checking and correcting; the photo is read on the device and not kept.
+* Practising mistakes: a mistake completed without a clean solution now says "Mistake practised".
